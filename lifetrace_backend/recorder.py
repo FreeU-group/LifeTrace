@@ -381,27 +381,51 @@ class ScreenRecorder:
         if not self.deduplicate:
             return False
             
+        is_duplicate = False
+        
         if screen_id not in self.last_hashes:
+            # 第一次截图，不是重复
+            self.last_hashes[screen_id] = image_hash
+            # 初始化状态跟踪
+            if not hasattr(self, '_last_duplicate_status'):
+                self._last_duplicate_status = {}
+            self._last_duplicate_status[screen_id] = False
             return False
-            
-        last_hash = self.last_hashes[screen_id]
+        
         try:
             # 计算汉明距离
             current = imagehash.hex_to_hash(image_hash)
-            previous = imagehash.hex_to_hash(last_hash)
+            previous = imagehash.hex_to_hash(self.last_hashes[screen_id])
             distance = current - previous
             
             is_duplicate = distance <= self.hash_threshold
             
-            # 简单的去重通知
-            if is_duplicate:
-                logger.info(f"屏幕 {screen_id}: 跳过重复截图")
-                print(f"[去重] 屏幕 {screen_id}: 跳过重复截图")
+            # 检查状态是否发生变化
+            if not hasattr(self, '_last_duplicate_status'):
+                self._last_duplicate_status = {}
+                
+            last_status = self._last_duplicate_status.get(screen_id, False)
             
-            return is_duplicate
+            # 只有状态发生变化时才打印日志
+            if is_duplicate and not last_status:
+                logger.info(f"屏幕 {screen_id}: 开始重复截图")
+                print(f"[去重] 屏幕 {screen_id}: 开始重复截图")
+            elif not is_duplicate and last_status:
+                logger.info(f"屏幕 {screen_id}: 重复结束，恢复截图")
+                print(f"[去重] 屏幕 {screen_id}: 重复结束，恢复截图")
+            elif is_duplicate and last_status:
+                # 连续重复，可以选择性地每N次打印一次或者完全不打印
+                pass
+                
+            # 更新状态记录
+            self._last_duplicate_status[screen_id] = is_duplicate
+            self.last_hashes[screen_id] = image_hash
+                
         except Exception as e:
             logger.error(f"比较图像哈希失败: {e}")
-            return False
+            is_duplicate = False
+        
+        return is_duplicate
     
     def _capture_screen(self, screen_id: int, app_name: str = None, window_title: str = None) -> Optional[str]:
         """截取指定屏幕"""

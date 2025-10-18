@@ -724,7 +724,7 @@ class DatabaseManager:
             with self.get_session() as session:
                 total_screenshots = session.query(Screenshot).count()
                 processed_screenshots = session.query(Screenshot).filter_by(is_processed=True).count()
-                pending_tasks = session.query(ProcessingQueue).filter_by(status='pending').count()
+                pending_tasks = session.query(Screenshot).filter_by(is_processed=False).count()
                 
                 # 今日统计
                 today = datetime.now().date()
