@@ -19,9 +19,9 @@ export interface ResultItem {
 // 根据应用名称生成图标
 function getIconForApp(appName?: string): string {
   if (!appName) return '📷';
-  
+
   const lowerApp = appName.toLowerCase();
-  
+
   // 常见应用图标映射
   const iconMap: { [key: string]: string } = {
     'chrome': '🌐',
@@ -64,21 +64,21 @@ function formatDateTime(dateString: string): string {
   if (!dateString) {
     return '未知时间';
   }
-  
+
   try {
     // 尝试解析日期
     const date = new Date(dateString);
-    
+
     // 检查日期是否有效
     if (isNaN(date.getTime())) {
       // 如果是无效日期，尝试其他格式
       const isoDate = dateString.includes('T') ? dateString : dateString + 'T00:00:00.000Z';
       const retryDate = new Date(isoDate);
-      
+
       if (isNaN(retryDate.getTime())) {
         return dateString; // 返回原始字符串
       }
-      
+
       return retryDate.toLocaleString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
@@ -87,7 +87,7 @@ function formatDateTime(dateString: string): string {
         minute: '2-digit',
       });
     }
-    
+
     return date.toLocaleString('zh-CN', {
       year: 'numeric',
       month: '2-digit',
@@ -105,7 +105,7 @@ function formatDateTime(dateString: string): string {
 export function transformScreenshotToResultItem(screenshot: ScreenshotData): ResultItem {
   const icon = getIconForApp(screenshot.app_name);
   const formattedTime = formatDateTime(screenshot.created_at);
-  
+
   // 生成标题
   let title = screenshot.window_title || screenshot.app_name || '未知应用';
   if (title.length > 50) {
@@ -162,7 +162,7 @@ export function transformSemanticSearchResult(searchResult: SemanticSearchResult
   // 优先使用关联的截图数据，如果没有则使用元数据
   const screenshot = searchResult.screenshot;
   const metadata = searchResult.metadata;
-  
+
   if (screenshot) {
     // 如果有截图数据，使用截图转换函数
     const resultItem = transformScreenshotToResultItem(screenshot);
@@ -173,7 +173,7 @@ export function transformSemanticSearchResult(searchResult: SemanticSearchResult
     // 如果没有截图数据，从元数据构建结果项
     const icon = getIconForApp(metadata.app_name);
     const formattedTime = metadata.created_at ? formatDateTime(metadata.created_at) : '未知时间';
-    
+
     let title = metadata.window_title || metadata.app_name || '搜索结果';
     if (title.length > 50) {
       title = title.substring(0, 50) + '...';

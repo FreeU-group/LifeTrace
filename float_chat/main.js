@@ -11,11 +11,11 @@ function createWindow() {
   // 获取屏幕尺寸
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-  
+
   // 计算默认窗口尺寸（屏幕宽度的四分之一，更紧凑）
   const defaultWidth = Math.floor(screenWidth / 4); // 改为1/4，约320px
   const defaultHeight = Math.floor(screenHeight * 0.75); // 高度调整为75%
-  
+
   // 获取保存的窗口状态，如果没有则使用默认值
   const windowState = store.get('windowState', {
     width: defaultWidth,
@@ -53,7 +53,7 @@ function createWindow() {
   // 窗口准备好后显示
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    
+
     // 开发模式下打开开发者工具
     if (process.argv.includes('--dev')) {
       mainWindow.webContents.openDevTools();
@@ -80,7 +80,7 @@ function createWindow() {
   // 阻止导航到外部页面
   mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
     const parsedUrl = new URL(navigationUrl);
-    
+
     if (parsedUrl.origin !== 'file://') {
       event.preventDefault();
       shell.openExternal(navigationUrl);

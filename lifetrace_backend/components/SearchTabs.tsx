@@ -17,7 +17,7 @@ const tabs = [
 
 export function SearchTabs({ activeTab, onTabChange, focused, selectedIndex, theme }: SearchTabsProps) {
   const isDark = theme === 'dark';
-  
+
   return (
     <div className="flex items-center gap-3 px-6 py-4">
       {tabs.map((tab, index) => (
@@ -43,7 +43,7 @@ export function SearchTabs({ activeTab, onTabChange, focused, selectedIndex, the
           {tab.label}
         </Button>
       ))}
-      
+
       <div className="flex-1" />
     </div>
   );

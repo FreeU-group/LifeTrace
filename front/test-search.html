@@ -48,28 +48,28 @@
 </head>
 <body>
     <h1>LifeTrace 搜索功能测试</h1>
-    
+
     <div class="search-container">
         <input type="text" id="searchInput" placeholder="输入搜索关键词" value="test">
         <button onclick="testSearch()">搜索</button>
         <button onclick="testHealth()">测试健康检查</button>
     </div>
-    
+
     <div id="results" class="results">
         <p>点击搜索按钮开始测试...</p>
     </div>
 
     <script>
         const API_BASE_URL = 'http://localhost:8840';
-        
+
         async function testHealth() {
             const resultsDiv = document.getElementById('results');
             resultsDiv.innerHTML = '<p>正在测试健康检查...</p>';
-            
+
             try {
                 const response = await fetch(`${API_BASE_URL}/health`);
                 const data = await response.json();
-                
+
                 resultsDiv.innerHTML = `
                     <div class="success">
                         <h3>健康检查成功</h3>
@@ -91,19 +91,19 @@
                 `;
             }
         }
-        
+
         async function testSearch() {
             const searchInput = document.getElementById('searchInput');
             const resultsDiv = document.getElementById('results');
             const query = searchInput.value.trim();
-            
+
             if (!query) {
                 resultsDiv.innerHTML = '<div class="error">请输入搜索关键词</div>';
                 return;
             }
-            
+
             resultsDiv.innerHTML = '<p>正在搜索...</p>';
-            
+
             try {
                 const response = await fetch(`${API_BASE_URL}/api/semantic-search`, {
                     method: 'POST',
@@ -116,13 +116,13 @@
                         use_rerank: true
                     })
                 });
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 resultsDiv.innerHTML = `
                     <div class="success">
                         <h3>搜索成功</h3>
@@ -146,7 +146,7 @@
                 `;
             }
         }
-        
+
         // 页面加载时自动测试健康检查
         window.onload = function() {
             testHealth();

@@ -4,9 +4,9 @@
     <title>LifeTrace 日志查看器</title>
     <meta charset="utf-8">
     <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            margin: 20px; 
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
             background-color: #f5f5f5;
         }
         .header {
@@ -16,47 +16,47 @@
             border-radius: 8px;
             margin-bottom: 20px;
         }
-        .log-container { 
-            display: flex; 
-            gap: 20px; 
+        .log-container {
+            display: flex;
+            gap: 20px;
             height: 70vh;
         }
-        .log-list { 
-            width: 300px; 
+        .log-list {
+            width: 300px;
             background: white;
             border-radius: 8px;
             padding: 15px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .log-content { 
-            flex: 1; 
+        .log-content {
+            flex: 1;
             background: white;
             border-radius: 8px;
             padding: 15px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .log-file { 
-            padding: 10px; 
-            margin: 5px 0; 
-            background: #f8f9fa; 
-            cursor: pointer; 
+        .log-file {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            cursor: pointer;
             border-radius: 4px;
             border: 1px solid #e9ecef;
         }
-        .log-file:hover { 
-            background: #e9ecef; 
+        .log-file:hover {
+            background: #e9ecef;
         }
-        .log-file.active { 
-            background: #007bff; 
-            color: white; 
+        .log-file.active {
+            background: #007bff;
+            color: white;
         }
-        #logContent { 
-            background: #1e1e1e; 
-            color: #d4d4d4; 
-            padding: 15px; 
-            height: calc(100% - 80px); 
-            overflow-y: auto; 
-            font-family: 'Consolas', 'Monaco', monospace; 
+        #logContent {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            height: calc(100% - 80px);
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
             font-size: 13px;
             line-height: 1.4;
             border-radius: 4px;
@@ -127,13 +127,13 @@
         <h1>LifeTrace 日志查看器</h1>
         <p>实时查看系统日志文件</p>
     </div>
-    
+
     <div class="log-container">
         <div class="log-list">
             <h3>日志文件</h3>
             <div id="fileList" class="loading">加载中...</div>
         </div>
-        
+
         <div class="log-content">
             <div class="controls">
                 <button class="btn btn-primary" onclick="refreshContent()">刷新</button>
@@ -151,16 +151,16 @@
     <script>
         let currentFile = null;
         let autoRefreshInterval = null;
-        
+
         // 加载文件列表
         async function loadFileList() {
             try {
                 const response = await fetch('/api/logs/files');
                 const files = await response.json();
-                
+
                 const fileList = document.getElementById('fileList');
                 fileList.innerHTML = '';
-                
+
                 if (files && files.length > 0) {
                     // 按类别分组显示
                     const categories = {};
@@ -170,14 +170,14 @@
                         }
                         categories[file.category].push(file);
                     });
-                    
+
                     Object.keys(categories).forEach(category => {
                         // 添加类别标题
                         const categoryDiv = document.createElement('div');
                         categoryDiv.className = 'category-header';
                         categoryDiv.innerHTML = `<h4>${category}</h4>`;
                         fileList.appendChild(categoryDiv);
-                        
+
                         // 添加该类别下的文件
                         categories[category].forEach(file => {
                             const fileDiv = document.createElement('div');
@@ -196,48 +196,48 @@
                     fileList.innerHTML = '<div class="error">没有找到日志文件</div>';
                 }
             } catch (error) {
-                document.getElementById('fileList').innerHTML = 
+                document.getElementById('fileList').innerHTML =
                     `<div class="error">加载文件列表失败: ${error.message}</div>`;
             }
         }
-        
+
         // 选择文件
         function selectFile(filePath, element) {
             // 移除之前的选中状态
             document.querySelectorAll('.log-file').forEach(el => el.classList.remove('active'));
             // 添加当前选中状态
             element.classList.add('active');
-            
+
             currentFile = filePath;
             loadLogContent();
         }
-        
+
         // 加载日志内容
         async function loadLogContent() {
             if (!currentFile) return;
-            
+
             try {
                 const response = await fetch(`/api/logs/content?file=${encodeURIComponent(currentFile)}`);
                 const content = await response.text();
-                
+
                 const logContent = document.getElementById('logContent');
                 if (content) {
                     logContent.textContent = content;
                     // 滚动到底部
                     logContent.scrollTop = logContent.scrollHeight;
-                    
+
                     // 更新最后更新时间
-                    document.getElementById('lastUpdate').textContent = 
+                    document.getElementById('lastUpdate').textContent =
                         `最后更新: ${new Date().toLocaleTimeString()}`;
                 } else {
                     logContent.textContent = '文件为空或无法读取';
                 }
             } catch (error) {
-                document.getElementById('logContent').textContent = 
+                document.getElementById('logContent').textContent =
                     `加载日志内容失败: ${error.message}`;
             }
         }
-        
+
         // 刷新内容
         function refreshContent() {
             if (currentFile) {
@@ -246,16 +246,16 @@
                 loadFileList();
             }
         }
-        
+
         // 清空内容
         function clearContent() {
             document.getElementById('logContent').textContent = '';
         }
-        
+
         // 切换自动刷新
         function toggleAutoRefresh() {
             const checkbox = document.getElementById('autoRefresh');
-            
+
             if (checkbox.checked) {
                 autoRefreshInterval = setInterval(() => {
                     if (currentFile) {
@@ -269,7 +269,7 @@
                 }
             }
         }
-        
+
         // 格式化文件大小
         function formatFileSize(bytes) {
             if (bytes === 0) return '0 B';
@@ -278,20 +278,20 @@
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
-        
+
         // 格式化日期
         function formatDate(dateString) {
             const date = new Date(dateString);
             return date.toLocaleString('zh-CN');
         }
-        
+
         // 页面加载时初始化
         window.onload = function() {
             loadFileList();
             // 默认启用自动刷新
             toggleAutoRefresh();
         };
-        
+
         // 页面卸载时清理定时器
         window.onbeforeunload = function() {
             if (autoRefreshInterval) {

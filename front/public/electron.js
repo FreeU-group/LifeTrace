@@ -26,16 +26,16 @@ function createWindow() {
   });
 
   // Load the app
-  const startUrl = isDev 
-    ? 'http://localhost:8844' 
+  const startUrl = isDev
+    ? 'http://localhost:8844'
     : `file://${path.join(__dirname, '../dist/index.html')}`;
-  
+
   mainWindow.loadURL(startUrl);
 
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    
+
     // Open DevTools in development
     if (isDev) {
       mainWindow.webContents.openDevTools();
@@ -71,13 +71,13 @@ function createWindow() {
 function createTray() {
   // 创建托盘图标 - 使用 nativeImage 创建可见图标
   const { nativeImage } = require('electron');
-  
+
   try {
     // 创建一个 16x16 的蓝色方块图标 (RGBA格式)
     const width = 16;
     const height = 16;
     const buffer = Buffer.alloc(width * height * 4); // RGBA = 4 bytes per pixel
-    
+
     // 填充蓝色像素 (R=37, G=99, B=235, A=255)
     for (let i = 0; i < buffer.length; i += 4) {
       buffer[i] = 37;     // Red
@@ -85,9 +85,9 @@ function createTray() {
       buffer[i + 2] = 235; // Blue
       buffer[i + 3] = 255; // Alpha
     }
-    
+
     const image = nativeImage.createFromBuffer(buffer, { width, height });
-    
+
     if (!image.isEmpty()) {
       console.log('成功创建托盘图标');
       tray = new Tray(image);
@@ -101,7 +101,7 @@ function createTray() {
     const emptyImage = nativeImage.createEmpty();
     tray = new Tray(emptyImage);
   }
-  
+
   // 设置托盘菜单
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -118,10 +118,10 @@ function createTray() {
       }
     }
   ]);
-  
+
   tray.setToolTip('LifeTrace');
   tray.setContextMenu(contextMenu);
-  
+
   // 双击托盘图标显示窗口
   tray.on('double-click', () => {
     mainWindow.show();

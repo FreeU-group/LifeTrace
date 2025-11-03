@@ -12,20 +12,20 @@
         async function testAPI() {
             const statusDiv = document.getElementById('status');
             const resultDiv = document.getElementById('result');
-            
+
             try {
                 statusDiv.textContent = 'Testing API connection...';
-                
+
                 // 测试健康检查
                 const healthResponse = await fetch('http://localhost:8840/health');
                 const healthData = await healthResponse.json();
                 console.log('Health check:', healthData);
-                
+
                 // 测试获取截图
                 const screenshotsResponse = await fetch('http://localhost:8840/api/screenshots?limit=3');
                 const screenshotsData = await screenshotsResponse.json();
                 console.log('Screenshots:', screenshotsData);
-                
+
                 statusDiv.textContent = 'API connection successful!';
                 resultDiv.innerHTML = `
                     <h3>Health Status:</h3>
@@ -33,14 +33,14 @@
                     <h3>Screenshots (${screenshotsData.length} items):</h3>
                     <pre>${JSON.stringify(screenshotsData, null, 2)}</pre>
                 `;
-                
+
             } catch (error) {
                 console.error('API test failed:', error);
                 statusDiv.textContent = 'API connection failed!';
                 resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
             }
         }
-        
+
         // 页面加载后测试API
         window.addEventListener('load', testAPI);
     </script>

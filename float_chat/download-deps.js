@@ -13,16 +13,16 @@ function downloadFile(url, filename) {
     return new Promise((resolve, reject) => {
         const filePath = path.join(libDir, filename);
         const file = fs.createWriteStream(filePath);
-        
+
         https.get(url, (response) => {
             response.pipe(file);
-            
+
             file.on('finish', () => {
                 file.close();
                 console.log(`✓ Downloaded ${filename}`);
                 resolve();
             });
-            
+
             file.on('error', (err) => {
                 fs.unlink(filePath, () => {}); // 删除部分下载的文件
                 reject(err);
@@ -48,7 +48,7 @@ const downloads = [
 // 执行下载
 async function downloadDependencies() {
     console.log('Downloading dependencies...');
-    
+
     try {
         for (const download of downloads) {
             await downloadFile(download.url, download.filename);

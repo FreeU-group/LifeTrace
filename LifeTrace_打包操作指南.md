@@ -233,7 +233,7 @@ optional arguments:
    ```bash
    # 创建models目录
    mkdir models
-   
+
    # 复制ONNX模型文件
    python -c "
    import rapidocr_onnxruntime

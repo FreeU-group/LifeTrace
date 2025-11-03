@@ -60,14 +60,14 @@ if self._is_app_blacklisted(app_name, window_title):
 if self._is_app_blacklisted(app_name, window_title):
     logger.debug(f"当前应用 '{app_name}' 或窗口 '{window_title}' 在黑名单中，跳过所有屏幕截图")
     print(f"[黑名单] 跳过截图 - 应用: {app_name}, 窗口: {window_title}")
-    
+
     # ✅ 新增：关闭上一个未结束的事件（如果存在）
     try:
         db_manager.close_active_event()
         logger.debug("已关闭上一个活跃事件")
     except Exception as e:
         logger.error(f"关闭活跃事件失败: {e}")
-    
+
     return captured_files
 ```
 
@@ -86,7 +86,7 @@ def close_active_event(self, end_time: Optional[datetime] = None) -> bool:
                 last_event.end_time = end_time or datetime.now()
                 closed_event_id = last_event.id
                 session.flush()
-        
+
         # ✅ 新增：在session关闭后，异步生成已关闭事件的摘要
         if closed_event_id:
             try:
@@ -94,7 +94,7 @@ def close_active_event(self, end_time: Optional[datetime] = None) -> bool:
                 generate_event_summary_async(closed_event_id)
             except Exception as e:
                 logging.error(f"触发事件摘要生成失败: {e}")
-        
+
         return closed_event_id is not None
     except SQLAlchemyError as e:
         logging.error(f"结束事件失败: {e}")
@@ -127,10 +127,10 @@ def close_active_event(self, end_time: Optional[datetime] = None) -> bool:
 2. 按照复现步骤操作
 3. 检查数据库 `events` 表：
    ```sql
-   SELECT id, app_name, start_time, end_time, 
+   SELECT id, app_name, start_time, end_time,
           (julianday(end_time) - julianday(start_time)) * 24 * 60 as duration_minutes
-   FROM events 
-   ORDER BY start_time DESC 
+   FROM events
+   ORDER BY start_time DESC
    LIMIT 5;
    ```
 4. 验证白名单应用的事件 `end_time` 是否正确设置
@@ -142,18 +142,18 @@ def test_blacklist_closes_previous_event():
     """测试黑名单切换时是否正确关闭上一个事件"""
     # 1. 模拟白名单应用（Chrome）
     recorder.capture_all_screens()  # app_name="chrome.exe"
-    
+
     # 2. 获取当前活跃事件
     event_before = db_manager.get_last_open_event()
     assert event_before.end_time is None
-    
+
     # 3. 切换到黑名单应用（微信）
     recorder.capture_all_screens()  # app_name="WeChat.exe"
-    
+
     # 4. 验证上一个事件已关闭
     event_after = db_manager.get_event_by_id(event_before.id)
     assert event_after.end_time is not None
-    
+
     # 5. 验证没有为黑名单应用创建新事件
     latest_event = db_manager.get_last_open_event()
     assert latest_event is None  # 没有新的未结束事件
@@ -171,4 +171,3 @@ def test_blacklist_closes_previous_event():
 ## 修复人员
 
 AI Assistant (Claude Sonnet 4.5)
-

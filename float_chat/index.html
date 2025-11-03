@@ -11,7 +11,7 @@
 </head>
 <body>
 
-    
+
     <!-- Main Chat Area -->
     <main class="chat-container">
         <div class="chat-messages" id="chatMessages">
@@ -35,13 +35,13 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Messages List -->
             <div class="messages-list" id="messagesList" style="display: none;">
                 <!-- 消息将在这里动态添加 -->
             </div>
         </div>
-        
+
         <div class="thinking-indicator" id="thinkingIndicator" style="display: none;">
             <div class="thinking-avatar">
                 <i data-lucide="bot"></i>
@@ -55,7 +55,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- 保持原有的loading指示器以兼容性 -->
         <div class="loading" id="loadingIndicator">
             <div class="message-avatar" style="background: var(--accent); color: var(--accent-foreground);">
@@ -63,16 +63,16 @@
             </div>
             <span>正在思考<span class="loading-dots"></span></span>
         </div>
-        
+
         <!-- Input Area -->
         <div class="chat-input-container">
             <div class="input-wrapper">
                 <form class="chat-input-form" id="chatForm">
                     <div class="input-container">
-                        <textarea 
-                            class="chat-input" 
-                            id="chatInput" 
-                            placeholder="询问 LifeTrace 助手..." 
+                        <textarea
+                            class="chat-input"
+                            id="chatInput"
+                            placeholder="询问 LifeTrace 助手..."
                             rows="1"
                             required
                         ></textarea>
@@ -103,19 +103,19 @@
                     </label>
                     <p class="setting-description">保存对话历史到本地存储</p>
                 </div>
-                
+
                 <div class="setting-group">
                     <label for="historyLimit">历史记录条数限制:</label>
                     <input type="number" id="historyLimit" value="6" min="1" max="20">
                     <p class="setting-description">每次对话携带的历史记录条数</p>
                 </div>
-                
+
                 <div class="setting-group">
                     <label for="serverUrl">服务器地址:</label>
                     <input type="text" id="serverUrl" value="http://127.0.0.1:8840" placeholder="http://127.0.0.1:8840">
                     <p class="setting-description">LifeTrace 后端服务器地址</p>
                 </div>
-                
+
                 <div class="setting-group">
                     <button class="btn btn-outline" onclick="clearAllHistory()">清除所有历史记录</button>
                     <p class="setting-description">删除所有本地保存的对话记录</p>

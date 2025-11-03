@@ -21,7 +21,7 @@ const TABS = [
 
 const TAB_TO_CATEGORY = {
   apps: "应用",
-  docs: "文档", 
+  docs: "文档",
   timemachine: "时光机"
 } as const;
 
@@ -219,18 +219,18 @@ export default function App() {
   const [selectedActionIndex, setSelectedActionIndex] = useState(0);
   const [theme, setTheme] = useState<Theme>('dark');
   const [showSettings, setShowSettings] = useState(false);
-  
+
   // API数据状态
   const [timeMachineData, setTimeMachineData] = useState<ResultItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  
+
   // 搜索状态
   const [searchResults, setSearchResults] = useState<ResultItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [lastSearchQuery, setLastSearchQuery] = useState("");
-  
+
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // 工具函数
@@ -242,17 +242,17 @@ export default function App() {
     textTertiary: theme === 'dark' ? 'text-gray-500' : 'text-gray-500'
   });
 
-  const getKbdClasses = () => 
+  const getKbdClasses = () =>
     `inline-flex items-center justify-center h-5 px-2 text-xs font-medium rounded border ${
-      theme === 'dark' 
-        ? 'bg-slate-700 text-gray-300 border-slate-600' 
+      theme === 'dark'
+        ? 'bg-slate-700 text-gray-300 border-slate-600'
         : 'bg-gray-100 text-gray-700 border-gray-300'
     }`;
 
   const getArrowKbdClasses = () =>
     `inline-flex items-center justify-center min-w-6 h-5 px-1.5 text-xs font-medium rounded border ${
-      theme === 'dark' 
-        ? 'bg-slate-700 text-gray-300 border-slate-600' 
+      theme === 'dark'
+        ? 'bg-slate-700 text-gray-300 border-slate-600'
         : 'bg-gray-100 text-gray-700 border-gray-300'
     }`;
 
@@ -261,14 +261,14 @@ export default function App() {
     try {
       setIsLoading(true);
       setApiError(null);
-      
+
       // 改为拉取事件列表（事件粒度）
       const events = await apiClient.listEvents({ limit: 50 });
       const transformed = events.map(e => ({
         ...transformEventToResultItem(e),
       }));
       setTimeMachineData(transformed);
-      
+
     } catch (error) {
       console.error('Failed to load time machine data:', error);
       setApiError(error instanceof Error ? error.message : '加载数据失败');
@@ -289,9 +289,9 @@ export default function App() {
     try {
       setIsSearching(true);
       setApiError(null);
-      
+
       console.log('开始语义搜索:', query);
-      
+
       try {
         // 优先使用事件级语义搜索
         const eventResults = await apiClient.semanticSearchEvents(query.trim(), 20);
@@ -310,7 +310,7 @@ export default function App() {
         setLastSearchQuery(query);
         console.log('简单搜索成功，找到', eventResults.length, '个结果');
       }
-      
+
     } catch (error) {
       console.error('搜索失败:', error);
       setApiError(error instanceof Error ? error.message : '搜索失败');
@@ -323,7 +323,7 @@ export default function App() {
   // 实时搜索函数（移除防抖，立即搜索）
   const handleSearchQueryChange = (query: string) => {
     setSearchQuery(query);
-    
+
     // 如果查询为空，立即清除搜索结果
     if (!query.trim()) {
       setSearchResults([]);
@@ -331,10 +331,10 @@ export default function App() {
       setLastSearchQuery("");
       return;
     }
-    
+
     // 设置搜索状态为true，即使还没开始搜索
     setHasSearched(true);
-    
+
     // 立即执行搜索（实时搜索）
     performSearch(query);
   };
@@ -342,10 +342,10 @@ export default function App() {
   // 组合所有数据源
   const getAllResults = () => {
     // 应用和文档类别继续使用MOCK数据
-    const mockAppsAndDocs = MOCK_RESULTS.filter(item => 
+    const mockAppsAndDocs = MOCK_RESULTS.filter(item =>
       item.category === '应用' || item.category === '文档'
     );
-    
+
     // 时光机使用API数据
     return [...mockAppsAndDocs, ...timeMachineData];
   };
@@ -355,14 +355,14 @@ export default function App() {
     if (searchQuery.trim()) {
       return searchResults;
     }
-    
+
     // 否则按标签筛选
     if (activeTab === 'all') {
       return getAllResults();
     } else if (activeTab === 'timemachine') {
       return timeMachineData;
     } else {
-      return MOCK_RESULTS.filter(result => 
+      return MOCK_RESULTS.filter(result =>
         result.category === TAB_TO_CATEGORY[activeTab as keyof typeof TAB_TO_CATEGORY]
       );
     }
@@ -449,12 +449,12 @@ export default function App() {
 
       // 只对导航键阻止默认行为，允许文本输入键正常工作
       const isNavigationKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Escape', 'Tab'].includes(e.key);
-      
+
       // 如果焦点在搜索框且不是导航键，则允许默认行为（文本输入、删除等）
       if (focusArea === 'search' && !isNavigationKey) {
         return;
       }
-      
+
       // 对导航键阻止默认行为
       if (isNavigationKey) {
         e.preventDefault();
@@ -537,13 +537,13 @@ export default function App() {
 
         case 'Tab':
           const currentIndex = FOCUS_AREAS.indexOf(focusArea);
-          const nextIndex = e.shiftKey 
+          const nextIndex = e.shiftKey
             ? (currentIndex - 1 + FOCUS_AREAS.length) % FOCUS_AREAS.length
             : (currentIndex + 1) % FOCUS_AREAS.length;
           const nextArea = FOCUS_AREAS[nextIndex];
-          
+
           setFocusArea(nextArea);
-          
+
           if (nextArea === 'search') {
             searchInputRef.current?.focus();
           } else if (nextArea === 'details') {
@@ -587,7 +587,7 @@ export default function App() {
 
   if (showSettings) {
     return (
-      <Settings 
+      <Settings
         theme={theme}
         onThemeToggle={handleThemeToggle}
         onClose={() => setShowSettings(false)}
@@ -596,13 +596,13 @@ export default function App() {
   }
 
   return (
-    <div 
+    <div
       className={`h-screen flex flex-col transition-colors duration-300 ${
         theme === 'dark' ? 'text-white' : 'text-gray-900'
       }`}
       style={{ backgroundColor: colors.background }}
     >
-      <SearchHeader 
+      <SearchHeader
         searchQuery={searchQuery}
         onSearchQueryChange={handleSearchQueryChange}
         focused={focusArea === 'search'}
@@ -612,17 +612,17 @@ export default function App() {
         onCloseClick={handleCloseClick}
         ref={searchInputRef}
       />
-      
-      <SearchTabs 
+
+      <SearchTabs
         activeTab={activeTab}
         onTabChange={handleTabChange}
         focused={focusArea === 'tabs'}
         selectedIndex={selectedTabIndex}
         theme={theme}
       />
-      
+
       <div className="flex-1 flex overflow-hidden">
-        <SearchResults 
+        <SearchResults
           results={filteredResults}
           selectedId={selectedResult}
           selectedIndex={selectedResultIndex}
@@ -634,8 +634,8 @@ export default function App() {
           hasSearched={hasSearched}
           searchQuery={searchQuery}
         />
-        
-        <DetailPanel 
+
+        <DetailPanel
           selectedResult={selectedResult}
           selectedResultData={selectedResult ? filteredResults.find(r => r.id === selectedResult) : null}
           focused={focusArea === 'details'}
@@ -644,13 +644,13 @@ export default function App() {
           theme={theme}
         />
       </div>
-      
+
       {/* 键盘提示 */}
       {!showSettings && (
         <div className="px-6 py-3">
-          <div 
+          <div
             className="rounded-xl px-4 py-3 backdrop-blur-sm border"
-            style={{ 
+            style={{
               backgroundColor: theme === 'dark' ? 'rgba(60, 60, 60, 0.8)' : 'rgba(255, 255, 255, 0.9)',
               borderColor: theme === 'dark' ? 'rgba(100, 100, 100, 0.2)' : 'rgba(200, 200, 200, 0.3)'
             }}
@@ -666,7 +666,7 @@ export default function App() {
                     导航结果
                   </span>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-0.5">
                     <kbd className={getArrowKbdClasses()}>←</kbd>
@@ -677,7 +677,7 @@ export default function App() {
                   </span>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
                   <kbd className={getKbdClasses()}>Enter</kbd>
@@ -685,14 +685,14 @@ export default function App() {
                     打开
                   </span>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   <kbd className={getKbdClasses()}>Esc</kbd>
                   <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                     返回搜索
                   </span>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   <kbd className={getKbdClasses()}>Tab</kbd>
                   <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>

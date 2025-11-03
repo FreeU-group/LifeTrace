@@ -19,7 +19,7 @@
       --accent-foreground: oklch(0.985 0 0);
       --destructive: oklch(0.637 0.257 25);
       --radius: 0.625rem;
-      
+
       /* 渐变色彩系统 */
       --gradient-appearance-start: #667eea;
       --gradient-appearance-end: #764ba2;
@@ -35,13 +35,13 @@
       --gradient-notification-end: #5aa6c0;
       --gradient-privacy-start: #8a6691;
       --gradient-privacy-end: #7a6685;
-      
+
       /* 阴影层级 */
       --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.04);
       --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
       --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
       --shadow-xl: 0 12px 32px rgba(0, 0, 0, 0.16);
-      
+
       /* 动画时长 */
       --duration-fast: 0.15s;
       --duration-normal: 0.3s;
@@ -58,7 +58,7 @@
       --accent: oklch(0.646 0.222 264.376);
       --accent-foreground: oklch(0.985 0 0);
       --destructive: oklch(0.637 0.257 25);
-      
+
       /* 深色模式阴影加深 */
       --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
       --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
@@ -67,7 +67,7 @@
     }
     *{box-sizing: border-box}
     body{
-      margin:0; min-height:100vh; 
+      margin:0; min-height:100vh;
       background: linear-gradient(135deg, #fafafa 0%, #f5f7fa 50%, #e8eef5 100%);
       color:var(--foreground);
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, Helvetica Neue, Arial, Apple Color Emoji, Segoe UI Emoji;
@@ -77,14 +77,14 @@
     }
     /* Header */
     .header{
-      position:sticky; top:0; z-index:20; 
+      position:sticky; top:0; z-index:20;
       border-bottom:2px solid transparent;
       background:color-mix(in oklch, var(--background) 95%, transparent);
       backdrop-filter: blur(10px);
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-      background-image: linear-gradient(to right, 
-        var(--gradient-appearance-start), 
-        var(--gradient-ai-start), 
+      background-image: linear-gradient(to right,
+        var(--gradient-appearance-start),
+        var(--gradient-ai-start),
         var(--gradient-recording-start));
       background-size: 100% 2px;
       background-position: 0 100%;
@@ -92,9 +92,9 @@
     }
     .header-inner{height:4rem; display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:0 1rem; max-width:64rem; margin:0 auto}
     .icon-btn{
-      display:inline-flex; align-items:center; justify-content:center; 
-      width:2.5rem; height:2.5rem; 
-      border:1px solid var(--border); border-radius:.5rem; 
+      display:inline-flex; align-items:center; justify-content:center;
+      width:2.5rem; height:2.5rem;
+      border:1px solid var(--border); border-radius:.5rem;
       background:transparent; color:var(--foreground); cursor:pointer;
       transition: all var(--duration-normal) ease;
     }
@@ -123,7 +123,7 @@
     /* Card */
     .card{
       position: relative;
-      border-radius:var(--radius); 
+      border-radius:var(--radius);
       background:rgba(255, 255, 255, 0.85);
       backdrop-filter: blur(10px);
       color:var(--card-foreground);
@@ -156,9 +156,9 @@
     }
     .card-h{padding:1rem 1rem .5rem; border-bottom:1px solid var(--border)}
     .card-t{
-      font-weight:600; 
-      display:flex; 
-      align-items:center; 
+      font-weight:600;
+      display:flex;
+      align-items:center;
       gap:.5rem;
       font-size: 1.125rem;
     }
@@ -175,7 +175,7 @@
     }
     .card-d{margin-top:.25rem; color:var(--muted-foreground); font-size:.875rem}
     .card-c{padding:1rem; display:flex; flex-direction:column; gap:1rem}
-    
+
     /* 分类卡片渐变色 */
     .card.card-appearance{--gradient-start: var(--gradient-appearance-start); --gradient-end: var(--gradient-appearance-end);}
     .card.card-blacklist{--gradient-start: var(--gradient-blacklist-start); --gradient-end: var(--gradient-blacklist-end);}
@@ -184,26 +184,26 @@
     .card.card-ai{--gradient-start: var(--gradient-ai-start); --gradient-end: var(--gradient-ai-end);}
     .card.card-notification{--gradient-start: var(--gradient-notification-start); --gradient-end: var(--gradient-notification-end);}
     .card.card-privacy{--gradient-start: var(--gradient-privacy-start); --gradient-end: var(--gradient-privacy-end);}
-    
+
     .row{display:flex; align-items:center; justify-content:space-between; gap:1rem}
     .col{display:flex; flex-direction:column; gap:.25rem}
     .label{font-weight:600}
     .hint{font-size:.75rem; color:var(--muted-foreground)}
     .sep{
-      height:1px; 
-      background: linear-gradient(to right, 
-        transparent, 
-        var(--border), 
+      height:1px;
+      background: linear-gradient(to right,
+        transparent,
+        var(--border),
         transparent
       );
     }
 
     /* Controls - iOS风格开关 */
     .switch{
-      position:relative; 
-      width:48px; 
-      height:28px; 
-      border-radius:999px; 
+      position:relative;
+      width:48px;
+      height:28px;
+      border-radius:999px;
       background: linear-gradient(135deg, #e0e0e0, #d0d0d0);
       border: none;
       cursor:pointer;
@@ -211,13 +211,13 @@
       box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
     }
     .switch::after{
-      content:""; 
-      position:absolute; 
-      top: 3px; 
-      left: 3px; 
-      width: 22px; 
-      height: 22px; 
-      border-radius:50%; 
+      content:"";
+      position:absolute;
+      top: 3px;
+      left: 3px;
+      width: 22px;
+      height: 22px;
+      border-radius:50%;
       background: white;
       transition: all var(--duration-normal) cubic-bezier(0.4, 0.0, 0.2, 1);
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
@@ -238,10 +238,10 @@
     }
     /* 输入框美化 */
     select, input[type="text"], input[type="number"]{
-      min-width:14rem; 
-      padding:.5rem .75rem; 
-      border:2px solid var(--border); 
-      border-radius:.5rem; 
+      min-width:14rem;
+      padding:.5rem .75rem;
+      border:2px solid var(--border);
+      border-radius:.5rem;
       background:rgba(255, 255, 255, 0.6);
       color:var(--foreground);
       transition: all var(--duration-fast) ease;
@@ -262,16 +262,16 @@
     select:hover, input[type="text"]:hover, input[type="number"]:hover{
       border-color: color-mix(in srgb, var(--gradient-start, var(--border)) 50%, var(--border));
     }
-    
+
     /* 滑块美化 */
     .slider{width:100%}
     input[type="range"]{
-      appearance:none; 
-      width:100%; 
-      height:6px; 
-      border-radius:999px; 
-      background: linear-gradient(to right, 
-        var(--gradient-start, #667eea), 
+      appearance:none;
+      width:100%;
+      height:6px;
+      border-radius:999px;
+      background: linear-gradient(to right,
+        var(--gradient-start, #667eea),
         var(--gradient-end, #764ba2)
       );
       outline:none;
@@ -281,10 +281,10 @@
       opacity: 0.9;
     }
     input[type="range"]::-webkit-slider-thumb{
-      appearance:none; 
-      width:20px; 
-      height:20px; 
-      border-radius:50%; 
+      appearance:none;
+      width:20px;
+      height:20px;
+      border-radius:50%;
       background: white;
       cursor:pointer;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
@@ -298,9 +298,9 @@
       transform: scale(1.05);
     }
     input[type="range"]::-moz-range-thumb{
-      width:20px; 
-      height:20px; 
-      border-radius:50%; 
+      width:20px;
+      height:20px;
+      border-radius:50%;
       background: white;
       cursor:pointer;
       border: none;
@@ -315,12 +315,12 @@
     /* Enhanced Select */
     .select-wrap{position:relative; display:inline-flex; align-items:center}
     .select{
-      appearance:none; -webkit-appearance:none; -moz-appearance:none; 
-      min-width:12rem; height:2.25rem; line-height:1; 
-      padding:.5rem .75rem; padding-right:2rem; 
-      border:2px solid var(--border); border-radius:.5rem; 
+      appearance:none; -webkit-appearance:none; -moz-appearance:none;
+      min-width:12rem; height:2.25rem; line-height:1;
+      padding:.5rem .75rem; padding-right:2rem;
+      border:2px solid var(--border); border-radius:.5rem;
       background:rgba(255, 255, 255, 0.6);
-      color:var(--foreground); 
+      color:var(--foreground);
       transition: all var(--duration-fast) ease;
       box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
     }
@@ -330,8 +330,8 @@
       border-color: color-mix(in srgb, var(--gradient-start, var(--border)) 50%, var(--border));
     }
     .select:focus{
-      outline:none; 
-      box-shadow:0 0 0 3px color-mix(in srgb, var(--gradient-start, var(--accent)) 15%, transparent); 
+      outline:none;
+      box-shadow:0 0 0 3px color-mix(in srgb, var(--gradient-start, var(--accent)) 15%, transparent);
       border-color: var(--gradient-start, var(--accent));
       background: white;
     }
@@ -343,11 +343,11 @@
 
     /* Buttons */
     .btn{
-      display:inline-flex; align-items:center; gap:.5rem; 
-      border:2px solid var(--border); border-radius:.5rem; 
-      padding:.5rem .75rem; 
+      display:inline-flex; align-items:center; gap:.5rem;
+      border:2px solid var(--border); border-radius:.5rem;
+      padding:.5rem .75rem;
       background:white;
-      color:var(--foreground); 
+      color:var(--foreground);
       cursor:pointer;
       transition: all var(--duration-normal) ease;
       box-shadow: var(--shadow-sm);
@@ -362,14 +362,14 @@
       transform: translateY(0);
     }
     .btn-outline-danger{
-      color:var(--destructive); 
+      color:var(--destructive);
       border-color:color-mix(in srgb, var(--destructive) 50%, var(--border));
     }
     .btn-outline-danger:hover{
       background:color-mix(in srgb, var(--destructive) 10%, transparent);
       border-color: var(--destructive);
     }
-    
+
     /* 动画系统 */
     @keyframes cardFadeIn {
       from {
@@ -381,7 +381,7 @@
         transform: translateY(0);
       }
     }
-    
+
     @keyframes iconRotate {
       from {
         transform: rotate(0deg);
@@ -390,7 +390,7 @@
         transform: rotate(360deg);
       }
     }
-    
+
     @keyframes pulse {
       0%, 100% {
         opacity: 1;
@@ -399,7 +399,7 @@
         opacity: 0.6;
       }
     }
-    
+
     /* 为卡片添加延迟入场动画 */
     .card:nth-child(1) { animation-delay: 0s; }
     .card:nth-child(2) { animation-delay: 0.05s; }
@@ -748,7 +748,7 @@
         }, 1000);
       }
     }
-    
+
     document.addEventListener('DOMContentLoaded', initIcons);
 
     const KEY = 'lifetrace_chat_settings';
@@ -934,13 +934,13 @@
         console.error('保存配置时发生错误:', error);
       }
     };
-    
+
     // 显示保存成功提示 - 增强版
     function showSaveNotification(message) {
       // 移除已存在的通知
       const existing = document.querySelector('.save-notification');
       if (existing) existing.remove();
-      
+
       // 创建新通知
       const notification = document.createElement('div');
       notification.className = 'save-notification';
@@ -967,18 +967,18 @@
         transition: all 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
         backdrop-filter: blur(10px);
       `;
-      
+
       document.body.appendChild(notification);
-      
+
       // 初始化图标
       initIcons();
-      
+
       // 显示动画
       setTimeout(() => {
         notification.style.opacity = '1';
         notification.style.transform = 'translateX(0) scale(1)';
       }, 10);
-      
+
       // 3秒后自动隐藏
       setTimeout(() => {
         notification.style.opacity = '0';

@@ -346,7 +346,7 @@
             .stats-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .filters {
                 flex-direction: column;
             }
@@ -410,7 +410,7 @@
                 <div class="stat-value" id="totalUsageTime">-</div>
                 <div class="stat-change">小时</div>
             </div>
-            
+
             <div class="stat-card">
                 <div class="stat-header">
                     <span class="stat-title">使用应用数</span>
@@ -419,7 +419,7 @@
                 <div class="stat-value" id="totalAppsUsed">-</div>
                 <div class="stat-change">个应用</div>
             </div>
-            
+
             <div class="stat-card">
                 <div class="stat-header">
                     <span class="stat-title">应用切换次数</span>
@@ -428,7 +428,7 @@
                 <div class="stat-value" id="appSwitches">-</div>
                 <div class="stat-change">次切换</div>
             </div>
-            
+
             <div class="stat-card">
                 <div class="stat-header">
                     <span class="stat-title">平均会话时长</span>
@@ -499,7 +499,7 @@
         async function fetchAppUsageStats() {
             try {
                 const days = document.getElementById('daysFilter').value;
-                
+
                 const params = new URLSearchParams({
                     days: days
                 });
@@ -508,7 +508,7 @@
                 if (!response.ok) {
                     throw new Error('获取数据失败');
                 }
-                
+
                 const data = await response.json();
                 updateStats(data);
                 updateCharts(data);
@@ -520,14 +520,14 @@
 
         // 更新统计卡片
         function updateStats(data) {
-            document.getElementById('totalUsageTime').textContent = 
+            document.getElementById('totalUsageTime').textContent =
                 (data.total_usage_time / 3600).toFixed(1);
             document.getElementById('totalAppsUsed').textContent = data.total_apps_used;
-            document.getElementById('appSwitches').textContent = 
+            document.getElementById('appSwitches').textContent =
                 data.app_switching_patterns?.total_switches || 0;
-            
+
             const avgSession = data.app_switching_patterns?.avg_session_duration || 0;
-            document.getElementById('avgSessionTime').textContent = 
+            document.getElementById('avgSessionTime').textContent =
                 Math.round(avgSession);
         }
 
@@ -540,7 +540,7 @@
         // 应用使用时长分布图表
         function updateAppUsageChart(topApps) {
             const ctx = document.getElementById('appUsageChart').getContext('2d');
-            
+
             if (appUsageChart) {
                 appUsageChart.destroy();
             }
@@ -611,7 +611,7 @@
                                             const value = dataset.data[i];
                                             const total = dataset.data.reduce((sum, val) => sum + val, 0);
                                             const percentage = ((value / total) * 100).toFixed(1);
-                                            
+
                                             return {
                                                 text: `${label} (${percentage}%)`,
                                                 fillStyle: gradientColors[i]?.start || '#ccc',
@@ -685,7 +685,7 @@
         // 小时使用分布图表
         function updateHourlyUsageChart(hourlyData) {
             const ctx = document.getElementById('hourlyUsageChart').getContext('2d');
-            
+
             if (hourlyUsageChart) {
                 hourlyUsageChart.destroy();
             }
@@ -777,7 +777,7 @@
                                     const hours = context.parsed.y.toFixed(2);
                                     const minutes = Math.round(context.parsed.y * 60);
                                     const seconds = Math.round(context.parsed.y * 3600);
-                                    
+
                                     if (hours >= 1) {
                                         return `⏱️ 使用时长: ${hours} 小时`;
                                     } else if (minutes >= 1) {

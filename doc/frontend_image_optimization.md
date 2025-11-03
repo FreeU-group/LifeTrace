@@ -39,7 +39,7 @@ setTotalScreenshots(allIds.length);  // 记录总数
 const nextImage = () => {
   const nextIndex = (currentImageIndex + 1) % totalScreenshots;
   setCurrentImageIndex(nextIndex);
-  
+
   // 如果下一张图片还没加载，则加载它
   if (nextIndex >= eventScreenshotIds.length && !isLoadingMore) {
     loadMoreScreenshots();
@@ -61,7 +61,7 @@ const loadMoreScreenshots = async () => {
 ```typescript
 useEffect(() => {
   // ... 加载逻辑
-  
+
   // 清理函数：释放内存
   return () => {
     setEventScreenshotIds([]);
@@ -236,9 +236,9 @@ async def get_thumbnail(screenshot_id: int, width: int = 400):
 
 先加载低质量版本，再加载高质量：
 ```tsx
-<img 
-  src={lowQualityUrl} 
-  onLoad={() => setSrc(highQualityUrl)} 
+<img
+  src={lowQualityUrl}
+  onLoad={() => setSrc(highQualityUrl)}
 />
 ```
 
@@ -251,4 +251,3 @@ async def get_thumbnail(screenshot_id: int, width: int = 400):
 - ✅ 及时释放不用的内存
 - ✅ 用户触发时才加载更多
 - ✅ 提供清晰的加载状态反馈
-

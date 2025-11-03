@@ -81,35 +81,35 @@ a = Analysis(
     datas=[
         # 1. 项目配置文件
         ('config', 'config'),
-        
+
         # 2. ONNX模型文件（外部化，性能优化关键）
         ('models', 'models'),
-        
+
         # 3. RapidOCR包的所有子模块（硬编码环境路径）
-        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/*.py', 
+        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/*.py',
          'rapidocr_onnxruntime'),
-        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/utils', 
+        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/utils',
          'rapidocr_onnxruntime/utils'),
-        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/ch_ppocr_det', 
+        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/ch_ppocr_det',
          'rapidocr_onnxruntime/ch_ppocr_det'),
-        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/ch_ppocr_rec', 
+        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/ch_ppocr_rec',
          'rapidocr_onnxruntime/ch_ppocr_rec'),
-        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/ch_ppocr_cls', 
+        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/ch_ppocr_cls',
          'rapidocr_onnxruntime/ch_ppocr_cls'),
-        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/cal_rec_boxes', 
+        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/cal_rec_boxes',
          'rapidocr_onnxruntime/cal_rec_boxes'),
-        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/config.yaml', 
+        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/config.yaml',
          'rapidocr_onnxruntime'),
-        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/models', 
+        (r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/rapidocr_onnxruntime/models',
          'rapidocr_onnxruntime/models'),
-        
+
         # 4. 后端模块
         ('lifetrace_backend/*.py', 'lifetrace_backend'),
     ],
     hiddenimports=[
         # 后端模块
         'lifetrace_backend.config',
-        'lifetrace_backend.utils', 
+        'lifetrace_backend.utils',
         'lifetrace_backend.storage',
         'lifetrace_backend.logging_config',
         'lifetrace_backend.simple_heartbeat',
@@ -119,14 +119,14 @@ a = Analysis(
         'lifetrace_backend.multimodal_vector_service',
         'lifetrace_backend.vector_db',
         'lifetrace_backend.simple_ocr',
-        
+
         # 基础依赖
         'yaml', 'numpy', 'PIL', 'psutil',
-        
+
         # OCR核心
         'rapidocr_onnxruntime',
         'onnxruntime',
-        
+
         # RapidOCR所有子模块
         'rapidocr_onnxruntime.main',
         'rapidocr_onnxruntime.utils',
@@ -147,7 +147,7 @@ a = Analysis(
         'rapidocr_onnxruntime.ch_ppocr_cls.utils',
         'rapidocr_onnxruntime.cal_rec_boxes',
         'rapidocr_onnxruntime.cal_rec_boxes.main',
-        
+
         # 向量数据库（可选）
         'transformers', 'torch', 'sentence_transformers',
         'chromadb', 'chromadb.utils.embedding_functions',
@@ -237,7 +237,7 @@ dist/
    # 问题：硬编码了特定用户的conda环境路径
    r'C:/Users/25048/anaconda3/envs/sword/lib/site-packages/...'
    ```
-   
+
    **影响：**
    - 更换开发机器需要修改 spec 文件
    - 团队协作时每个人的路径可能不同
@@ -304,22 +304,22 @@ a = Analysis(
     hiddenimports=[
         # 后端核心
         'lifetrace_backend.config',
-        'lifetrace_backend.utils', 
+        'lifetrace_backend.utils',
         'lifetrace_backend.storage',
         'lifetrace_backend.logging_config',
         'lifetrace_backend.simple_heartbeat',
         'lifetrace_backend.app_mapping',
         'lifetrace_backend.models',
-        
+
         # 截图相关
         'mss',        # 跨平台截图库
         'PIL',        # 图像处理
         'imagehash',  # 图像哈希（去重）
-        
+
         # 系统监控
         'psutil',     # 进程和系统信息
         'watchdog',   # 文件系统监控
-        
+
         # 基础库
         'sqlalchemy', 'pydantic', 'yaml',
         'numpy', 'scipy',
@@ -486,20 +486,20 @@ a = Analysis(
     datas=[
         # 配置文件
         ('config/default_config.yaml', 'config'),
-        
+
         # 后端模块
         ('lifetrace_backend/*.py', 'lifetrace_backend'),
-        
+
         # Web模板文件（重要！）
         ('lifetrace_backend/templates', 'lifetrace_backend/templates'),
-        
+
         # 静态文件（如果存在）
         # ('lifetrace_backend/static', 'lifetrace_backend/static'),
     ],
     hiddenimports=[
         # 后端核心模块
         'lifetrace_backend.config',
-        'lifetrace_backend.utils', 
+        'lifetrace_backend.utils',
         'lifetrace_backend.storage',
         'lifetrace_backend.logging_config',
         'lifetrace_backend.simple_heartbeat',
@@ -518,7 +518,7 @@ a = Analysis(
         'lifetrace_backend.file_monitor',
         'lifetrace_backend.consistency_checker',
         'lifetrace_backend.sync_service',
-        
+
         # Web框架
         'fastapi',
         'uvicorn',
@@ -526,19 +526,19 @@ a = Analysis(
         'aiofiles',
         'python_multipart',
         'starlette',
-        
+
         # 数据库和ORM
         'sqlalchemy',
         'pydantic',
-        
+
         # 基础库
         'yaml', 'numpy', 'scipy',
         'PIL', 'imagehash', 'psutil', 'watchdog',
-        
+
         # OCR功能
         'rapidocr_onnxruntime',
         'onnxruntime',
-        
+
         # AI和向量数据库
         'transformers',
         'torch',
@@ -554,7 +554,7 @@ a = Analysis(
         'chromadb.utils.embedding_functions.openai_ef',
         'chromadb.utils.embedding_functions.google_palm_ef',
         'chromadb.utils.embedding_functions.ollama_ef',
-        
+
         # API客户端
         'openai',
         'anthropic',
@@ -1043,11 +1043,11 @@ datas=[
     # 单个文件
     ('config/default_config.yaml', 'config'),
     # 结果: dist/_internal/config/default_config.yaml
-    
+
     # 整个目录
     ('lifetrace_backend/templates', 'lifetrace_backend/templates'),
     # 结果: dist/_internal/lifetrace_backend/templates/*
-    
+
     # 通配符
     ('lifetrace_backend/*.py', 'lifetrace_backend'),
     # 结果: dist/_internal/lifetrace_backend/*.py
@@ -1068,7 +1068,7 @@ def resource_path(relative_path):
     else:
         # 开发环境
         base_path = os.path.abspath(".")
-    
+
     return os.path.join(base_path, relative_path)
 
 # 使用
@@ -1143,7 +1143,7 @@ a = Analysis(
     datas=[
         ('config', 'config'),
         ('models', 'models'),
-        
+
         # 动态路径
         (os.path.join(rapidocr_base, '*.py'), 'rapidocr_onnxruntime'),
         (os.path.join(rapidocr_base, 'utils'), 'rapidocr_onnxruntime/utils'),
@@ -1153,7 +1153,7 @@ a = Analysis(
         (os.path.join(rapidocr_base, 'cal_rec_boxes'), 'rapidocr_onnxruntime/cal_rec_boxes'),
         (os.path.join(rapidocr_base, 'config.yaml'), 'rapidocr_onnxruntime'),
         (os.path.join(rapidocr_base, 'models'), 'rapidocr_onnxruntime/models'),
-        
+
         ('lifetrace_backend/*.py', 'lifetrace_backend'),
     ],
     # ... 其他配置
@@ -1480,7 +1480,7 @@ VSVersionInfo(
         StringStruct(u'FileVersion', u'1.0.0.0'),
         StringStruct(u'ProductName', u'LifeTrace'),
         StringStruct(u'ProductVersion', u'1.0.0.0')])
-      ]), 
+      ]),
     VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
   ]
 )
@@ -1546,30 +1546,30 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    
+
     - name: Install dependencies
       run: |
         pip install -r requirements_recorder.txt
         pip install -r requirements_server.txt
         pip install pyinstaller
-    
+
     - name: Build Recorder
       run: pyinstaller build_recorder.spec
-    
+
     - name: Build OCR
       run: pyinstaller build_ocr.spec
-    
+
     - name: Build Server
       run: pyinstaller build_server.spec
-    
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
@@ -1809,7 +1809,7 @@ LifeTrace 使用说明
    - 1GB 可用磁盘空间
 
 2. 快速开始
-   
+
    单机使用:
    1) 双击 LifeTrace_Server.exe
    2) 双击 LifeTrace_OCR.exe
@@ -2142,4 +2142,3 @@ Remove-Item -Recurse -Force build, dist
 **文档结束**
 
 > 如有问题或建议，请提交 Issue 或 Pull Request。
-

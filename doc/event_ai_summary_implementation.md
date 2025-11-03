@@ -45,7 +45,7 @@
 - `get_or_create_event()` - 在事件关闭时触发异步摘要生成
   - 记录被关闭的事件ID
   - session提交后调用异步生成函数
-  
+
 - `list_events()` - 返回数据中包含ai_title和ai_summary字段
 - `get_event_summary()` - 返回数据中包含ai_title和ai_summary字段
 
@@ -266,4 +266,3 @@
 **文档版本：** 1.0  
 **创建日期：** 2025-10-11  
 **作者：** LifeTrace开发团队
-

@@ -39,4 +39,3 @@ Invoke-WebRequest -Uri 'https://cdn.jsdelivr.net/npm/turndown@7.1.2/dist/turndow
 1. 这些文件应该在打包（PyInstaller）时被包含
 2. server.py 已配置 `/static` 路由来服务这些文件
 3. 本地化可以确保离线环境下功能正常
-

@@ -13,7 +13,7 @@ interface SettingsProps {
   onClose: () => void;
 }
 
-type SettingCategory = 
+type SettingCategory =
   | 'account'
   | 'interface'
   | 'search'
@@ -80,7 +80,7 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
           e.preventDefault();
           onClose();
           break;
-        
+
         case 'ArrowUp':
           e.preventDefault();
           if (focusArea === 'sidebar' && selectedSidebarIndex > 0) {
@@ -88,7 +88,7 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
             setActiveCategory(settingsCategories[selectedSidebarIndex - 1].id);
           }
           break;
-        
+
         case 'ArrowDown':
           e.preventDefault();
           if (focusArea === 'sidebar' && selectedSidebarIndex < settingsCategories.length - 1) {
@@ -96,14 +96,14 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
             setActiveCategory(settingsCategories[selectedSidebarIndex + 1].id);
           }
           break;
-        
+
         case 'ArrowRight':
           e.preventDefault();
           if (focusArea === 'sidebar') {
             setFocusArea('content');
           }
           break;
-        
+
         case 'ArrowLeft':
           e.preventDefault();
           if (focusArea === 'content') {
@@ -128,7 +128,7 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
     <div className="space-y-8">
       <div>
         <h2 className={`text-2xl mb-6 ${colors.text}`}>账户与个人信息</h2>
-        
+
         <div className="space-y-6">
           <div>
             <h3 className={`text-lg mb-4 ${colors.text}`}>个人资料编辑</h3>
@@ -180,7 +180,7 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
     <div className="space-y-8">
       <div>
         <h2 className={`text-2xl mb-6 ${colors.text}`}>界面与显示</h2>
-        
+
         <div className="space-y-6">
           <div>
             <h3 className={`text-lg mb-4 ${colors.text}`}>主题设置</h3>
@@ -230,7 +230,7 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
     <div className="space-y-8">
       <div>
         <h2 className={`text-2xl mb-6 ${colors.text}`}>搜索与内容偏好</h2>
-        
+
         <div className="space-y-6">
           <div>
             <h3 className={`text-lg mb-4 ${colors.text}`}>默认搜索引擎选择</h3>
@@ -268,9 +268,9 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
                   <Label className={colors.textSecondary}>保存搜索历史</Label>
                   <p className={`text-sm ${colors.textMuted} mt-1`}>记住您的搜索查询以便快速访问</p>
                 </div>
-                <Switch 
-                  checked={searchHistoryEnabled} 
-                  onCheckedChange={setSearchHistoryEnabled} 
+                <Switch
+                  checked={searchHistoryEnabled}
+                  onCheckedChange={setSearchHistoryEnabled}
                 />
               </div>
               <Button variant="outline" className="w-full justify-start">
@@ -288,9 +288,9 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
                 <Label className={colors.textSecondary}>启用安全搜索</Label>
                 <p className={`text-sm ${colors.textMuted} mt-1`}>过滤不适宜内容</p>
               </div>
-              <Switch 
-                checked={contentFilterEnabled} 
-                onCheckedChange={setContentFilterEnabled} 
+              <Switch
+                checked={contentFilterEnabled}
+                onCheckedChange={setContentFilterEnabled}
               />
             </div>
           </div>
@@ -303,7 +303,7 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
     <div className="space-y-8">
       <div>
         <h2 className={`text-2xl mb-6 ${colors.text}`}>功能模块管理</h2>
-        
+
         <div className="space-y-6">
           <div>
             <h3 className={`text-lg mb-4 ${colors.text}`}>快捷功能按键</h3>
@@ -349,7 +349,7 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
     <div className="space-y-8">
       <div>
         <h2 className={`text-2xl mb-6 ${colors.text}`}>隐私与安全</h2>
-        
+
         <div className="space-y-6">
           <div>
             <h3 className={`text-lg mb-4 ${colors.text}`}>数据收集偏好</h3>
@@ -359,9 +359,9 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
                   <Label className={colors.textSecondary}>使用数据分析</Label>
                   <p className={`text-sm ${colors.textMuted} mt-1`}>帮助改善软件体验</p>
                 </div>
-                <Switch 
-                  checked={dataCollectionEnabled} 
-                  onCheckedChange={setDataCollectionEnabled} 
+                <Switch
+                  checked={dataCollectionEnabled}
+                  onCheckedChange={setDataCollectionEnabled}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -413,7 +413,7 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
   };
 
   return (
-    <div 
+    <div
       className={`h-screen flex flex-col transition-colors duration-300 ${colors.text}`}
       style={{ backgroundColor: colors.background }}
     >
@@ -427,8 +427,8 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
           size="sm"
           onClick={onClose}
           className={`w-10 h-10 rounded-full p-0 transition-colors ${
-            isDark 
-              ? 'text-gray-300 hover:text-white hover:bg-slate-700' 
+            isDark
+              ? 'text-gray-300 hover:text-white hover:bg-slate-700'
               : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
           }`}
         >
@@ -439,8 +439,8 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
-        <div 
-          className={`w-80 border-r ${colors.border}`} 
+        <div
+          className={`w-80 border-r ${colors.border}`}
           style={{ backgroundColor: colors.sidebar }}
         >
           <nav className="p-4">
@@ -448,7 +448,7 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
               const Icon = category.icon;
               const isActive = activeCategory === category.id;
               const isKeyboardSelected = focusArea === 'sidebar' && selectedSidebarIndex === index;
-              
+
               return (
                 <Button
                   key={category.id}
@@ -471,7 +471,7 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
         </div>
 
         {/* Content Area */}
-        <div 
+        <div
           className={`flex-1 overflow-y-auto custom-scrollbar transition-all ${
             focusArea === 'content' ? `ring-2 ${colors.ring}` : ''
           }`}
@@ -485,9 +485,9 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
 
       {/* Keyboard shortcuts hint */}
       <div className="px-6 py-3 border-t" style={{ borderColor: colors.border }}>
-        <div 
+        <div
           className="rounded-xl px-4 py-3 backdrop-blur-sm border"
-          style={{ 
+          style={{
             backgroundColor: isDark ? 'rgba(60, 60, 60, 0.8)' : 'rgba(255, 255, 255, 0.9)',
             borderColor: isDark ? 'rgba(100, 100, 100, 0.2)' : 'rgba(200, 200, 200, 0.3)'
           }}
@@ -496,37 +496,37 @@ export function Settings({ theme, onThemeToggle, onClose }: SettingsProps) {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <kbd className={`inline-flex items-center justify-center h-5 px-2 text-xs font-medium rounded border ${
-                  isDark 
-                    ? 'bg-slate-700 text-gray-300 border-slate-600' 
+                  isDark
+                    ? 'bg-slate-700 text-gray-300 border-slate-600'
                     : 'bg-gray-100 text-gray-700 border-gray-300'
                 }`}>↑↓</kbd>
                 <span className={`text-sm ${colors.textSecondary}`}>导航</span>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <kbd className={`inline-flex items-center justify-center h-5 px-2 text-xs font-medium rounded border ${
-                  isDark 
-                    ? 'bg-slate-700 text-gray-300 border-slate-600' 
+                  isDark
+                    ? 'bg-slate-700 text-gray-300 border-slate-600'
                     : 'bg-gray-100 text-gray-700 border-gray-300'
                 }`}>←→</kbd>
                 <span className={`text-sm ${colors.textSecondary}`}>切换区域</span>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <kbd className={`inline-flex items-center justify-center h-5 px-2 text-xs font-medium rounded border ${
-                  isDark 
-                    ? 'bg-slate-700 text-gray-300 border-slate-600' 
+                  isDark
+                    ? 'bg-slate-700 text-gray-300 border-slate-600'
                     : 'bg-gray-100 text-gray-700 border-gray-300'
                 }`}>Enter</kbd>
                 <span className={`text-sm ${colors.textSecondary}`}>选择</span>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <kbd className={`inline-flex items-center justify-center h-5 px-2 text-xs font-medium rounded border ${
-                  isDark 
-                    ? 'bg-slate-700 text-gray-300 border-slate-600' 
+                  isDark
+                    ? 'bg-slate-700 text-gray-300 border-slate-600'
                     : 'bg-gray-100 text-gray-700 border-gray-300'
                 }`}>Esc</kbd>
                 <span className={`text-sm ${colors.textSecondary}`}>关闭设置</span>

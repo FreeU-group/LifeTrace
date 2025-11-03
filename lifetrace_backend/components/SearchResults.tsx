@@ -97,7 +97,7 @@ export function SearchResults({
         iconBg: "bg-gray-200",
         chevronColor: "text-gray-400",
         selectedBorder: "border-gray-400",
-        hoveredBorder: "border-gray-300", 
+        hoveredBorder: "border-gray-300",
       };
     }
   };

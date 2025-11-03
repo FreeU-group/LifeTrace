@@ -47,7 +47,7 @@ class Event(Base):
 class Screenshot(Base):
     """截图记录模型"""
     __tablename__ = 'screenshots'
-    
+
     id = Column(Integer, primary_key=True)
     file_path = Column(String(500), nullable=False, unique=True)
     # ... 其他字段
@@ -68,11 +68,11 @@ class Screenshot(Base):
 位置：`lifetrace_backend/storage.py`
 
 ```python
-def get_or_create_event(self, app_name: Optional[str], 
-                       window_title: Optional[str], 
+def get_or_create_event(self, app_name: Optional[str],
+                       window_title: Optional[str],
                        timestamp: Optional[datetime] = None) -> Optional[int]:
     """按当前前台应用和窗口标题维护事件。
-    
+
     事件切分规则：
     - 应用名相同 + 窗口标题相同 → 复用现有事件
     - 应用名不同 或 窗口标题不同 → 创建新事件
@@ -96,11 +96,11 @@ def get_or_create_event(self, app_name: Optional[str],
        new_title=window_title
    )
    ```
-   
+
    **判断逻辑（非常简单）：**
    - 应用名相同 + 窗口标题相同 → 复用事件
    - 应用名不同 或 窗口标题不同 → 创建新事件
-   
+
    **应用场景示例：**
    - 🌐 **浏览器**：访问不同网页（标题不同）→ 创建新事件
    - 📝 **编辑器**：打开不同文件（标题不同）→ 创建新事件
@@ -119,7 +119,7 @@ def get_or_create_event(self, app_name: Optional[str],
    # 关闭旧事件
    last_event.end_time = now_ts
    closed_event_id = last_event.id
-   
+
    # 创建新事件
    new_event = Event(
        app_name=app_name,
@@ -139,15 +139,15 @@ def get_or_create_event(self, app_name: Optional[str],
 在保存截图到数据库时，自动调用事件管理逻辑：
 
 ```python
-def _save_to_database(self, file_path: str, file_hash: str, width: int, height: int, 
+def _save_to_database(self, file_path: str, file_hash: str, width: int, height: int,
                      screen_id: int, app_name: str, window_title: str, timestamp):
     # 获取或创建事件（基于当前前台应用）
     event_id = db_manager.get_or_create_event(
-        app_name or "未知应用", 
-        window_title or "未知窗口", 
+        app_name or "未知应用",
+        window_title or "未知窗口",
         timestamp
     )
-    
+
     # 保存截图并关联事件
     screenshot_id = db_manager.add_screenshot(
         file_path=file_path,
@@ -413,7 +413,7 @@ WHERE event_id IS NOT NULL
 GROUP BY event_id;
 
 -- 每个应用的使用时长（秒）
-SELECT app_name, 
+SELECT app_name,
        SUM(JULIANDAY(end_time) - JULIANDAY(start_time)) * 86400 as total_seconds
 FROM events
 WHERE end_time IS NOT NULL
@@ -701,7 +701,3 @@ AI生成的摘要更加简洁、易懂，突出关键信息，显著提升了用
 **最后更新：** 2025-10-11  
 **维护者：** LifeTrace Team  
 **更新内容：** 新增AI智能摘要功能说明
-
-
-
-

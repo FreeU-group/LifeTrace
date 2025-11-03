@@ -10,13 +10,13 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f5f5f5;
             color: #333;
         }
-        
+
         .search-container {
             position: fixed;
             top: 0;
@@ -27,13 +27,13 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
             z-index: 100;
         }
-        
+
         .search-box {
             max-width: 800px;
             margin: 0 auto;
             position: relative;
         }
-        
+
         .search-input {
              width: 100%;
              padding: 1rem 3.5rem 1rem 1.5rem;
@@ -44,11 +44,11 @@
              background: white;
              transition: all 0.3s ease;
          }
-         
+
          .search-input:focus {
              border-color: #667eea;
          }
-        
+
         .search-btn {
             position: absolute;
             right: 12px;
@@ -65,12 +65,12 @@
             color: #667eea;
             padding: 8px;
         }
-        
+
         .search-btn:hover {
             color: #5a67d8;
             transform: translateY(-50%) scale(1.1);
         }
-        
+
         .results-container {
             margin-top: 120px;
             padding: 1rem;
@@ -78,13 +78,13 @@
             margin-left: auto;
             margin-right: auto;
         }
-        
+
         .screenshot-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 1rem;
         }
-        
+
         .screenshot-item {
             background: white;
             border-radius: 8px;
@@ -96,12 +96,12 @@
             display: flex;
             flex-direction: column;
         }
-        
+
         .screenshot-item:hover {
             transform: translateY(-4px);
             box-shadow: 0 8px 25px rgba(0,0,0,0.15);
         }
-        
+
         .screenshot-image {
             width: 100%;
             height: 140px;
@@ -109,32 +109,32 @@
             cursor: pointer;
             transition: transform 0.3s ease;
         }
-        
+
         .screenshot-item:hover .screenshot-image {
             transform: scale(1.02);
         }
-        
+
         .screenshot-info {
             padding: 0.8rem;
             flex: 1;
             display: flex;
             flex-direction: column;
         }
-        
+
         .screenshot-time {
             color: #888;
             font-size: 0.85rem;
             margin-bottom: 0.6rem;
             font-weight: 500;
         }
-        
+
         .screenshot-app {
             font-weight: 600;
             color: #333;
             margin-bottom: 0.6rem;
             font-size: 1rem;
         }
-        
+
         .screenshot-text {
             color: #666;
             font-size: 0.8rem;
@@ -146,32 +146,32 @@
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
         }
-        
+
         .loading {
             text-align: center;
             padding: 3rem;
             color: #888;
             font-size: 1.1rem;
         }
-        
+
         .no-results {
             text-align: center;
             padding: 3rem;
             color: #888;
             font-size: 1.1rem;
         }
-        
 
-        
+
+
         @media (max-width: 768px) {
             .search-container {
                 padding: 1rem;
             }
-            
+
             .results-container {
                 margin-top: 100px;
             }
-            
+
             .screenshot-grid {
                 grid-template-columns: 1fr;
                 gap: 1rem;
@@ -191,7 +191,7 @@
             </button>
         </div>
     </div>
-    
+
     <div class="results-container">
         <div id="resultsContainer" class="loading">
             正在加载所有截图...
@@ -203,47 +203,47 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadAllScreenshots();
         });
-        
+
         // 处理回车键搜索
         function handleKeyPress(event) {
             if (event.key === 'Enter') {
                 performSearch();
             }
         }
-        
+
         // 加载所有截图（默认显示）
         async function loadAllScreenshots() {
             const container = document.getElementById('resultsContainer');
             container.innerHTML = '<div class="loading">正在加载所有截图...</div>';
-            
+
             try {
                 const response = await fetch('/api/screenshots?limit=100');
-                
+
                 if (!response.ok) {
                     throw new Error('加载失败');
                 }
-                
+
                 const results = await response.json();
                 displayResults(results, '所有截图');
-                
+
             } catch (error) {
                 console.error('加载错误:', error);
                 container.innerHTML = '<div class="loading">加载失败，请重试</div>';
             }
         }
-        
+
         // 执行搜索
         async function performSearch() {
             const query = document.getElementById('searchInput').value.trim();
             const container = document.getElementById('resultsContainer');
-            
+
             if (!query) {
                 loadAllScreenshots();
                 return;
             }
-            
+
             container.innerHTML = '<div class="loading">搜索中...</div>';
-            
+
             try {
                 const response = await fetch('/api/search', {
                     method: 'POST',
@@ -252,24 +252,24 @@
                     },
                     body: JSON.stringify({ query: query })
                 });
-                
+
                 if (!response.ok) {
                     throw new Error('搜索失败');
                 }
-                
+
                 const results = await response.json();
                 displayResults(results, `搜索结果: "${query}"`);
-                
+
             } catch (error) {
                 console.error('搜索错误:', error);
                 container.innerHTML = '<div class="loading">搜索失败，请重试</div>';
             }
         }
-        
+
         // 显示搜索结果
         function displayResults(results, title) {
             const container = document.getElementById('resultsContainer');
-            
+
             if (!results || results.length === 0) {
                 container.innerHTML = `
                     <div class="no-results">
@@ -278,18 +278,18 @@
                 `;
                 return;
             }
-            
+
             const gridHtml = results.map(screenshot => {
                 const time = new Date(screenshot.created_at).toLocaleString('zh-CN');
                 const appName = screenshot.app_name || '未知应用';
                 const textContent = screenshot.text_content || '';
-                const preview = textContent.length > 120 ? 
+                const preview = textContent.length > 120 ?
                     textContent.substring(0, 120) + '...' : textContent;
-                
+
                 return `
                     <div class="screenshot-item">
-                        <img src="/api/screenshots/${screenshot.id}/image" 
-                             alt="截图" 
+                        <img src="/api/screenshots/${screenshot.id}/image"
+                             alt="截图"
                              class="screenshot-image"
                              onclick="viewScreenshot(${screenshot.id})"
                              loading="lazy"
@@ -302,57 +302,57 @@
                     </div>
                 `;
             }).join('');
-            
+
             container.innerHTML = `<div class="screenshot-grid">${gridHtml}</div>`;
         }
-        
+
         // 查看截图详情
         async function viewScreenshot(screenshotId) {
             try {
                 const response = await fetch(`/api/screenshots/${screenshotId}`);
                 const screenshot = await response.json();
-                
+
                 // 改进的模态框显示详情
                 const modalHtml = `
-                    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                                background: rgba(0,0,0,0.85); z-index: 1000; display: flex; 
+                    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                                background: rgba(0,0,0,0.85); z-index: 1000; display: flex;
                                 align-items: center; justify-content: center; padding: 1rem;"
                          onclick="this.remove()">
-                        <div style="background: white; border-radius: 12px; max-width: 90%; 
-                                    max-height: 90%; overflow: auto; padding: 1.5rem; 
+                        <div style="background: white; border-radius: 12px; max-width: 90%;
+                                    max-height: 90%; overflow: auto; padding: 1.5rem;
                                     box-shadow: 0 10px 30px rgba(0,0,0,0.3);"
                              onclick="event.stopPropagation()">
-                            <div style="display: flex; justify-content: space-between; 
-                                        align-items: center; margin-bottom: 1.5rem; 
+                            <div style="display: flex; justify-content: space-between;
+                                        align-items: center; margin-bottom: 1.5rem;
                                         border-bottom: 1px solid #eee; padding-bottom: 1rem;">
                                 <h3 style="color: #333; margin: 0;">截图详情</h3>
                                 <button onclick="this.parentElement.parentElement.parentElement.remove()"
-                                        style="border: none; background: #f5f5f5; border-radius: 50%; 
-                                               width: 32px; height: 32px; cursor: pointer; 
+                                        style="border: none; background: #f5f5f5; border-radius: 50%;
+                                               width: 32px; height: 32px; cursor: pointer;
                                                display: flex; align-items: center; justify-content: center;
                                                font-size: 1.2rem; color: #666;">×</button>
                             </div>
-                            <img src="/api/screenshots/${screenshotId}/image" 
-                                 style="max-width: 100%; height: auto; margin-bottom: 1.5rem; 
+                            <img src="/api/screenshots/${screenshotId}/image"
+                                 style="max-width: 100%; height: auto; margin-bottom: 1.5rem;
                                         border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
                             <div style="line-height: 1.6;">
                                 <p style="margin-bottom: 0.8rem;"><strong>时间:</strong> ${new Date(screenshot.created_at).toLocaleString('zh-CN')}</p>
                                 <p style="margin-bottom: 0.8rem;"><strong>应用:</strong> ${screenshot.app_name || '未知'}</p>
                                 <p style="margin-bottom: 0.8rem;"><strong>窗口标题:</strong> ${screenshot.window_title || '无'}</p>
-                                ${screenshot.text_content ? 
+                                ${screenshot.text_content ?
                                   `<p style="margin-bottom: 0.5rem;"><strong>识别文字:</strong></p>
-                                   <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; 
-                                               margin-top: 0.5rem; max-height: 200px; overflow-y: auto; 
-                                               border: 1px solid #e9ecef; font-family: monospace; 
-                                               font-size: 0.9rem; line-height: 1.5;">${screenshot.text_content.replace(/\n/g, '<br>')}</div>` : 
+                                   <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px;
+                                               margin-top: 0.5rem; max-height: 200px; overflow-y: auto;
+                                               border: 1px solid #e9ecef; font-family: monospace;
+                                               font-size: 0.9rem; line-height: 1.5;">${screenshot.text_content.replace(/\n/g, '<br>')}</div>` :
                                   '<p style="color: #888; font-style: italic;">暂无OCR识别结果</p>'}
                             </div>
                         </div>
                     </div>
                 `;
-                
+
                 document.body.insertAdjacentHTML('beforeend', modalHtml);
-                
+
             } catch (error) {
                 console.error('加载截图详情失败:', error);
                 alert('加载详情失败');

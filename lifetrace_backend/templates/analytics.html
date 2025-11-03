@@ -289,7 +289,7 @@
             .stats-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .filters {
                 flex-direction: column;
             }
@@ -351,7 +351,7 @@
                 <div class="stat-value" id="totalActions">-</div>
                 <div class="stat-change">与昨天相比</div>
             </div>
-            
+
             <div class="stat-card">
                 <div class="stat-header">
                     <span class="stat-title">搜索次数</span>
@@ -360,7 +360,7 @@
                 <div class="stat-value" id="totalSearches">-</div>
                 <div class="stat-change">与昨天相比</div>
             </div>
-            
+
             <div class="stat-card">
                 <div class="stat-header">
                     <span class="stat-title">聊天次数</span>
@@ -369,7 +369,7 @@
                 <div class="stat-value" id="totalChats">-</div>
                 <div class="stat-change">与昨天相比</div>
             </div>
-            
+
             <div class="stat-card">
                 <div class="stat-header">
                     <span class="stat-title">平均响应时间</span>
@@ -438,12 +438,12 @@
             try {
                 const days = document.getElementById('daysFilter').value;
                 const actionType = document.getElementById('actionFilter').value;
-                
+
                 const params = new URLSearchParams({
                     days: days,
                     limit: 1000
                 });
-                
+
                 if (actionType) {
                     params.append('action_type', actionType);
                 }
@@ -452,7 +452,7 @@
                 if (!response.ok) {
                     throw new Error('获取数据失败');
                 }
-                
+
                 const data = await response.json();
                 updateStats(data);
                 updateCharts(data);
@@ -469,7 +469,7 @@
             const chats = data.behavior_records.filter(r => r.action_type === 'chat').length;
             const avgResponseTime = data.behavior_records
                 .filter(r => r.response_time)
-                .reduce((sum, r) => sum + r.response_time, 0) / 
+                .reduce((sum, r) => sum + r.response_time, 0) /
                 Math.max(data.behavior_records.filter(r => r.response_time).length, 1);
 
             document.getElementById('totalActions').textContent = totalActions;
@@ -488,7 +488,7 @@
         // 每日趋势图表
         function updateDailyTrendChart(dailyStats) {
             const ctx = document.getElementById('dailyTrendChart').getContext('2d');
-            
+
             if (dailyTrendChart) {
                 dailyTrendChart.destroy();
             }
@@ -546,7 +546,7 @@
         // 行为分布饼图
         function updateActionDistributionChart(actionDistribution) {
             const ctx = document.getElementById('actionDistributionChart').getContext('2d');
-            
+
             if (actionDistributionChart) {
                 actionDistributionChart.destroy();
             }
@@ -586,7 +586,7 @@
         // 小时活动柱状图
         function updateHourlyActivityChart(hourlyActivity) {
             const ctx = document.getElementById('hourlyActivityChart').getContext('2d');
-            
+
             if (hourlyActivityChart) {
                 hourlyActivityChart.destroy();
             }
@@ -661,7 +661,7 @@
                 }, 1000);
             }
         }
-        
+
         // 初始化
         initIcons();
         fetchStats();

@@ -16,7 +16,7 @@ interface SearchHeaderProps {
 export const SearchHeader = forwardRef<HTMLInputElement, SearchHeaderProps>(
   ({ searchQuery, onSearchQueryChange, focused, theme, onThemeToggle, onSettingsClick, onCloseClick }, ref) => {
     const isDark = theme === 'dark';
-    
+
     return (
       <div className="w-full px-6 pt-5 pb-3">
         <div className="relative flex items-center gap-3">
@@ -33,16 +33,16 @@ export const SearchHeader = forwardRef<HTMLInputElement, SearchHeaderProps>(
               className={`pl-12 pr-4 rounded-full h-12 transition-all text-base font-bold uppercase tracking-wide border-2 ${
                 focused ? 'ring-2 ring-slate-400' : ''
               } ${
-                isDark 
-                  ? 'border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
+                isDark
+                  ? 'border-gray-600 text-white placeholder-gray-400 hover:border-gray-500'
                   : 'border-gray-300 text-gray-900 placeholder-gray-500 bg-gray-50 hover:border-gray-400'
               }`}
-              style={{ 
+              style={{
                 backgroundColor: isDark ? 'rgb(60, 60, 60)' : undefined
               }}
             />
           </div>
-          
+
           {/* 右上角按钮组 */}
           <div className="flex items-center gap-2">
             {/* 主题切换按钮 */}
@@ -51,36 +51,36 @@ export const SearchHeader = forwardRef<HTMLInputElement, SearchHeaderProps>(
               size="sm"
               onClick={onThemeToggle}
               className={`w-12 h-12 rounded-full p-0 transition-colors ${
-                isDark 
-                  ? 'text-gray-300 hover:text-white hover:bg-slate-700' 
+                isDark
+                  ? 'text-gray-300 hover:text-white hover:bg-slate-700'
                   : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
               }`}
             >
               {isDark ? <Sun className="w-6 h-6 stroke-2" /> : <Moon className="w-6 h-6 stroke-2" />}
             </Button>
-            
+
             {/* 设置按钮 */}
             <Button
               variant="ghost"
               size="sm"
               onClick={onSettingsClick}
               className={`w-12 h-12 rounded-full p-0 transition-colors ${
-                isDark 
-                  ? 'text-gray-300 hover:text-white hover:bg-slate-700' 
+                isDark
+                  ? 'text-gray-300 hover:text-white hover:bg-slate-700'
                   : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
               }`}
             >
               <Settings className="w-6 h-6 stroke-2" />
             </Button>
-            
+
             {/* 关闭按钮 */}
             <Button
               variant="ghost"
               size="sm"
               onClick={onCloseClick}
               className={`w-12 h-12 rounded-full p-0 transition-colors ${
-                isDark 
-                  ? 'text-gray-300 hover:text-white hover:bg-slate-700' 
+                isDark
+                  ? 'text-gray-300 hover:text-white hover:bg-slate-700'
                   : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
               }`}
             >

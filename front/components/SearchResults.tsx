@@ -242,7 +242,7 @@ export function SearchResults({
             )
           )
         )}
-        
+
         {!hasSearched && !isLoading && (
           <div className="px-4 py-3">
             <h3 className={`text-base font-bold uppercase tracking-wide ${colors.categoryText}`}>

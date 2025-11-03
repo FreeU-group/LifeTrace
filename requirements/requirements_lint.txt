@@ -1,0 +1,4 @@
+# formatting
+pre-commit==4.0.1
+# lint
+ruff==0.14.0

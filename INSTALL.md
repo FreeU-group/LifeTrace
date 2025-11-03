@@ -130,5 +130,3 @@ pip install -r requirements_xxx.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 ## 更多信息
 
 详细的跨平台支持说明请参考：[doc/cross_platform_support.md](doc/cross_platform_support.md)
-
-

@@ -182,6 +182,31 @@ The LifeTrace community is possible thanks to thousands of kind volunteers like 
 4. **📤 Push to the branch** - `git push origin feature/amazing-feature`
 5. **🔄 Create a Pull Request** - Submit your changes for review
 
+**Code Style & Quality**
+
+Before submitting any code changes, please make sure your environment is set up for consistent formatting and linting.
+
+1. **Install linting and formatting dependencies**
+
+   ```bash
+   pip install -r ../requirements/requirements_lint.txt
+   ```
+
+2. **Set up pre-commit hooks**
+
+   ```bash
+   pre-commit install
+   ```
+
+   This will automatically run formatting and lint checks before each commit.
+
+3. **(Optional) Manually format and lint**
+
+   ```bash
+   make format
+   make lint
+   ```
+
 **Areas where you can contribute:**
 
 - 🐛 **Bug Reports** - Help us identify and fix issues

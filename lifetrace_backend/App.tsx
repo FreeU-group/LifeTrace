@@ -19,7 +19,7 @@ const TABS = [
 
 const TAB_TO_CATEGORY = {
   apps: "应用",
-  docs: "文档", 
+  docs: "文档",
   timemachine: "时光机"
 } as const;
 
@@ -217,7 +217,7 @@ export default function App() {
   const [selectedActionIndex, setSelectedActionIndex] = useState(0);
   const [theme, setTheme] = useState<Theme>('dark');
   const [showSettings, setShowSettings] = useState(false);
-  
+
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // 工具函数
@@ -229,23 +229,23 @@ export default function App() {
     textTertiary: theme === 'dark' ? 'text-gray-500' : 'text-gray-500'
   });
 
-  const getKbdClasses = () => 
+  const getKbdClasses = () =>
     `inline-flex items-center justify-center h-5 px-2 text-xs font-medium rounded border ${
-      theme === 'dark' 
-        ? 'bg-slate-700 text-gray-300 border-slate-600' 
+      theme === 'dark'
+        ? 'bg-slate-700 text-gray-300 border-slate-600'
         : 'bg-gray-100 text-gray-700 border-gray-300'
     }`;
 
   const getArrowKbdClasses = () =>
     `inline-flex items-center justify-center min-w-6 h-5 px-1.5 text-xs font-medium rounded border ${
-      theme === 'dark' 
-        ? 'bg-slate-700 text-gray-300 border-slate-600' 
+      theme === 'dark'
+        ? 'bg-slate-700 text-gray-300 border-slate-600'
         : 'bg-gray-100 text-gray-700 border-gray-300'
     }`;
 
-  const filteredResults = activeTab === 'all' 
-    ? MOCK_RESULTS 
-    : MOCK_RESULTS.filter(result => 
+  const filteredResults = activeTab === 'all'
+    ? MOCK_RESULTS
+    : MOCK_RESULTS.filter(result =>
         result.category === TAB_TO_CATEGORY[activeTab as keyof typeof TAB_TO_CATEGORY]
       );
 
@@ -376,13 +376,13 @@ export default function App() {
 
         case 'Tab':
           const currentIndex = FOCUS_AREAS.indexOf(focusArea);
-          const nextIndex = e.shiftKey 
+          const nextIndex = e.shiftKey
             ? (currentIndex - 1 + FOCUS_AREAS.length) % FOCUS_AREAS.length
             : (currentIndex + 1) % FOCUS_AREAS.length;
           const nextArea = FOCUS_AREAS[nextIndex];
-          
+
           setFocusArea(nextArea);
-          
+
           if (nextArea === 'search') {
             searchInputRef.current?.focus();
           } else if (nextArea === 'details') {
@@ -426,7 +426,7 @@ export default function App() {
 
   if (showSettings) {
     return (
-      <Settings 
+      <Settings
         theme={theme}
         onThemeToggle={handleThemeToggle}
         onClose={() => setShowSettings(false)}
@@ -435,13 +435,13 @@ export default function App() {
   }
 
   return (
-    <div 
+    <div
       className={`h-screen flex flex-col transition-colors duration-300 ${
         theme === 'dark' ? 'text-white' : 'text-gray-900'
       }`}
       style={{ backgroundColor: colors.background }}
     >
-      <SearchHeader 
+      <SearchHeader
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         focused={focusArea === 'search'}
@@ -451,17 +451,17 @@ export default function App() {
         onCloseClick={handleCloseClick}
         ref={searchInputRef}
       />
-      
-      <SearchTabs 
+
+      <SearchTabs
         activeTab={activeTab}
         onTabChange={handleTabChange}
         focused={focusArea === 'tabs'}
         selectedIndex={selectedTabIndex}
         theme={theme}
       />
-      
+
       <div className="flex-1 flex overflow-hidden">
-        <SearchResults 
+        <SearchResults
           results={filteredResults}
           selectedId={selectedResult}
           selectedIndex={selectedResultIndex}
@@ -469,8 +469,8 @@ export default function App() {
           focused={focusArea === 'results'}
           theme={theme}
         />
-        
-        <DetailPanel 
+
+        <DetailPanel
           selectedResult={selectedResult}
           selectedResultData={selectedResult ? filteredResults.find(r => r.id === selectedResult) : null}
           focused={focusArea === 'details'}
@@ -479,13 +479,13 @@ export default function App() {
           theme={theme}
         />
       </div>
-      
+
       {/* 键盘提示 */}
       {!showSettings && (
         <div className="px-6 py-3">
-          <div 
+          <div
             className="rounded-xl px-4 py-3 backdrop-blur-sm border"
-            style={{ 
+            style={{
               backgroundColor: theme === 'dark' ? 'rgba(60, 60, 60, 0.8)' : 'rgba(255, 255, 255, 0.9)',
               borderColor: theme === 'dark' ? 'rgba(100, 100, 100, 0.2)' : 'rgba(200, 200, 200, 0.3)'
             }}
@@ -501,7 +501,7 @@ export default function App() {
                     导航结果
                   </span>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-0.5">
                     <kbd className={getArrowKbdClasses()}>←</kbd>
@@ -512,7 +512,7 @@ export default function App() {
                   </span>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
                   <kbd className={getKbdClasses()}>Enter</kbd>
@@ -520,14 +520,14 @@ export default function App() {
                     打开
                   </span>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   <kbd className={getKbdClasses()}>Esc</kbd>
                   <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                     返回搜索
                   </span>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   <kbd className={getKbdClasses()}>Tab</kbd>
                   <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>

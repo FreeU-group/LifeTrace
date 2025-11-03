@@ -792,15 +792,15 @@ body {
     .header-content {
         padding: 0 0.5rem;
     }
-    
+
     .chat-messages > * {
         padding: 0 0.5rem;
     }
-    
+
     .message-card {
         max-width: 85%;
     }
-    
+
     .modal-content {
         width: 95%;
         margin: 10% auto;

@@ -60,7 +60,7 @@ if self.enabled:
     self.logger.info("正在初始化多模态向量服务...")
     # 初始化多模态嵌入器（会加载 CLIP 模型，占用约 600-800MB 内存）
     self.multimodal_embedding = get_multimodal_embedding()
-    
+
     if self.multimodal_embedding.is_available():
         self._initialize_vector_databases()
         self.logger.info("多模态向量服务已启用")
@@ -162,7 +162,7 @@ def is_enabled(self) -> bool:
 
 **Windows PowerShell**：
 ```powershell
-Get-Process | Where-Object {$_.ProcessName -like "*python*"} | 
+Get-Process | Where-Object {$_.ProcessName -like "*python*"} |
 Select-Object ProcessName, @{Name="Memory(MB)";Expression={[math]::Round($_.WS/1MB,2)}}
 ```
 
@@ -302,4 +302,3 @@ processing:
 - ✅ **可逆操作**：随时可以重新启用
 
 **推荐给所有内存资源有限或不需要图像搜索功能的用户！**
-

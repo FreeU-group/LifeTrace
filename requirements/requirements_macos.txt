@@ -57,5 +57,3 @@ python-dotenv>=1.0.0
 # macOS specific dependencies
 pyobjc-framework-Cocoa>=9.0
 pyobjc-framework-Quartz>=9.0
-
-

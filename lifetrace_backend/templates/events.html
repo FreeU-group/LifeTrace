@@ -10,40 +10,40 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f5f5f5;
             color: #333;
         }
-        
+
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 1rem 0;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 0 1rem;
         }
-        
+
         .header h1 {
             text-align: center;
             margin-bottom: 0.5rem;
         }
-        
+
         .header p {
             text-align: center;
             opacity: 0.9;
         }
-        
+
         .main-content {
             padding: 2rem 0;
         }
-        
+
         /* 搜索表单样式 */
         .search-section {
             background: white;
@@ -52,38 +52,38 @@
             margin-bottom: 2rem;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        
+
         .search-form {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr auto;
             gap: 1rem;
             align-items: end;
         }
-        
+
         .form-group {
             display: flex;
             flex-direction: column;
         }
-        
+
         .form-group label {
             margin-bottom: 0.5rem;
             font-weight: 500;
             color: #555;
         }
-        
+
         .form-group input {
             padding: 0.75rem;
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 1rem;
         }
-        
+
         .form-group input:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
         }
-        
+
         .btn {
             padding: 0.75rem 1.5rem;
             border: none;
@@ -92,16 +92,16 @@
             font-size: 1rem;
             transition: all 0.3s;
         }
-        
+
         .btn-primary {
             background: #667eea;
             color: white;
         }
-        
+
         .btn-primary:hover {
             background: #5a6fd8;
         }
-        
+
         /* 时间轴样式 */
         .timeline-section {
             background: white;
@@ -109,7 +109,7 @@
             padding: 1.5rem;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        
+
         .timeline-header {
             display: flex;
             justify-content: space-between;
@@ -118,23 +118,23 @@
             padding-bottom: 1rem;
             border-bottom: 1px solid #eee;
         }
-        
+
         .timeline-title {
             font-size: 1.5rem;
             font-weight: 600;
             color: #333;
         }
-        
+
         .timeline-stats {
             color: #666;
             font-size: 0.9rem;
         }
-        
+
         .timeline {
             position: relative;
             padding-left: 2rem;
         }
-        
+
         .timeline::before {
             content: '';
             position: absolute;
@@ -144,7 +144,7 @@
             width: 2px;
             background: linear-gradient(to bottom, #667eea, #764ba2);
         }
-        
+
         .timeline-item {
             position: relative;
             margin-bottom: 2rem;
@@ -154,12 +154,12 @@
             border-left: 4px solid #667eea;
             transition: all 0.3s;
         }
-        
+
         .timeline-item:hover {
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             transform: translateX(5px);
         }
-        
+
         .timeline-item::before {
             content: '';
             position: absolute;
@@ -172,21 +172,21 @@
             border: 3px solid white;
             box-shadow: 0 0 0 2px #667eea;
         }
-        
+
         .event-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             margin-bottom: 1rem;
         }
-        
+
         .event-title {
             font-size: 1.2rem;
             font-weight: 600;
             color: #333;
             margin-bottom: 0.25rem;
         }
-        
+
         .event-app {
             display: inline-block;
             background: #667eea;
@@ -196,35 +196,35 @@
             font-size: 0.8rem;
             font-weight: 500;
         }
-        
+
         .event-time {
             text-align: right;
             color: #666;
             font-size: 0.9rem;
         }
-        
+
         .event-duration {
             font-weight: 600;
             color: #333;
         }
-        
+
         .event-details {
             display: grid;
             grid-template-columns: 1fr auto;
             gap: 1rem;
             align-items: center;
         }
-        
+
         .event-info {
             color: #666;
             font-size: 0.9rem;
         }
-        
+
         .event-actions {
             display: flex;
             gap: 0.5rem;
         }
-        
+
         .btn-small {
             padding: 0.5rem 1rem;
             font-size: 0.8rem;
@@ -234,35 +234,35 @@
             cursor: pointer;
             transition: all 0.3s;
         }
-        
+
         .btn-small:hover {
             background: #f0f0f0;
         }
-        
+
         .btn-view {
             background: #28a745;
             color: white;
             border-color: #28a745;
         }
-        
+
         .btn-view:hover {
             background: #218838;
         }
-        
+
         /* 截图预览样式 */
         .screenshots-preview {
             margin-top: 1rem;
             padding-top: 1rem;
             border-top: 1px solid #eee;
         }
-        
+
         .screenshots-grid {
             display: flex;
             gap: 0.75rem;
             overflow-x: auto;
             padding-bottom: 0.5rem;
         }
-        
+
         .screenshot-thumb {
             flex-shrink: 0;
             width: 120px;
@@ -273,13 +273,13 @@
             transition: all 0.3s;
             border: 2px solid transparent;
         }
-        
+
         .screenshot-thumb:hover {
             transform: scale(1.05);
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
             border-color: #667eea;
         }
-        
+
         /* 图像悬浮窗样式 */
         .image-modal {
             position: fixed;
@@ -296,12 +296,12 @@
             visibility: hidden;
             transition: all 0.3s;
         }
-        
+
         .image-modal.show {
             opacity: 1;
             visibility: visible;
         }
-        
+
         .image-modal-content {
             position: relative;
             max-width: 90%;
@@ -311,14 +311,14 @@
             padding: 1rem;
             box-shadow: 0 8px 32px rgba(0,0,0,0.3);
         }
-        
+
         .image-modal img {
             max-width: 100%;
             max-height: 80vh;
             object-fit: contain;
             border-radius: 4px;
         }
-        
+
         .image-modal-close {
             position: absolute;
             top: -10px;
@@ -337,12 +337,12 @@
             font-weight: bold;
             transition: all 0.3s;
         }
-        
+
         .image-modal-close:hover {
             background: #ff3742;
             transform: scale(1.1);
         }
-        
+
         .image-modal-info {
             margin-top: 1rem;
             padding-top: 1rem;
@@ -357,7 +357,7 @@
             padding: 2rem;
             color: #666;
         }
-        
+
         .loading::after {
             content: '';
             display: inline-block;
@@ -369,26 +369,26 @@
             animation: spin 1s linear infinite;
             margin-left: 0.5rem;
         }
-        
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        
+
         /* 空状态 */
         .empty-state {
             text-align: center;
             padding: 3rem;
             color: #666;
         }
-        
+
         .empty-state svg {
             width: 64px;
             height: 64px;
             margin-bottom: 1rem;
             opacity: 0.5;
         }
-        
+
         /* 分页样式 */
         .pagination {
             display: flex;
@@ -399,7 +399,7 @@
             padding-top: 1rem;
             border-top: 1px solid #eee;
         }
-        
+
         .pagination button {
             padding: 0.5rem 1rem;
             border: 1px solid #ddd;
@@ -408,46 +408,46 @@
             border-radius: 4px;
             transition: all 0.3s;
         }
-        
+
         .pagination button:hover:not(:disabled) {
             background: #f0f0f0;
         }
-        
+
         .pagination button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
-        
+
         .pagination .current-page {
             background: #667eea;
             color: white;
             border-color: #667eea;
         }
-        
+
         /* 响应式设计 */
         @media (max-width: 768px) {
             .search-form {
                 grid-template-columns: 1fr;
                 gap: 1rem;
             }
-            
+
             .timeline {
                 padding-left: 1rem;
             }
-            
+
             .timeline::before {
                 left: 0.5rem;
             }
-            
+
             .timeline-item::before {
                 left: -1.75rem;
             }
-            
+
             .event-header {
                 flex-direction: column;
                 gap: 0.5rem;
             }
-            
+
             .event-details {
                 grid-template-columns: 1fr;
                 gap: 1rem;
@@ -489,7 +489,7 @@
                         加载中...
                     </div>
                 </div>
-                
+
                 <div id="timelineContainer">
                     <div class="loading">正在加载事件数据</div>
                 </div>
@@ -547,10 +547,10 @@
             console.log('开始加载事件数据...');
             const container = document.getElementById('timelineContainer');
             const stats = document.getElementById('timelineStats');
-            
+
             // 显示加载状态
             container.innerHTML = '<div class="loading">正在加载事件数据</div>';
-            
+
             try {
                 // 构建查询参数
                 const params = new URLSearchParams({
@@ -574,7 +574,7 @@
                 // 请求事件数据
                 const response = await fetch(apiUrl);
                 console.log('API响应状态:', response.status);
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -612,7 +612,7 @@
         function renderTimeline(events) {
             console.log('renderTimeline被调用，事件数量:', events.length);
             const container = document.getElementById('timelineContainer');
-            
+
             if (events.length === 0) {
                 console.log('没有事件数据，显示空状态');
                 container.innerHTML = `
@@ -678,13 +678,13 @@
         // 加载事件截图
         async function loadEventScreenshots(eventId) {
             const container = document.getElementById(`screenshots-${eventId}`);
-            
+
             // 检查容器是否存在
             if (!container) {
                 console.error(`找不到截图容器: screenshots-${eventId}`);
                 return;
             }
-            
+
             try {
                 console.log(`开始加载事件 ${eventId} 的截图`);
                 const response = await fetch(`/api/events/${eventId}`);
@@ -695,7 +695,7 @@
                 const eventDetail = await response.json();
                 console.log(`事件 ${eventId} 详情:`, eventDetail);
                 const screenshots = eventDetail.screenshots || [];
-                
+
                 if (screenshots.length === 0) {
                     // 再次检查容器是否存在
                     if (container) {
@@ -707,10 +707,10 @@
                 // 只显示前6张截图
                 const displayScreenshots = screenshots.slice(0, 6);
                 console.log(`显示 ${displayScreenshots.length} 张截图`);
-                
+
                 const grid = document.createElement('div');
                 grid.className = 'screenshots-grid';
-                
+
                 displayScreenshots.forEach((screenshot, index) => {
                     console.log(`加载截图 ${screenshot.id}`);
                     const img = document.createElement('img');
@@ -718,34 +718,34 @@
                     img.src = `/api/screenshots/${screenshot.id}/image`;
                     img.alt = `截图 ${screenshot.id}`;
                     img.title = `点击查看大图 - ${formatTime(new Date(screenshot.created_at))}`;
-                    
+
                     // 添加加载事件
                     img.addEventListener('load', () => {
                         console.log(`截图 ${screenshot.id} 加载成功`);
                     });
-                    
+
                     // 添加点击事件显示大图
                     img.addEventListener('click', () => {
                         showImageModal(screenshot);
                     });
-                    
+
                     // 添加错误处理
                     img.addEventListener('error', (e) => {
                         console.error(`截图 ${screenshot.id} 加载失败:`, e);
                         img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMTIwIDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjZjVmNWY1Ii8+CjxwYXRoIGQ9Ik02MCA0MEw0MCA2MEg4MEw2MCA0MFoiIGZpbGw9IiNjY2MiLz4KPHN2Zz4K';
                         img.title = '图片加载失败';
                     });
-                    
+
                     grid.appendChild(img);
                 });
-                
+
                 // 再次检查容器是否存在再设置内容
                 if (container) {
                     container.innerHTML = '';
                     container.appendChild(grid);
                     console.log(`事件 ${eventId} 截图加载完成`);
                 }
-                
+
             } catch (error) {
                 console.error(`加载事件 ${eventId} 截图失败:`, error);
                 // 再次检查容器是否存在再设置错误信息
@@ -771,21 +771,21 @@
                     </div>
                 </div>
             `;
-            
+
             document.body.appendChild(modal);
-            
+
             // 显示悬浮窗
             setTimeout(() => {
                 modal.classList.add('show');
             }, 10);
-            
+
             // 点击背景关闭
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
                     closeImageModal();
                 }
             });
-            
+
             // ESC键关闭
             const handleEsc = (e) => {
                 if (e.key === 'Escape') {
@@ -832,7 +832,7 @@
 
             pagination.style.display = 'flex';
             pageInfo.textContent = `第 ${currentPage} 页`;
-            
+
             prevBtn.disabled = currentPage <= 1;
             nextBtn.disabled = eventCount < pageSize;
         }
@@ -846,11 +846,11 @@
                 }
 
                 const eventDetail = await response.json();
-                
+
                 // 创建详情弹窗或跳转到详情页面
                 // 这里可以根据需要实现详情展示逻辑
                 alert(`事件详情:\n应用: ${eventDetail.app_name}\n窗口: ${eventDetail.window_title}\n截图数量: ${eventDetail.screenshots.length}`);
-                
+
             } catch (error) {
                 console.error('获取事件详情失败:', error);
                 alert('获取事件详情失败: ' + error.message);
@@ -867,9 +867,9 @@
         function setDefaultDates() {
             const today = new Date();
             const todayStr = today.toISOString().split('T')[0];
-            
+
             document.getElementById('endDate').value = todayStr;
-            
+
             // 设置开始日期为7天前
             const weekAgo = new Date(today);
             weekAgo.setDate(today.getDate() - 7);

@@ -99,7 +99,7 @@ sudo apt-get install x11-utils  # 如果未安装
 def get_active_window_info() -> Tuple[Optional[str], Optional[str]]:
     """获取当前活跃窗口信息"""
     system = platform.system()
-    
+
     if system == "Windows":
         return _get_windows_active_window()
     elif system == "Darwin":  # macOS
@@ -133,7 +133,7 @@ active_app = workspace.activeApplication()
 app_name = active_app.get('NSApplicationName', None)
 
 window_list = CGWindowListCopyWindowInfo(
-    kCGWindowListOptionOnScreenOnly, 
+    kCGWindowListOptionOnScreenOnly,
     kCGNullWindowID
 )
 ```
@@ -209,7 +209,7 @@ def _get_your_platform_active_window() -> Tuple[Optional[str], Optional[str]]:
         logging.warning("平台依赖未安装")
     except Exception as e:
         logging.error(f"获取窗口信息失败: {e}")
-    
+
     return None, None
 ```
 
@@ -219,4 +219,3 @@ def _get_your_platform_active_window() -> Tuple[Optional[str], Optional[str]]:
 
 - 2024-XX-XX: 添加 macOS 平台依赖到 requirements 文件
 - 2024-XX-XX: 完善跨平台支持文档
-

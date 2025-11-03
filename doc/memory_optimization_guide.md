@@ -32,7 +32,7 @@ multimodal_vector_service = create_multimodal_vector_service(config, db_manager)
 **前端图像加载**：
 ```tsx
 // front/components/DetailPanel.tsx
-<ImageWithFallback 
+<ImageWithFallback
   src={`http://localhost:8840/api/screenshots/${id}/image`}
   alt="截图"
 />
@@ -103,7 +103,7 @@ multimodal:
 class LazyVectorService:
     def __init__(self):
         self._service = None
-    
+
     def get_service(self):
         if self._service is None:
             # 仅在第一次使用时加载
@@ -134,26 +134,26 @@ import io
 
 @app.get("/api/screenshots/{screenshot_id}/thumbnail")
 async def get_screenshot_thumbnail(
-    screenshot_id: int, 
-    max_width: int = 400, 
+    screenshot_id: int,
+    max_width: int = 400,
     max_height: int = 300
 ):
     """返回缩略图"""
     screenshot = db_manager.get_screenshot_by_id(screenshot_id)
     if not screenshot:
         raise HTTPException(status_code=404)
-    
+
     # 打开图像
     img = Image.open(screenshot['file_path'])
-    
+
     # 生成缩略图
     img.thumbnail((max_width, max_height), Image.LANCZOS)
-    
+
     # 转换为 bytes
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='JPEG', quality=85)
     img_byte_arr.seek(0)
-    
+
     return StreamingResponse(img_byte_arr, media_type="image/jpeg")
 ```
 
@@ -177,7 +177,7 @@ async def get_screenshot_thumbnail(
 vector_db:
   # 原模型：~500MB
   # embedding_model: shibing624/text2vec-base-chinese
-  
+
   # 轻量级模型：~150MB
   embedding_model: sentence-transformers/all-MiniLM-L6-v2
 ```
@@ -243,7 +243,7 @@ heartbeat:
 
 **Windows PowerShell**：
 ```powershell
-Get-Process | Where-Object {$_.ProcessName -like "*python*"} | 
+Get-Process | Where-Object {$_.ProcessName -like "*python*"} |
 Select-Object ProcessName, @{Name="Memory(MB)";Expression={[math]::Round($_.WS/1MB,2)}}
 ```
 
@@ -264,7 +264,7 @@ async def get_memory_info():
     """获取系统内存信息"""
     process = psutil.Process(os.getpid())
     memory_info = process.memory_info()
-    
+
     return {
         "rss_mb": round(memory_info.rss / 1024 / 1024, 2),  # 物理内存
         "vms_mb": round(memory_info.vms / 1024 / 1024, 2),  # 虚拟内存
@@ -323,4 +323,3 @@ start LifeTrace_Server.exe
 - 延迟加载模型
 - 使用轻量级模型
 - 添加内存监控接口
-

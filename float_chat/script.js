@@ -24,12 +24,12 @@ document.addEventListener('DOMContentLoaded', function() {
     loadChatHistory();
     setupEventListeners();
     adjustInputHeight();
-    
+
     // 初始化图标
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
     }
-    
+
     // 检查是否有聊天历史
     if (chatHistory.length === 0) {
         showWelcomeScreen();
@@ -45,7 +45,7 @@ function setupEventListeners() {
     console.log('chatForm:', chatForm);
     console.log('chatInput:', chatInput);
     console.log('sendButton:', sendButton);
-    
+
     // 聊天表单提交 - 只使用表单的submit事件，避免重复
     if (chatForm) {
         chatForm.addEventListener('submit', handleChatSubmit);
@@ -53,11 +53,11 @@ function setupEventListeners() {
     } else {
         console.error('chatForm not found!');
     }
-    
+
     // 输入框自动调整高度
     if (chatInput) {
         chatInput.addEventListener('input', adjustInputHeight);
-        
+
         // 快捷键支持 - 使用表单提交而不是直接调用handleChatSubmit
         chatInput.addEventListener('keydown', function(e) {
             console.log('Key pressed:', e.key, 'Shift:', e.shiftKey);
@@ -73,7 +73,7 @@ function setupEventListeners() {
     } else {
         console.error('chatInput not found!');
     }
-    
+
     // 发送按钮点击事件 - 使用表单提交而不是直接调用handleChatSubmit
     if (sendButton) {
         sendButton.addEventListener('click', function(e) {
@@ -87,10 +87,10 @@ function setupEventListeners() {
     } else {
         console.error('sendButton not found!');
     }
-    
+
     // 设置模态框 - 使用onclick事件处理器，无需额外的事件监听器
     console.log('Settings modal found:', settingsModal);
-    
+
     // 点击模态框外部关闭
     if (settingsModal) {
         settingsModal.addEventListener('click', function(e) {
@@ -102,7 +102,7 @@ function setupEventListeners() {
     } else {
         console.error('settingsModal not found!');
     }
-    
+
     // 快速操作按钮
     document.querySelectorAll('.quick-action').forEach(button => {
         button.addEventListener('click', function() {
@@ -114,7 +114,7 @@ function setupEventListeners() {
             }
         });
     });
-    
+
     console.log('Event listeners setup completed');
 }
 
@@ -122,41 +122,41 @@ function setupEventListeners() {
 async function handleChatSubmit(e) {
     console.log('handleChatSubmit called');
     e.preventDefault();
-    
+
     if (!chatInput) {
         console.error('chatInput is null');
         return;
     }
-    
+
     const message = chatInput.value.trim();
     console.log('Message to send:', message);
-    
+
     if (!message) {
         console.log('No message');
         return;
     }
-    
+
     console.log('Processing message submission...');
-    
+
     // 清空输入框
     chatInput.value = '';
     adjustInputHeight();
-    
+
     // 禁用发送按钮
     if (sendButton) {
         sendButton.disabled = true;
     }
-    
+
     // 隐藏欢迎屏幕，显示聊天消息
     if (welcomeScreen && messagesList) {
         welcomeScreen.style.display = 'none';
         messagesList.style.display = 'block';
     }
-    
+
     // 添加用户消息到UI与本地历史
     addMessage('user', message);
     pushHistory('user', message);
-    
+
     // 滚动到最后一条用户消息，让其显示在可见区域的最上方，但留出10px空隙
     setTimeout(() => {
         const userMessages = messagesList.querySelectorAll('.message.user');
@@ -166,10 +166,10 @@ async function handleChatSubmit(e) {
             if (chatMessagesContainer) {
                 const messageRect = lastUserMessage.getBoundingClientRect();
                 const containerRect = chatMessagesContainer.getBoundingClientRect();
-                
+
                 // 计算需要滚动的距离，留出10px空隙
                 const targetScrollTop = chatMessagesContainer.scrollTop + messageRect.top - containerRect.top - 10;
-                
+
                 chatMessagesContainer.scrollTo({
                     top: targetScrollTop,
                     behavior: 'smooth'
@@ -177,20 +177,20 @@ async function handleChatSubmit(e) {
             }
         }
     }, 100);
-    
+
     try {
         console.log('Sending request to:', settings.apiUrl);
-        
+
         // 构建请求数据
         const promptWithHistory = buildPromptWithHistory(message);
         const requestData = { message: promptWithHistory };
         console.log('Request data:', requestData);
-        
+
         // 显示思考状态
         if (settings.enableThinking) {
             showThinking();
         }
-        
+
         // 发送请求
         const response = await fetch(`${settings.apiUrl}/api/chat/stream`, {
             method: 'POST',
@@ -199,39 +199,39 @@ async function handleChatSubmit(e) {
             },
             body: JSON.stringify(requestData)
         });
-        
+
         console.log('Response status:', response.status);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         // 隐藏思考状态
         if (settings.enableThinking) {
             hideThinking();
         }
-        
+
         // 创建助手消息元素
         currentStreamingMessage = addMessage('assistant', '');
         pushHistory('assistant', '');
-        
+
         // 处理流式响应 - 参考chat.html的处理方式
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let fullResponse = '';
-        
+
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            
+
             // 第一次接收到数据时隐藏思考指示器
             if (fullResponse === '' && settings.enableThinking) {
                 hideThinking();
             }
-            
+
             const chunk = decoder.decode(value, { stream: true });
             fullResponse += chunk;
-            
+
             // 实时更新显示内容
             if (currentStreamingMessage) {
                 // 检测并渲染Markdown
@@ -242,25 +242,25 @@ async function handleChatSubmit(e) {
                         processedContent = marked.parse(fullResponse);
                     }
                 }
-                
+
                 // 更新消息内容
                 const messageContent = currentStreamingMessage.querySelector('.message-content');
                 if (messageContent) {
                     messageContent.innerHTML = processedContent;
                 }
-                
+
                 // 更新历史记录中的最后一条助手消息
                 if (chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'assistant') {
                     chatHistory[chatHistory.length - 1].content = fullResponse;
                 }
             }
         }
-        
+
         // 流式输出结束后，重新处理截图链接
         if (currentStreamingMessage && fullResponse) {
             // 重新处理截图链接
             const processedContent = processScreenshotLinks(fullResponse);
-            
+
             // 检测并渲染Markdown
             let finalContent = processedContent;
             if (typeof marked !== 'undefined') {
@@ -269,37 +269,37 @@ async function handleChatSubmit(e) {
                     finalContent = marked.parse(processedContent);
                 }
             }
-            
+
             const messageContent = currentStreamingMessage.querySelector('.message-content');
             if (messageContent) {
                 messageContent.innerHTML = finalContent;
             }
         }
-        
+
         // 保存聊天历史
         saveChatHistory();
-        
+
     } catch (error) {
         console.error('Error in handleChatSubmit:', error);
-        
+
         // 隐藏思考状态
         if (settings.enableThinking) {
             hideThinking();
         }
-        
+
         // 移除可能存在的流式消息
         if (currentStreamingMessage) {
             currentStreamingMessage.remove();
             chatHistory.pop(); // 移除助手消息
         }
-        
+
         let errorMessage = '抱歉，发生了错误：';
         if (error.name === 'TypeError' && error.message.includes('fetch')) {
             errorMessage += '无法连接到服务器，请检查 API 地址设置';
         } else {
             errorMessage += error.message;
         }
-        
+
         // 添加错误消息
         const errorMessageElement = addMessage('assistant', errorMessage);
         errorMessageElement.querySelector('.message-card').style.background = '#fee';
@@ -307,13 +307,13 @@ async function handleChatSubmit(e) {
         errorMessageElement.querySelector('.message-card').style.border = '1px solid #fed7d7';
 
         showNotification('发送失败，请检查网络连接和设置', 'error');
-        
+
         // 保存聊天历史（包含错误消息）
         pushHistory('assistant', errorMessage);
         saveChatHistory();
-        
+
         currentStreamingMessage = null;
-        
+
     } finally {
         if (sendButton) {
             sendButton.disabled = false;
@@ -329,11 +329,11 @@ function addMessage(role, content) {
         welcomeScreen.style.display = 'none';
         messagesList.style.display = 'flex';
     }
-    
+
     // 创建消息元素
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${role}`;
-    
+
     // 对于AI回复，检测并渲染Markdown
     let processedContent = content;
     if (role === 'assistant' && typeof marked !== 'undefined') {
@@ -343,28 +343,28 @@ function addMessage(role, content) {
             processedContent = marked.parse(content);
         }
     }
-    
+
     // 处理截图ID链接（仅对AI回复）
     if (role === 'assistant') {
         processedContent = processScreenshotLinks(processedContent);
     }
-    
+
     const avatarContent = role === 'user' ? 'U' : '<i data-lucide="bot"></i>';
-    
+
     messageDiv.innerHTML = `
         <div class="message-avatar">${avatarContent}</div>
         <div class="message-card">
             <div class="message-content">${processedContent}</div>
         </div>
     `;
-    
+
     messagesList.appendChild(messageDiv);
-    
+
     // 重新创建图标
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
     }
-    
+
     // 不再自动滚动到底部，保持用户消息居中显示
 }
 }
@@ -373,7 +373,7 @@ function addMessage(role, content) {
 function appendToMessage(messageElement, content) {
     const messageContent = messageElement.querySelector('.message-content');
     const currentContent = messageContent.textContent + content;
-    
+
     // 检测并渲染Markdown
     let processedContent = currentContent;
     if (typeof marked !== 'undefined') {
@@ -382,9 +382,9 @@ function appendToMessage(messageElement, content) {
             processedContent = marked.parse(currentContent);
         }
     }
-    
+
     messageContent.innerHTML = processedContent;
-    
+
     // 重新创建图标
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
@@ -400,16 +400,16 @@ function showThinking(text = '正在思考...') {
     if (thinkingMessageDiv) {
         hideThinking();
     }
-    
+
     // 隐藏欢迎屏幕，显示消息列表
     if (welcomeScreen.style.display !== 'none') {
         welcomeScreen.style.display = 'none';
         messagesList.style.display = 'flex';
     }
-    
+
     thinkingMessageDiv = document.createElement('div');
     thinkingMessageDiv.className = 'message assistant thinking-message';
-    
+
     thinkingMessageDiv.innerHTML = `
         <div class="message-avatar">
             <i data-lucide="bot"></i>
@@ -427,15 +427,15 @@ function showThinking(text = '正在思考...') {
             </div>
         </div>
     `;
-    
+
     // 添加到消息列表
     messagesList.appendChild(thinkingMessageDiv);
-    
+
     // 使用requestAnimationFrame确保DOM更新后再添加show类
     requestAnimationFrame(() => {
         thinkingMessageDiv.classList.add('show');
     });
-    
+
     // 重新创建图标
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
@@ -496,7 +496,7 @@ function renderChatHistory() {
     chatHistory.forEach(msg => {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${msg.role}`;
-        
+
         const avatar = document.createElement('div');
         avatar.className = 'message-avatar';
         if (msg.role === 'user') {
@@ -504,13 +504,13 @@ function renderChatHistory() {
         } else {
             avatar.innerHTML = '<i data-lucide="bot"></i>';
         }
-        
+
         const card = document.createElement('div');
         card.className = 'message-card';
-        
+
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
-        
+
         if (msg.role === 'assistant') {
             // 检查marked是否可用，如果不可用则使用纯文本
             if (typeof marked !== 'undefined' && marked.parse) {
@@ -521,9 +521,9 @@ function renderChatHistory() {
         } else {
             messageContent.textContent = msg.content;
         }
-        
+
         card.appendChild(messageContent);
-        
+
         if (msg.role === 'user') {
             messageDiv.appendChild(card);
             messageDiv.appendChild(avatar);
@@ -531,15 +531,15 @@ function renderChatHistory() {
             messageDiv.appendChild(avatar);
             messageDiv.appendChild(card);
         }
-        
+
         messagesList.appendChild(messageDiv);
     });
-    
+
     // 重新创建图标
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
     }
-    
+
     scrollToBottom();
 }
 
@@ -549,13 +549,13 @@ function loadSettings() {
     if (savedSettings) {
         settings = { ...settings, ...JSON.parse(savedSettings) };
     }
-    
+
     // 应用主题
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
         document.body.classList.add('dark');
     }
-    
+
     // 更新设置表单
     updateSettingsForm();
 }
@@ -568,7 +568,7 @@ function updateSettingsForm() {
     const maxTokensInput = document.getElementById('max-tokens');
     const systemPromptInput = document.getElementById('system-prompt');
     const enableThinkingInput = document.getElementById('enable-thinking');
-    
+
     if (apiUrlInput) apiUrlInput.value = settings.apiUrl;
     if (temperatureInput) {
         temperatureInput.value = settings.temperature;
@@ -586,10 +586,10 @@ function handleSaveSettings() {
     settings.maxTokens = parseInt(document.getElementById('max-tokens').value);
     settings.systemPrompt = document.getElementById('system-prompt').value;
     settings.enableThinking = document.getElementById('enable-thinking').checked;
-    
+
     localStorage.setItem('chatSettings', JSON.stringify(settings));
     settingsModal.style.display = 'none';
-    
+
     // 显示保存成功提示
     showNotification('设置已保存');
 }
@@ -611,9 +611,9 @@ function showNotification(message) {
         animation: slideInRight 0.3s ease-out;
     `;
     notification.textContent = message;
-    
+
     document.body.appendChild(notification);
-    
+
     // 3秒后自动移除
     setTimeout(() => {
         notification.style.animation = 'slideOutRight 0.3s ease-out';
@@ -640,12 +640,12 @@ function saveChatHistory() {
 function buildPromptWithHistory(message, maxHistory = 6) {
     // 获取最近的历史记录（不包括当前消息）
     const recentHistory = chatHistory.slice(-maxHistory);
-    
+
     // 如果没有历史记录，直接返回当前消息
     if (recentHistory.length === 0) {
         return message;
     }
-    
+
     // 构建包含历史的提示
     let prompt = '';
     for (const item of recentHistory) {
@@ -655,10 +655,10 @@ function buildPromptWithHistory(message, maxHistory = 6) {
             prompt += `助手: ${item.content}\n`;
         }
     }
-    
+
     // 添加当前消息
     prompt += `用户: ${message}`;
-    
+
     return prompt;
 }
 
@@ -674,12 +674,12 @@ function processScreenshotLinks(content) {
         }
         return html.trim();
     });
-    
+
     // 处理单个截图ID (例如: screenshot:3)
     content = content.replace(/screenshot:(\d+)/g, (match, id) => {
         return `<span class="screenshot-link" onclick="showScreenshotPreview(${id})">📷 截图${id}</span>`;
     });
-    
+
     // 处理多个截图ID (例如: screenshot:1,3,5)
     content = content.replace(/screenshot:([\d,]+)/g, (match, ids) => {
         const idList = ids.split(',');
@@ -692,7 +692,7 @@ function processScreenshotLinks(content) {
         }
         return html.trim();
     });
-    
+
     return content;
 }
 
@@ -721,7 +721,7 @@ style.textContent = `
             opacity: 1;
         }
     }
-    
+
     @keyframes slideOutRight {
         from {
             transform: translateX(0);
@@ -756,7 +756,7 @@ function saveSettings() {
     const localHistoryEnabled = document.getElementById('localHistoryEnabled');
     const historyLimit = document.getElementById('historyLimit');
     const serverUrl = document.getElementById('serverUrl');
-    
+
     if (localHistoryEnabled) {
         settings.localHistoryEnabled = localHistoryEnabled.checked;
     }
@@ -766,12 +766,12 @@ function saveSettings() {
     if (serverUrl) {
         settings.apiUrl = serverUrl.value || 'http://localhost:8000';
     }
-    
+
     // 保存到本地存储
     if (typeof Storage !== 'undefined') {
         localStorage.setItem('lifetrace_settings', JSON.stringify(settings));
     }
-    
+
     closeSettingsModal();
     showNotification('设置已保存');
 }
@@ -782,13 +782,13 @@ function clearAllHistory() {
         if (typeof Storage !== 'undefined') {
             localStorage.removeItem('lifetrace_chat_history');
         }
-        
+
         // 清空UI
         const messagesList = document.getElementById('messagesList');
         if (messagesList) {
             messagesList.innerHTML = '';
         }
-        
+
         showWelcomeScreen();
         showNotification('历史记录已清除');
     }
