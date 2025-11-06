@@ -49,19 +49,20 @@ async def chat_with_llm(message: ChatMessage, request: Request):
                 performance=rag_result.get("performance"),
             )
 
-            # 记录用户行为
-            deps.behavior_tracker.track_action(
-                action_type="chat",
-                action_details={
-                    "query": message.message,
-                    "response_length": len(rag_result["response"]),
-                    "success": True,
-                },
-                session_id=session_id,
-                user_agent=user_agent,
-                ip_address=client_ip,
-                response_time=response_time,
-            )
+            # 记录用户行为（如果behavior_tracker可用）
+            if deps.behavior_tracker is not None:
+                deps.behavior_tracker.track_action(
+                    action_type="chat",
+                    action_details={
+                        "query": message.message,
+                        "response_length": len(rag_result["response"]),
+                        "success": True,
+                    },
+                    session_id=session_id,
+                    user_agent=user_agent,
+                    ip_address=client_ip,
+                    response_time=response_time,
+                )
 
             return response
         else:
@@ -70,19 +71,20 @@ async def chat_with_llm(message: ChatMessage, request: Request):
                 "response", "处理您的查询时出现了错误，请稍后重试。"
             )
 
-            # 记录失败的用户行为
-            deps.behavior_tracker.track_action(
-                action_type="chat",
-                action_details={
-                    "query": message.message,
-                    "error": rag_result.get("error"),
-                    "success": False,
-                },
-                session_id=session_id,
-                user_agent=user_agent,
-                ip_address=client_ip,
-                response_time=response_time,
-            )
+            # 记录失败的用户行为（如果behavior_tracker可用）
+            if deps.behavior_tracker is not None:
+                deps.behavior_tracker.track_action(
+                    action_type="chat",
+                    action_details={
+                        "query": message.message,
+                        "error": rag_result.get("error"),
+                        "success": False,
+                    },
+                    session_id=session_id,
+                    user_agent=user_agent,
+                    ip_address=client_ip,
+                    response_time=response_time,
+                )
 
             return ChatResponse(
                 response=error_msg,
@@ -96,20 +98,21 @@ async def chat_with_llm(message: ChatMessage, request: Request):
     except Exception as e:
         deps.logger.error(f"聊天处理失败: {e}")
 
-        # 记录异常的用户行为
+        # 记录异常的用户行为（如果behavior_tracker可用）
         response_time = (datetime.now() - start_time).total_seconds() * 1000
-        deps.behavior_tracker.track_action(
-            action_type="chat",
-            action_details={
-                "query": message.message,
-                "error": str(e),
-                "success": False,
-            },
-            session_id=session_id,
-            user_agent=request.headers.get("user-agent", "") if request else "",
-            ip_address=request.client.host if request and request.client else "unknown",
-            response_time=response_time,
-        )
+        if deps.behavior_tracker is not None:
+            deps.behavior_tracker.track_action(
+                action_type="chat",
+                action_details={
+                    "query": message.message,
+                    "error": str(e),
+                    "success": False,
+                },
+                session_id=session_id,
+                user_agent=request.headers.get("user-agent", "") if request else "",
+                ip_address=request.client.host if request and request.client else "unknown",
+                response_time=response_time,
+            )
 
         return ChatResponse(
             response="抱歉，系统暂时无法处理您的请求，请稍后重试。",

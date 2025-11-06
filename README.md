@@ -61,6 +61,17 @@ source .venv/bin/activate
 
 ### Start the Backend Service
 
+**Before starting the server, you need to configure the settings:**
+
+```bash
+# Copy the default configuration file
+cp lifetrace/config/default_config.yaml lifetrace/config/config.yaml
+
+# Edit config.yaml to customize your settings (optional)
+```
+
+**Start the server:**
+
 ```bash
 python -m lifetrace.server
 ```

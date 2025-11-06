@@ -77,6 +77,17 @@ source .venv/bin/activate
 
 ### 启动后端服务
 
+**在启动服务器之前，需要配置设置：**
+
+```bash
+# 复制默认配置文件
+cp lifetrace/config/default_config.yaml lifetrace/config/config.yaml
+
+# 编辑 config.yaml 自定义您的设置（可选）
+```
+
+**启动服务器：**
+
 ```bash
 python -m lifetrace.server
 ```

@@ -1,44 +1,39 @@
 'use client';
 
-import { useState } from 'react';
 import Image from 'next/image';
 import { Settings } from 'lucide-react';
-import SettingsModal from '../common/SettingsModal';
 
-export default function Header() {
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+interface HeaderProps {
+  onSettingsClick: () => void;
+}
 
+export default function Header({ onSettingsClick }: HeaderProps) {
   return (
-    <>
-      <header className="sticky top-0 z-50 w-full border-b bg-background shadow-sm">
-        <div className="flex h-12 items-center justify-between w-full px-4">
-          {/* Logo + Title */}
-          <div className="flex items-center space-x-2">
-            <div className="relative h-6 w-6 flex-shrink-0">
-              <Image
-                src="/logo.png"
-                alt="LifeTrace Logo"
-                fill
-                className="object-contain"
-                unoptimized
-              />
-            </div>
-            <h1 className="text-lg font-bold text-foreground">LifeTrace Chat</h1>
+    <header className="sticky top-0 z-50 w-full border-b bg-background shadow-sm">
+      <div className="flex h-12 items-center justify-between w-full px-4">
+        {/* Logo + Title */}
+        <div className="flex items-center space-x-2">
+          <div className="relative h-6 w-6 flex-shrink-0">
+            <Image
+              src="/logo.png"
+              alt="LifeTrace Logo"
+              fill
+              className="object-contain"
+              unoptimized
+            />
           </div>
-
-          {/* Settings Button */}
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="rounded-lg p-2 text-foreground transition-colors hover:bg-muted"
-            aria-label="设置"
-          >
-            <Settings className="h-5 w-5" />
-          </button>
+          <h1 className="text-lg font-bold text-foreground">LifeTrace Chat</h1>
         </div>
-      </header>
 
-      {/* Settings Modal */}
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-    </>
+        {/* Settings Button */}
+        <button
+          onClick={onSettingsClick}
+          className="rounded-lg p-2 text-foreground transition-colors hover:bg-muted"
+          aria-label="设置"
+        >
+          <Settings className="h-5 w-5" />
+        </button>
+      </div>
+    </header>
   );
 }

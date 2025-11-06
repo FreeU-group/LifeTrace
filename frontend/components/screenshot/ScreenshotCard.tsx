@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import { Screenshot } from '@/lib/types';
 import { formatDateTime, truncateText } from '@/lib/utils';
 import { api } from '@/lib/api';

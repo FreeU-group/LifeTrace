@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import MainLayout from "@/components/layout/MainLayout";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "LifeTrace - 智能生活记录系统",
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body className="antialiased">
         <MainLayout>{children}</MainLayout>
+        <Toaster position="top-right" richColors closeButton />
       </body>
     </html>
   );

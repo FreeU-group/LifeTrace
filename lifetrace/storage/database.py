@@ -507,7 +507,12 @@ class DatabaseManager:
             return []
 
     def search_events_simple(
-        self, query: Optional[str], limit: int = 50
+        self,
+        query: Optional[str],
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        app_name: Optional[str] = None,
+        limit: int = 50
     ) -> List[Dict[str, Any]]:
         """基于SQLite的简单事件搜索（按OCR文本聚合）"""
         try:
@@ -526,9 +531,22 @@ class DatabaseManager:
                 """
                 where_clause = []
                 params: Dict[str, Any] = {}
-                if query:
+
+                if query and query.strip():
                     where_clause.append("(o.text_content LIKE :q)")
                     params["q"] = f"%{query}%"
+
+                if start_date:
+                    where_clause.append("e.start_time >= :start_date")
+                    params["start_date"] = start_date
+
+                if end_date:
+                    where_clause.append("e.start_time <= :end_date")
+                    params["end_date"] = end_date
+
+                if app_name:
+                    where_clause.append("e.app_name LIKE :app_name")
+                    params["app_name"] = f"%{app_name}%"
 
                 sql = base_sql
                 if where_clause:
@@ -536,6 +554,8 @@ class DatabaseManager:
                 sql += " GROUP BY e.id ORDER BY e.start_time DESC LIMIT :limit"
                 params["limit"] = limit
 
+                logging.info(f"执行搜索SQL: {sql}")
+                logging.info(f"参数: {params}")
                 rows = session.execute(text(sql), params).fetchall()
                 results = []
                 for r in rows:

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Event, Screenshot } from '@/lib/types';
 import { api } from '@/lib/api';
 import { formatDateTime, formatDuration, calculateDuration } from '@/lib/utils';
@@ -8,12 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/common/Ca
 import { FormField } from '@/components/common/Input';
 import Button from '@/components/common/Button';
 import Loading from '@/components/common/Loading';
-import { ChevronDown, ChevronUp, Square, Check } from 'lucide-react';
+import { ChevronDown, ChevronUp, Square, Check, MessageSquare, Search } from 'lucide-react';
 import ScreenshotModal from '@/components/screenshot/ScreenshotModal';
 import { useSelectedEvents } from '@/lib/context/SelectedEventsContext';
 import { marked } from 'marked';
+import { toast } from '@/lib/toast';
 
 export default function EventsPage() {
+  const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -22,6 +25,7 @@ export default function EventsPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [appName, setAppName] = useState('');
+  const [keyword, setKeyword] = useState('');
   const [offset, setOffset] = useState(0);
   const [eventDetails, setEventDetails] = useState<{ [key: number]: any }>({});
   const [currentImages, setCurrentImages] = useState<{ [key: number]: number }>({});
@@ -74,29 +78,54 @@ export default function EventsPage() {
 
     try {
       const currentOffset = reset ? 0 : offset;
-      const params: any = {
-        limit: pageSize,
-        offset: currentOffset,
-      };
+      let response;
+      let newEvents: Event[] = [];
+      let totalCount = 0;
 
-      if (startDate) params.start_date = startDate + 'T00:00:00';
-      if (endDate) params.end_date = endDate + 'T23:59:59';
-      if (appName) params.app_name = appName;
+      // 如果有关键词，使用事件搜索接口
+      if (keyword.trim()) {
+        const searchParams: any = {
+          query: keyword.trim(),
+          limit: 100, // 搜索接口不支持分页，一次返回较多结果
+        };
 
-      const response = await api.getEvents(params);
+        // 添加日期过滤条件
+        if (startDate) searchParams.start_date = startDate + 'T00:00:00';
+        if (endDate) searchParams.end_date = endDate + 'T23:59:59';
+        if (appName) searchParams.app_name = appName;
 
-      // 新的响应结构：{ events: Event[], total_count: number }
-      const responseData = response.data || response;
+        response = await api.eventSearch(searchParams);
 
-      const newEvents = responseData.events || responseData || [];
-      const totalCount = responseData.total_count ?? 0;
+        // eventSearch 返回的是事件数组
+        const searchData = response.data || response;
+        newEvents = Array.isArray(searchData) ? searchData : [];
+        totalCount = newEvents.length; // 搜索接口不返回总数，使用实际返回的数量
+      } else {
+        // 没有关键词，使用普通的事件列表接口
+        const params: any = {
+          limit: pageSize,
+          offset: currentOffset,
+        };
+
+        if (startDate) params.start_date = startDate + 'T00:00:00';
+        if (endDate) params.end_date = endDate + 'T23:59:59';
+        if (appName) params.app_name = appName;
+
+        response = await api.getEvents(params);
+
+        // 新的响应结构：{ events: Event[], total_count: number }
+        const responseData = response.data || response;
+
+        newEvents = responseData.events || responseData || [];
+        totalCount = responseData.total_count ?? 0;
+      }
 
       if (reset) {
         setEvents(newEvents);
         setTotalCount(totalCount);
         setOffset(pageSize);
-        // 判断是否还有更多数据：已加载数量 < 总数量
-        setHasMore(newEvents.length < totalCount);
+        // 判断是否还有更多数据：关键词搜索时不支持分页
+        setHasMore(keyword.trim() ? false : newEvents.length < totalCount);
       } else {
         setEvents((prev) => {
           // 使用 Map 去重，确保 event.id 唯一
@@ -127,12 +156,12 @@ export default function EventsPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [offset, startDate, endDate, appName, loadEventDetail]);
+  }, [offset, startDate, endDate, appName, keyword, loadEventDetail]);
 
-  // 滚动到底部时加载更多
+  // 滚动到底部时加载更多（关键词搜索时不启用）
   useEffect(() => {
     const handleScroll = (e: UIEvent) => {
-      if (loading || loadingMore || !hasMore) return;
+      if (loading || loadingMore || !hasMore || keyword.trim()) return;
 
       const target = e.currentTarget as HTMLElement;
       const scrollTop = target.scrollTop;
@@ -151,7 +180,7 @@ export default function EventsPage() {
       scrollContainer.addEventListener('scroll', handleScroll as EventListener);
       return () => scrollContainer.removeEventListener('scroll', handleScroll as EventListener);
     }
-  }, [loading, loadingMore, hasMore, loadEvents]);
+  }, [loading, loadingMore, hasMore, keyword, loadEvents]);
 
   // 切换事件的显示图片
   const navigateImage = (eventId: number, direction: 'prev' | 'next') => {
@@ -180,19 +209,25 @@ export default function EventsPage() {
     loadEvents(true);
   };
 
-  // 切换事件选中状态
+  // 切换事件选中状态（最多10个）
   const toggleEventSelection = (eventId: number, e?: React.MouseEvent) => {
     e?.stopPropagation();
     const event = events.find(ev => ev.id === eventId);
     const newSet = new Set(selectedEvents);
 
     if (newSet.has(eventId)) {
+      // 取消选中
       newSet.delete(eventId);
-      // 从 selectedEventsData 中移除
       setSelectedEventsData((prevData: Event[]) => prevData.filter(ev => ev.id !== eventId));
     } else {
+      // 检查是否已达到上限
+      if (newSet.size >= 10) {
+        toast.eventLimitReached();
+        return;
+      }
+
+      // 添加选中
       newSet.add(eventId);
-      // 添加到 selectedEventsData
       if (event) {
         setSelectedEventsData((prevData: Event[]) => [...prevData, event]);
       }
@@ -333,11 +368,48 @@ export default function EventsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden p-4">
+      {/* 选中事件提示 */}
+      {selectedEvents.size > 0 && (
+        <div className={`mb-4 flex items-center justify-between rounded-lg px-4 py-3 border ${
+          selectedEvents.size >= 10
+            ? 'bg-destructive/10 border-destructive/30'
+            : 'bg-primary/10 border-primary/20'
+        }`}>
+          <div className="flex items-center gap-2">
+            <Check className={`h-5 w-5 ${selectedEvents.size >= 10 ? 'text-destructive' : 'text-primary'}`} />
+            <span className={`font-medium ${selectedEvents.size >= 10 ? 'text-destructive' : 'text-primary'}`}>
+              已选择 {selectedEvents.size} / 10 个事件
+              {selectedEvents.size >= 10 && <span className="ml-2">（已达上限）</span>}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedEvents(new Set());
+                setSelectedEventsData([]);
+              }}
+            >
+              清空选择
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => router.push('/chat')}
+              className="gap-2"
+            >
+              <MessageSquare className="h-4 w-4" />
+              前往对话
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* 搜索表单 - 固定区域 */}
       <Card className="mb-4 flex-shrink-0">
         <CardContent className="p-4">
           <form onSubmit={handleSearch} className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="flex-1 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="flex-1 grid grid-cols-1 gap-4 sm:grid-cols-4">
               <FormField
                 label="开始日期"
                 type="date"
@@ -356,9 +428,16 @@ export default function EventsPage() {
                 value={appName}
                 onChange={(e) => setAppName(e.target.value)}
               />
+              <FormField
+                label="关键词搜索"
+                placeholder="搜索事件内容..."
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+              />
             </div>
-            <Button type="submit" className="sm:w-auto w-full">
-              搜索事件
+            <Button type="submit" className="sm:w-24 w-full flex items-center justify-center gap-2">
+              <Search className="h-4 w-4" />
+              <span className="hidden sm:inline">搜索</span>
             </Button>
           </form>
         </CardContent>

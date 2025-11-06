@@ -96,18 +96,19 @@ async def get_screenshot_image(screenshot_id: int, request: Request):
         screenshot = deps.db_manager.get_screenshot_by_id(screenshot_id)
 
         if not screenshot:
-            # 记录失败的查看截图行为
-            deps.behavior_tracker.track_action(
-                action_type="view_screenshot",
-                action_details={
-                    "screenshot_id": screenshot_id,
-                    "success": False,
-                    "error": "截图不存在",
-                },
-                user_agent=request.headers.get("user-agent", ""),
-                ip_address=request.client.host if request.client else "",
-                response_time=time.time() - start_time,
-            )
+            # 记录失败的查看截图行为（如果behavior_tracker可用）
+            if deps.behavior_tracker is not None:
+                deps.behavior_tracker.track_action(
+                    action_type="view_screenshot",
+                    action_details={
+                        "screenshot_id": screenshot_id,
+                        "success": False,
+                        "error": "截图不存在",
+                    },
+                    user_agent=request.headers.get("user-agent", ""),
+                    ip_address=request.client.host if request.client else "",
+                    response_time=time.time() - start_time,
+                )
             raise HTTPException(status_code=404, detail="截图不存在")
 
         file_path = screenshot["file_path"]

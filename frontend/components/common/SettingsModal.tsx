@@ -1,16 +1,132 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './Card';
 import Input from './Input';
 import Button from './Button';
+import { api } from '@/lib/api';
+import { toast } from '@/lib/toast';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  isRequired?: boolean; // 是否是必须配置（健康检查失败时）
 }
 
-export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+interface ConfigSettings {
+  llmKey: string;
+  baseUrl: string;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  recordInterval: number;
+  maxDays: number;
+}
+
+export default function SettingsModal({ isOpen, onClose, isRequired = false }: SettingsModalProps) {
+  const [settings, setSettings] = useState<ConfigSettings>({
+    llmKey: '',
+    baseUrl: '',
+    model: 'qwen3-max',
+    temperature: 0.7,
+    maxTokens: 2048,
+    recordInterval: 5,
+    maxDays: 30,
+  });
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // 加载配置
+  useEffect(() => {
+    if (isOpen) {
+      loadConfig();
+    }
+  }, [isOpen]);
+
+  const loadConfig = async () => {
+    setLoading(true);
+    try {
+      const response = await api.getConfig();
+      if (response.data.success) {
+        const config = response.data.config;
+        setSettings({
+          llmKey: config.llmKey || '',
+          baseUrl: config.baseUrl || '',
+          model: config.model || 'qwen3-max',
+          temperature: config.temperature || 0.7,
+          maxTokens: config.maxTokens || 2048,
+          recordInterval: config.recordInterval || 5,
+          maxDays: config.maxDays || 30,
+        });
+      }
+    } catch (error) {
+      console.error('加载配置失败:', error);
+      const errorMsg = error instanceof Error ? error.message : undefined;
+      toast.configLoadFailed(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTest = async () => {
+    if (!settings.llmKey || !settings.baseUrl) {
+      setMessage({ type: 'error', text: '请先填写 API Key 和 Base URL' });
+      return;
+    }
+
+    setTesting(true);
+    setMessage(null);
+    try {
+      const response = await api.testLlmConfig({
+        llmKey: settings.llmKey,
+        baseUrl: settings.baseUrl,
+        model: settings.model,
+      });
+
+      if (response.data.success) {
+        setMessage({ type: 'success', text: '✓ API 配置验证成功！' });
+      } else {
+        setMessage({
+          type: 'error',
+          text: `✗ API 配置验证失败: ${response.data.error || '未知错误'}`
+        });
+      }
+    } catch (error) {
+      console.error('测试配置失败:', error);
+      const errorMsg = error instanceof Error ? error.message : '网络连接失败';
+      setMessage({ type: 'error', text: `✗ 测试失败: ${errorMsg}` });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const response = await api.saveConfig(settings);
+      if (response.data.success) {
+        toast.configSaved();
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('保存配置失败:', error);
+      const errorMsg = error instanceof Error ? error.message : undefined;
+      toast.configSaveFailed(errorMsg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleChange = (key: keyof ConfigSettings, value: string | number) => {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -23,8 +139,15 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 flex items-center justify-between border-b bg-background px-6 py-4">
-          <h2 className="text-xl font-bold text-foreground">设置</h2>
+        <div className="sticky top-0 flex items-center justify-between border-b bg-background px-4 py-3">
+          <div>
+            <h2 className="text-lg font-bold text-foreground">设置</h2>
+            {isRequired && (
+              <p className="text-xs text-orange-500 dark:text-orange-400 mt-0.5">
+                ⚠️ 需要配置 API Key 才能使用 LLM 功能
+              </p>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="rounded-lg p-1 text-foreground transition-colors hover:bg-muted"
@@ -35,102 +158,160 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
-          {/* 基本设置 */}
-          <Card>
-            <CardHeader>
-              <CardTitle>基本设置</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-foreground">
-                    截图间隔（秒）
-                  </label>
-                  <Input
-                    type="number"
-                    className="px-4 py-2"
-                    defaultValue={5}
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-foreground">
-                    OCR 语言
-                  </label>
-                  <select className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20">
-                    <option value="zh-cn">中文</option>
-                    <option value="en">英文</option>
-                    <option value="mixed">中英混合</option>
-                  </select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="p-4 space-y-4">
+          {/* 消息提示 */}
+          {message && (
+            <div
+              className={`rounded-lg px-3 py-2 text-sm font-medium ${
+                message.type === 'success'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                  : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+              }`}
+            >
+              {message.text}
+            </div>
+          )}
 
-          {/* AI 设置 */}
-          <Card>
-            <CardHeader>
-              <CardTitle>AI 设置</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-foreground">
-                    API Key
-                  </label>
-                  <Input
-                    type="password"
-                    className="px-4 py-2"
-                    placeholder="输入您的 API Key"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-foreground">
-                    模型选择
-                  </label>
-                  <select className="w-full rounded-lg border border-input bg-background px-4 py-2 text-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20">
-                    <option value="gpt-4">GPT-4</option>
-                    <option value="gpt-3.5">GPT-3.5</option>
-                    <option value="claude">Claude</option>
-                  </select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-muted-foreground">加载配置中...</div>
+            </div>
+          ) : (
+            <>
+              {/* LLM 配置 */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">LLM 配置</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-foreground">
+                        API Key <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        type="password"
+                        className="px-3 py-2 h-9"
+                        placeholder="输入您的 API Key"
+                        value={settings.llmKey}
+                        onChange={(e) => handleChange('llmKey', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-foreground">
+                        Base URL <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        type="text"
+                        className="px-3 py-2 h-9"
+                        placeholder="https://api.example.com/v1"
+                        value={settings.baseUrl}
+                        onChange={(e) => handleChange('baseUrl', e.target.value)}
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="col-span-1">
+                        <label className="mb-1 block text-sm font-medium text-foreground">
+                          模型
+                        </label>
+                        <Input
+                          type="text"
+                          className="px-3 py-2 h-9"
+                          placeholder="qwen3-max"
+                          value={settings.model}
+                          onChange={(e) => handleChange('model', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-foreground">
+                          Temperature
+                        </label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="2"
+                          className="px-3 py-2 h-9"
+                          value={settings.temperature}
+                          onChange={(e) => handleChange('temperature', parseFloat(e.target.value))}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-foreground">
+                          Max Tokens
+                        </label>
+                        <Input
+                          type="number"
+                          className="px-3 py-2 h-9"
+                          value={settings.maxTokens}
+                          onChange={(e) => handleChange('maxTokens', parseInt(e.target.value))}
+                        />
+                      </div>
+                    </div>
 
-          {/* 存储设置 */}
-          <Card>
-            <CardHeader>
-              <CardTitle>存储设置</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-foreground">
-                    自动清理天数
-                  </label>
-                  <Input
-                    type="number"
-                    className="px-4 py-2"
-                    defaultValue={30}
-                  />
-                  <p className="mt-1 text-sm font-medium text-muted-foreground">
-                    超过指定天数的截图将被自动删除
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                    {/* 测试按钮 */}
+                    <div className="pt-1">
+                      <Button
+                        variant="outline"
+                        onClick={handleTest}
+                        disabled={testing || !settings.llmKey || !settings.baseUrl}
+                        className="w-full h-9"
+                      >
+                        {testing ? '测试中...' : '测试 API 连接'}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* 操作按钮 */}
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={onClose}>
-              取消
-            </Button>
-            <Button onClick={onClose}>
-              保存
-            </Button>
-          </div>
+              {/* 基础设置 */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">基础设置</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-foreground">
+                        截图间隔（秒）
+                      </label>
+                      <Input
+                        type="number"
+                        className="px-3 py-2 h-9"
+                        value={settings.recordInterval}
+                        onChange={(e) => handleChange('recordInterval', parseInt(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-foreground">
+                        自动清理（天）
+                      </label>
+                      <Input
+                        type="number"
+                        className="px-3 py-2 h-9"
+                        value={settings.maxDays}
+                        onChange={(e) => handleChange('maxDays', parseInt(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 操作按钮 */}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={onClose} disabled={saving} className="h-9">
+                  取消
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={saving || (isRequired && (!settings.llmKey || !settings.baseUrl))}
+                  className="h-9"
+                >
+                  {saving ? '保存中...' : '保存'}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
