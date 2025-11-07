@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Calendar, BarChart2, FileText, Activity, TrendingUp, Search } from 'lucide-react';
+import { Calendar, BarChart2, FileText, Activity, TrendingUp, Search, FolderKanban } from 'lucide-react';
 import { marked } from 'marked';
 import { Send, Trash2, Plus, User, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -20,13 +20,15 @@ import type { SidebarNavItem } from '@/components/ui/sidebar-nav';
 const EventsPage = dynamic(() => import('@/app/events/page'), { ssr: false });
 const AnalyticsPage = dynamic(() => import('@/app/analytics/page'), { ssr: false });
 const PlanPage = dynamic(() => import('@/app/plan/page'), { ssr: false });
+const ProjectManagementPage = dynamic(() => import('@/app/project-management/page'), { ssr: false });
 
-type MenuType = 'events' | 'analytics' | 'plan';
+type MenuType = 'events' | 'analytics' | 'plan' | 'project-management';
 
 const menuItems: SidebarNavItem[] = [
   { id: 'events', label: '事件管理', icon: Calendar },
   { id: 'analytics', label: '行为分析', icon: BarChart2 },
   { id: 'plan', label: '工作计划', icon: FileText },
+  { id: 'project-management', label: '项目管理', icon: FolderKanban },
 ];
 
 function AppLayoutInner() {
@@ -236,6 +238,8 @@ function AppLayoutInner() {
         return <AnalyticsPage />;
       case 'plan':
         return <PlanPage />;
+      case 'project-management':
+        return <ProjectManagementPage />;
       default:
         return <EventsPage />;
     }
