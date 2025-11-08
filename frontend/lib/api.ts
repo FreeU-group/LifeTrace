@@ -166,4 +166,23 @@ export const api = {
 
   deleteProject: (id: number) =>
     apiClient.delete(`/api/projects/${id}`),
+
+  // 任务管理
+  createTask: (projectId: number, data: { name: string; description?: string; status?: string; parent_task_id?: number }) =>
+    apiClient.post(`/api/projects/${projectId}/tasks`, data),
+
+  getProjectTasks: (projectId: number, params?: { limit?: number; offset?: number; parent_task_id?: number; include_subtasks?: boolean }) =>
+    apiClient.get(`/api/projects/${projectId}/tasks`, { params }),
+
+  getTask: (projectId: number, taskId: number) =>
+    apiClient.get(`/api/projects/${projectId}/tasks/${taskId}`),
+
+  updateTask: (projectId: number, taskId: number, data: { name?: string; description?: string; status?: string; parent_task_id?: number }) =>
+    apiClient.put(`/api/projects/${projectId}/tasks/${taskId}`, data),
+
+  deleteTask: (projectId: number, taskId: number) =>
+    apiClient.delete(`/api/projects/${projectId}/tasks/${taskId}`),
+
+  getTaskChildren: (projectId: number, taskId: number) =>
+    apiClient.get(`/api/projects/${projectId}/tasks/${taskId}/children`),
 };

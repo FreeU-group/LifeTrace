@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/common/Card';
 import { Project } from '@/lib/types';
 import { Calendar, Target, Trash2, Edit2 } from 'lucide-react';
@@ -15,6 +16,8 @@ interface ProjectCardProps {
 }
 
 export default function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
+  const router = useRouter();
+
   const formatDate = (dateString: string) => {
     try {
       return dayjs(dateString).format('YYYY年MM月DD日 HH:mm');
@@ -23,8 +26,25 @@ export default function ProjectCard({ project, onEdit, onDelete }: ProjectCardPr
     }
   };
 
+  const handleCardClick = () => {
+    router.push(`/project-management/${project.id}`);
+  };
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit?.(project);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete?.(project.id);
+  };
+
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card 
+      className="hover:shadow-md transition-shadow cursor-pointer"
+      onClick={handleCardClick}
+    >
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -49,7 +69,7 @@ export default function ProjectCard({ project, onEdit, onDelete }: ProjectCardPr
       <CardFooter className="flex justify-end gap-2">
         {onEdit && (
           <button
-            onClick={() => onEdit(project)}
+            onClick={handleEdit}
             className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground rounded-md transition-colors"
           >
             <Edit2 className="h-4 w-4" />
@@ -58,7 +78,7 @@ export default function ProjectCard({ project, onEdit, onDelete }: ProjectCardPr
         )}
         {onDelete && (
           <button
-            onClick={() => onDelete(project.id)}
+            onClick={handleDelete}
             className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 rounded-md transition-colors"
           >
             <Trash2 className="h-4 w-4" />
