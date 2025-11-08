@@ -5,12 +5,12 @@ server:
   host: 127.0.0.1
   port: 8840
 record:
-  interval: 1
-  screens: all
+  interval: 10
+  screens: primary
   auto_exclude_self: true
   blacklist:
-    enabled: false
-    apps: ''
+    enabled: true
+    apps: QQ, 微信
     windows:
     - 记事本
     - 计算器
@@ -88,8 +88,8 @@ ui:
   sound_enabled: true
   auto_save: true
 llm:
-  llm_key: YOUR_LLM_KEY_HERE
-  base_url: YOUR_BASE_URL_HERE
+  llm_key: sk-a32af075c7e54eee90f283a92a12339b
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
   model: qwen3-max
   temperature: 0.7
   max_tokens: 2048
