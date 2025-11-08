@@ -10,6 +10,7 @@ interface TaskListProps {
   onDelete: (taskId: number) => void;
   onStatusChange: (taskId: number, newStatus: string) => void;
   onCreateSubtask: (parentTaskId: number) => void;
+  projectId?: number; // 添加项目ID参数
 }
 
 export default function TaskList({
@@ -18,6 +19,7 @@ export default function TaskList({
   onDelete,
   onStatusChange,
   onCreateSubtask,
+  projectId,
 }: TaskListProps) {
   // 构建任务树结构
   const buildTaskTree = (tasks: Task[]): Task[] => {
@@ -58,6 +60,7 @@ export default function TaskList({
           onStatusChange={onStatusChange}
           onCreateSubtask={onCreateSubtask}
           level={0}
+          projectId={projectId}
         />
       ))}
     </div>

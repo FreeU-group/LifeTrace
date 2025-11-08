@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Task, TaskStatus } from '@/lib/types';
-import { ChevronRight, ChevronDown, Plus, Edit2, Trash2, Circle, CircleDot, CheckCircle2, XCircle } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Edit2, Trash2, Circle, CircleDot, CheckCircle2, XCircle, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TaskStatusSelect from './TaskStatusSelect';
 
@@ -13,6 +14,7 @@ interface TaskItemProps {
   onStatusChange: (taskId: number, newStatus: string) => void;
   onCreateSubtask: (parentTaskId: number) => void;
   level: number;
+  projectId?: number; // 添加项目ID参数
 }
 
 const statusConfig = {
@@ -49,11 +51,20 @@ export default function TaskItem({
   onStatusChange,
   onCreateSubtask,
   level,
+  projectId,
 }: TaskItemProps) {
+  const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = task.children && task.children.length > 0;
   const config = statusConfig[task.status as TaskStatus];
   const StatusIcon = config.icon;
+
+  // 处理任务名称点击 - 跳转到详情页
+  const handleTaskClick = () => {
+    if (projectId) {
+      router.push(`/project-management/${projectId}/tasks/${task.id}`);
+    }
+  };
 
   return (
     <div>
@@ -91,15 +102,19 @@ export default function TaskItem({
         {/* 任务内容 */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start gap-2">
-            <h3
+            <button
+              onClick={handleTaskClick}
               className={cn(
-                'font-medium text-foreground',
+                'font-medium text-foreground hover:text-primary transition-colors text-left group/name',
                 task.status === 'completed' && 'line-through text-muted-foreground',
                 task.status === 'cancelled' && 'line-through text-muted-foreground'
               )}
             >
               {task.name}
-            </h3>
+              {projectId && (
+                <ExternalLink className="inline-block ml-1 h-3 w-3 opacity-0 group-hover/name:opacity-100 transition-opacity" />
+              )}
+            </button>
             {hasChildren && (
               <span className="flex-shrink-0 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
                 {task.children!.length} 个子任务
@@ -151,6 +166,7 @@ export default function TaskItem({
               onStatusChange={onStatusChange}
               onCreateSubtask={onCreateSubtask}
               level={level + 1}
+              projectId={projectId}
             />
           ))}
         </div>

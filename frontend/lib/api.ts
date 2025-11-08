@@ -185,4 +185,14 @@ export const api = {
 
   getTaskChildren: (projectId: number, taskId: number) =>
     apiClient.get(`/api/projects/${projectId}/tasks/${taskId}/children`),
+
+  // 上下文管理
+  getContexts: (params?: { associated?: boolean; task_id?: number; limit?: number; offset?: number }) =>
+    apiClient.get('/api/contexts', { params }),
+
+  getContext: (contextId: number) =>
+    apiClient.get(`/api/contexts/${contextId}`),
+
+  updateContext: (contextId: number, data: { task_id?: number | null }) =>
+    apiClient.put(`/api/contexts/${contextId}`, data),
 };

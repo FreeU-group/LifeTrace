@@ -148,3 +148,25 @@ export interface TaskListResponse {
   total: number;
   tasks: Task[];
 }
+
+// 上下文管理类型
+export interface Context {
+  id: number;
+  app_name?: string;
+  window_title?: string;
+  start_time?: string;
+  end_time?: string;
+  ai_title?: string;
+  ai_summary?: string;
+  task_id?: number;
+  created_at?: string;
+}
+
+export interface ContextListResponse {
+  total: number;
+  contexts: Context[];
+}
+
+export interface ContextUpdateRequest {
+  task_id?: number | null;
+}

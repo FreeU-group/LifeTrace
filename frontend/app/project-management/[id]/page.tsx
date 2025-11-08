@@ -181,6 +181,7 @@ export default function ProjectDetailPage() {
             onDelete={handleDeleteTask}
             onStatusChange={handleTaskStatusChange}
             onCreateSubtask={handleCreateTask}
+            projectId={projectId}
           />
         )}
       </div>
