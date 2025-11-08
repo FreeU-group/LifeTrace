@@ -25,6 +25,7 @@ class Event(Base):
     created_at = Column(DateTime, default=get_local_time)
     ai_title = Column(String(50))  # LLM生成的事件标题（≤10字）
     ai_summary = Column(Text)  # LLM生成的事件摘要（≤30字，支持markdown）
+    task_id = Column(Integer, ForeignKey("tasks.id"))  # 关联的任务ID（可为空）
 
     def __repr__(self):
         return f"<Event(id={self.id}, app={self.app_name})>"

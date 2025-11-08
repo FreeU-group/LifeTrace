@@ -80,6 +80,24 @@ class DatabaseManager:
             except Exception as me:
                 logging.warning(f"检查/添加 screenshots.event_id 列失败: {me}")
 
+            # 轻量级迁移：为已存在的 events 表添加 task_id 列
+            try:
+                if self.database_url.startswith("sqlite:///"):
+                    with self.engine.connect() as conn:
+                        cols = [
+                            row[1]
+                            for row in conn.execute(
+                                text("PRAGMA table_info('events')")
+                            ).fetchall()
+                        ]
+                        if "task_id" not in cols:
+                            conn.execute(
+                                text("ALTER TABLE events ADD COLUMN task_id INTEGER")
+                            )
+                            logging.info("已为 events 表添加 task_id 列")
+            except Exception as me:
+                logging.warning(f"检查/添加 events.task_id 列失败: {me}")
+
             # 性能优化：添加关键索引
             self._create_performance_indexes()
 
@@ -1450,6 +1468,137 @@ class DatabaseManager:
         except SQLAlchemyError as e:
             logging.error(f"获取子任务失败: {e}")
             return []
+
+    # 上下文管理（事件与任务关联）
+    def list_contexts(
+        self,
+        associated: Optional[bool] = None,
+        task_id: Optional[int] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """列出上下文记录（事件）
+        
+        Args:
+            associated: 是否已关联任务（None表示全部，True表示已关联，False表示未关联）
+            task_id: 按任务ID过滤
+            limit: 返回数量限制
+            offset: 偏移量
+        """
+        try:
+            with self.get_session() as session:
+                q = session.query(Event)
+
+                # 按关联状态过滤
+                if associated is False:
+                    q = q.filter(Event.task_id.is_(None))
+                elif associated is True:
+                    q = q.filter(Event.task_id.isnot(None))
+
+                # 按任务ID过滤
+                if task_id is not None:
+                    q = q.filter(Event.task_id == task_id)
+
+                events = (
+                    q.order_by(Event.start_time.desc())
+                    .offset(offset)
+                    .limit(limit)
+                    .all()
+                )
+
+                return [
+                    {
+                        "id": e.id,
+                        "app_name": e.app_name,
+                        "window_title": e.window_title,
+                        "start_time": e.start_time,
+                        "end_time": e.end_time,
+                        "ai_title": e.ai_title,
+                        "ai_summary": e.ai_summary,
+                        "task_id": e.task_id,
+                        "created_at": e.created_at,
+                    }
+                    for e in events
+                ]
+        except SQLAlchemyError as e:
+            logging.error(f"列出上下文记录失败: {e}")
+            return []
+
+    def count_contexts(
+        self,
+        associated: Optional[bool] = None,
+        task_id: Optional[int] = None,
+    ) -> int:
+        """统计上下文记录数量"""
+        try:
+            with self.get_session() as session:
+                q = session.query(Event)
+
+                if associated is False:
+                    q = q.filter(Event.task_id.is_(None))
+                elif associated is True:
+                    q = q.filter(Event.task_id.isnot(None))
+
+                if task_id is not None:
+                    q = q.filter(Event.task_id == task_id)
+
+                return q.count()
+        except SQLAlchemyError as e:
+            logging.error(f"统计上下文记录数量失败: {e}")
+            return 0
+
+    def get_context(self, context_id: int) -> Optional[Dict[str, Any]]:
+        """获取单个上下文记录"""
+        try:
+            with self.get_session() as session:
+                event = session.query(Event).filter_by(id=context_id).first()
+                if event:
+                    return {
+                        "id": event.id,
+                        "app_name": event.app_name,
+                        "window_title": event.window_title,
+                        "start_time": event.start_time,
+                        "end_time": event.end_time,
+                        "ai_title": event.ai_title,
+                        "ai_summary": event.ai_summary,
+                        "task_id": event.task_id,
+                        "created_at": event.created_at,
+                    }
+                return None
+        except SQLAlchemyError as e:
+            logging.error(f"获取上下文记录失败: {e}")
+            return None
+
+    def update_context_task(
+        self, context_id: int, task_id: Optional[int]
+    ) -> bool:
+        """更新上下文记录的任务关联
+        
+        Args:
+            context_id: 上下文（事件）ID
+            task_id: 任务ID（None表示解除关联）
+        """
+        try:
+            with self.get_session() as session:
+                event = session.query(Event).filter_by(id=context_id).first()
+                if not event:
+                    logging.warning(f"上下文记录不存在: {context_id}")
+                    return False
+
+                # 如果指定了task_id，验证任务是否存在
+                if task_id is not None:
+                    task = session.query(Task).filter_by(id=task_id).first()
+                    if not task:
+                        logging.warning(f"任务不存在: {task_id}")
+                        return False
+
+                event.task_id = task_id
+                session.flush()
+                logging.info(f"更新上下文记录 {context_id} 的任务关联: {task_id}")
+                return True
+        except SQLAlchemyError as e:
+            logging.error(f"更新上下文记录失败: {e}")
+            return False
 
 
 # 全局数据库管理器实例
