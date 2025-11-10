@@ -11,7 +11,6 @@ import { toast } from '@/lib/toast';
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  isRequired?: boolean; // 是否是必须配置（健康检查失败时）
 }
 
 interface ConfigSettings {
@@ -24,7 +23,7 @@ interface ConfigSettings {
   maxDays: number;
 }
 
-export default function SettingsModal({ isOpen, onClose, isRequired = false }: SettingsModalProps) {
+export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [settings, setSettings] = useState<ConfigSettings>({
     llmKey: '',
     baseUrl: '',
@@ -38,11 +37,18 @@ export default function SettingsModal({ isOpen, onClose, isRequired = false }: S
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [initialShowScheduler, setInitialShowScheduler] = useState(false); // 记录初始值
 
   // 加载配置
   useEffect(() => {
     if (isOpen) {
       loadConfig();
+      // 从 localStorage 读取定时任务显示设置
+      const saved = localStorage.getItem('showScheduler');
+      const savedValue = saved === 'true';
+      setShowScheduler(savedValue);
+      setInitialShowScheduler(savedValue); // 记录初始值
     }
   }, [isOpen]);
 
@@ -109,6 +115,22 @@ export default function SettingsModal({ isOpen, onClose, isRequired = false }: S
     try {
       const response = await api.saveConfig(settings);
       if (response.data.success) {
+        // 保存定时任务显示设置
+        const schedulerChanged = showScheduler !== initialShowScheduler;
+        if (schedulerChanged) {
+          localStorage.setItem('showScheduler', String(showScheduler));
+          setInitialShowScheduler(showScheduler); // 更新初始值
+
+          // 触发自定义事件通知其他组件
+          const currentPath = window.location.pathname;
+          window.dispatchEvent(new CustomEvent('schedulerVisibilityChange', {
+            detail: {
+              visible: showScheduler,
+              currentPath: currentPath
+            }
+          }));
+        }
+
         toast.configSaved();
         setTimeout(() => {
           onClose();
@@ -127,6 +149,18 @@ export default function SettingsModal({ isOpen, onClose, isRequired = false }: S
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
+  // 处理定时任务显示开关（仅更新状态，不立即保存）
+  const handleSchedulerToggle = (checked: boolean) => {
+    setShowScheduler(checked);
+  };
+
+  // 处理取消操作
+  const handleCancel = () => {
+    // 恢复定时任务开关到初始状态
+    setShowScheduler(initialShowScheduler);
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -140,14 +174,7 @@ export default function SettingsModal({ isOpen, onClose, isRequired = false }: S
       >
         {/* Header */}
         <div className="sticky top-0 flex items-center justify-between border-b bg-background px-4 py-3">
-          <div>
-            <h2 className="text-lg font-bold text-foreground">设置</h2>
-            {isRequired && (
-              <p className="text-xs text-orange-500 dark:text-orange-400 mt-0.5">
-                ⚠️ 需要配置 API Key 才能使用 LLM 功能
-              </p>
-            )}
-          </div>
+          <h2 className="text-lg font-bold text-foreground">设置</h2>
           <button
             onClick={onClose}
             className="rounded-lg p-1 text-foreground transition-colors hover:bg-muted"
@@ -297,14 +324,42 @@ export default function SettingsModal({ isOpen, onClose, isRequired = false }: S
                 </CardContent>
               </Card>
 
+              {/* 开发者选项 */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">开发者选项</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground">
+                        显示定时任务
+                      </label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        开启后在侧边栏显示定时任务菜单
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={showScheduler}
+                        onChange={(e) => handleSchedulerToggle(e.target.checked)}
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* 操作按钮 */}
               <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={onClose} disabled={saving} className="h-9">
+                <Button variant="outline" onClick={handleCancel} disabled={saving} className="h-9">
                   取消
                 </Button>
                 <Button
                   onClick={handleSave}
-                  disabled={saving || (isRequired && (!settings.llmKey || !settings.baseUrl))}
+                  disabled={saving}
                   className="h-9"
                 >
                   {saving ? '保存中...' : '保存'}

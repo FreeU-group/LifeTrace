@@ -1,7 +1,5 @@
 """项目管理相关路由"""
 
-from typing import List
-
 from fastapi import APIRouter, HTTPException, Query
 
 from lifetrace.routers import dependencies as deps
@@ -28,9 +26,7 @@ async def create_project(project: ProjectCreate):
     """
     try:
         # 创建项目
-        project_id = deps.db_manager.create_project(
-            name=project.name, goal=project.goal
-        )
+        project_id = deps.db_manager.create_project(name=project.name, goal=project.goal)
 
         if not project_id:
             raise HTTPException(status_code=500, detail="创建项目失败")
@@ -47,7 +43,7 @@ async def create_project(project: ProjectCreate):
         raise
     except Exception as e:
         deps.logger.error(f"创建项目失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"创建项目失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"创建项目失败: {str(e)}") from e
 
 
 @router.get("", response_model=ProjectListResponse)
@@ -81,7 +77,7 @@ async def get_projects(
 
     except Exception as e:
         deps.logger.error(f"获取项目列表失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"获取项目列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取项目列表失败: {str(e)}") from e
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
@@ -107,7 +103,7 @@ async def get_project(project_id: int):
         raise
     except Exception as e:
         deps.logger.error(f"获取项目详情失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"获取项目详情失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取项目详情失败: {str(e)}") from e
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)
@@ -148,7 +144,7 @@ async def update_project(project_id: int, project: ProjectUpdate):
         raise
     except Exception as e:
         deps.logger.error(f"更新项目失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"更新项目失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"更新项目失败: {str(e)}") from e
 
 
 @router.delete("/{project_id}", status_code=204)
@@ -181,5 +177,4 @@ async def delete_project(project_id: int):
         raise
     except Exception as e:
         deps.logger.error(f"删除项目失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"删除项目失败: {str(e)}")
-
+        raise HTTPException(status_code=500, detail=f"删除项目失败: {str(e)}") from e

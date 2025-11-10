@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Event, Screenshot } from '@/lib/types';
-import { api } from '@/lib/api';
+import { Event, Screenshot, ChatMessage } from '@/lib/types';
+import { api, API_BASE_URL } from '@/lib/api';
 import { formatDateTime, formatDuration, calculateDuration } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/common/Card';
 import { FormField } from '@/components/common/Input';
 import Button from '@/components/common/Button';
+import Input from '@/components/common/Input';
 import Loading from '@/components/common/Loading';
-import { ChevronDown, ChevronUp, Square, Check, MessageSquare, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, Square, Check, Search, Send, Plus, User, Bot, X, Activity, TrendingUp } from 'lucide-react';
 import ScreenshotModal from '@/components/screenshot/ScreenshotModal';
 import { useSelectedEvents } from '@/lib/context/SelectedEventsContext';
 import { marked } from 'marked';
@@ -31,7 +32,17 @@ export default function EventsPage() {
   const [currentImages, setCurrentImages] = useState<{ [key: number]: number }>({});
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
   const [selectedScreenshot, setSelectedScreenshot] = useState<Screenshot | null>(null);
-  const { selectedEvents, setSelectedEvents, setSelectedEventsData } = useSelectedEvents();
+  const { selectedEvents, setSelectedEvents, setSelectedEventsData, selectedEventsData } = useSelectedEvents();
+
+  // 聊天相关状态
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [useRAG, setUseRAG] = useState(true);
+  const [llmHealthy, setLlmHealthy] = useState(true);
+  const [llmHealthChecked, setLlmHealthChecked] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const pageSize = 10; // 每次加载10条
 
@@ -43,6 +54,165 @@ export default function EventsPage() {
       console.error('Markdown渲染失败:', error);
       return text;
     }
+  };
+
+  // 滚动到聊天底部
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // 检查 LLM 健康状态
+  const checkLlmHealth = async () => {
+    try {
+      const response = await api.llmHealthCheck();
+      const status = response.data.status;
+      setLlmHealthy(status === 'healthy');
+      setLlmHealthChecked(true);
+      return status === 'healthy';
+    } catch (error) {
+      console.error('LLM健康检查失败:', error);
+      setLlmHealthy(false);
+      setLlmHealthChecked(true);
+      return false;
+    }
+  };
+
+  // 快捷选项处理
+  const handleQuickAction = (action: string) => {
+    let message = '';
+    switch (action) {
+      case 'timeline':
+        message = '我今天做了什么？';
+        break;
+      case 'analytics':
+        message = '分析过去的一周我的应用使用情况';
+        break;
+      case 'search':
+        message = '搜索包含特定内容的截图';
+        break;
+    }
+    setInputMessage(message);
+  };
+
+  // 发送消息（支持事件上下文和流式响应）
+  const sendMessage = async () => {
+    if (!inputMessage.trim()) return;
+
+    // 检查 LLM 健康状态
+    if (!llmHealthChecked) {
+      await checkLlmHealth();
+    }
+
+    if (!llmHealthy) {
+      toast.error('LLM 服务未配置或不可用，请前往设置页面配置 API Key');
+      return;
+    }
+
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: inputMessage,
+      timestamp: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    const currentInput = inputMessage;
+    setInputMessage('');
+    setChatLoading(true);
+
+    try {
+      // 如果有选中的事件，使用流式接口并附带上下文
+      if (selectedEventsData.length > 0) {
+        const eventContext = selectedEventsData.map((event) => ({
+          event_id: event.id,
+          text: event.ai_summary || event.summary || '',
+        }));
+
+        // 使用流式接口
+        const response = await fetch(`${API_BASE_URL}/api/chat/stream-with-context`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: currentInput,
+            event_context: eventContext,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('请求失败');
+        }
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let assistantContent = '';
+
+        // 创建助手消息占位
+        const assistantMessage: ChatMessage = {
+          role: 'assistant',
+          content: '',
+          timestamp: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+
+        // 读取流式响应
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            assistantContent += chunk;
+
+            // 更新消息内容
+            setMessages((prev) => {
+              const newMessages = [...prev];
+              newMessages[newMessages.length - 1] = {
+                ...newMessages[newMessages.length - 1],
+                content: assistantContent,
+              };
+              return newMessages;
+            });
+          }
+        }
+      } else {
+        // 没有选中事件，使用普通接口
+        const response = await api.sendChatMessage({
+          message: currentInput,
+          conversation_id: currentConversationId || undefined,
+          use_rag: useRAG,
+        });
+
+        const assistantMessage: ChatMessage = {
+          role: 'assistant',
+          content: response.data.response || response.data.message,
+          timestamp: new Date().toISOString(),
+          sources: response.data.sources,
+        };
+
+        setMessages((prev) => [...prev, assistantMessage]);
+
+        if (response.data.conversation_id) {
+          setCurrentConversationId(response.data.conversation_id);
+        }
+      }
+    } catch (error) {
+      console.error('发送消息失败:', error);
+      const errorMessage: ChatMessage = {
+        role: 'assistant',
+        content: '抱歉，发送消息失败，请重试。',
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  // 新建会话
+  const createNewConversation = () => {
+    setCurrentConversationId(null);
+    setMessages([]);
   };
 
   // 加载事件详情（包含截图）
@@ -309,6 +479,16 @@ export default function EventsPage() {
     }
   }, [sortedDates]);
 
+  // 监听消息变化，滚动到底部
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // 初始化时检查 LLM 健康状态
+  useEffect(() => {
+    checkLlmHealth();
+  }, []);
+
   // 初始化：设置默认日期并加载事件（只执行一次）
   useEffect(() => {
     // 设置默认日期（最近7天）
@@ -367,22 +547,23 @@ export default function EventsPage() {
   }, []); // 只在组件挂载时执行一次
 
   return (
-    <div className="flex h-full flex-col overflow-hidden p-4">
-      {/* 选中事件提示 */}
-      {selectedEvents.size > 0 && (
-        <div className={`mb-4 flex items-center justify-between rounded-lg px-4 py-3 border ${
-          selectedEvents.size >= 10
-            ? 'bg-destructive/10 border-destructive/30'
-            : 'bg-primary/10 border-primary/20'
-        }`}>
-          <div className="flex items-center gap-2">
-            <Check className={`h-5 w-5 ${selectedEvents.size >= 10 ? 'text-destructive' : 'text-primary'}`} />
-            <span className={`font-medium ${selectedEvents.size >= 10 ? 'text-destructive' : 'text-primary'}`}>
-              已选择 {selectedEvents.size} / 10 个事件
-              {selectedEvents.size >= 10 && <span className="ml-2">（已达上限）</span>}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
+    <div className="flex h-full overflow-hidden">
+      {/* 左侧事件管理区域 - 占2/3 */}
+      <div className="flex w-2/3 flex-col overflow-hidden p-4 border-r">
+        {/* 选中事件提示 */}
+        {selectedEvents.size > 0 && (
+          <div className={`mb-4 flex items-center justify-between rounded-lg px-4 py-3 border ${
+            selectedEvents.size >= 10
+              ? 'bg-destructive/10 border-destructive/30'
+              : 'bg-primary/10 border-primary/20'
+          }`}>
+            <div className="flex items-center gap-2">
+              <Check className={`h-5 w-5 ${selectedEvents.size >= 10 ? 'text-destructive' : 'text-primary'}`} />
+              <span className={`font-medium ${selectedEvents.size >= 10 ? 'text-destructive' : 'text-primary'}`}>
+                已选择 {selectedEvents.size} / 10 个事件
+                {selectedEvents.size >= 10 && <span className="ml-2">（已达上限）</span>}
+              </span>
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -393,17 +574,8 @@ export default function EventsPage() {
             >
               清空选择
             </Button>
-            <Button
-              size="sm"
-              onClick={() => router.push('/chat')}
-              className="gap-2"
-            >
-              <MessageSquare className="h-4 w-4" />
-              前往对话
-            </Button>
           </div>
-        </div>
-      )}
+        )}
 
       {/* 搜索表单 - 固定区域 */}
       <Card className="mb-4 flex-shrink-0">
@@ -665,34 +837,270 @@ export default function EventsPage() {
         </CardContent>
       </Card>
 
-      {/* 截图查看模态框 */}
-      {selectedScreenshot && (() => {
-        // 找到选中截图所属的事件
-        const eventWithScreenshot = events.find((event) => {
-          const detail = eventDetails[event.id];
-          const screenshots = detail?.screenshots || [];
-          return screenshots.some((s: Screenshot) => s.id === selectedScreenshot.id);
-        });
+        {/* 截图查看模态框 */}
+        {selectedScreenshot && (() => {
+          // 找到选中截图所属的事件
+          const eventWithScreenshot = events.find((event) => {
+            const detail = eventDetails[event.id];
+            const screenshots = detail?.screenshots || [];
+            return screenshots.some((s: Screenshot) => s.id === selectedScreenshot.id);
+          });
 
-        if (eventWithScreenshot) {
-          const detail = eventDetails[eventWithScreenshot.id];
-          const screenshots = detail?.screenshots || [];
+          if (eventWithScreenshot) {
+            const detail = eventDetails[eventWithScreenshot.id];
+            const screenshots = detail?.screenshots || [];
+            return (
+              <ScreenshotModal
+                screenshot={selectedScreenshot}
+                screenshots={screenshots}
+                onClose={() => setSelectedScreenshot(null)}
+              />
+            );
+          }
+
           return (
             <ScreenshotModal
               screenshot={selectedScreenshot}
-              screenshots={screenshots}
               onClose={() => setSelectedScreenshot(null)}
             />
           );
-        }
+        })()}
+      </div>
 
-        return (
-          <ScreenshotModal
-            screenshot={selectedScreenshot}
-            onClose={() => setSelectedScreenshot(null)}
-          />
-        );
-      })()}
+      {/* 右侧聊天区域 - 占1/3 */}
+      <div className="w-1/3 bg-card flex flex-col flex-shrink-0 h-full overflow-hidden">
+        <div className="flex flex-1 flex-col h-full overflow-hidden">
+          {/* 顶部工具栏 */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
+            <h2 className="text-sm font-semibold text-foreground">Chat</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={createNewConversation}
+              className="h-8 w-8 p-0"
+              title="新建对话"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* 消息列表 - 滚动条靠边 */}
+          <div className="flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+            {messages.length === 0 ? (
+              <div className="h-full flex items-center justify-center px-4">
+                <div className="text-center space-y-6 max-w-md w-full">
+                  {/* LLM 健康状态提醒 */}
+                  {llmHealthChecked && !llmHealthy && (
+                    <div className="rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 p-4 mb-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <svg className="w-5 h-5 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 text-left">
+                          <h3 className="text-sm font-semibold text-orange-800 dark:text-orange-300 mb-1">
+                            LLM 服务未配置
+                          </h3>
+                          <p className="text-xs text-orange-700 dark:text-orange-400 mb-2">
+                            聊天功能需要配置 API Key 才能使用。请点击右上角设置按钮进行配置。
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 欢迎标题 */}
+                  <h1 className="text-2xl font-bold text-foreground my-8">
+                    我可以帮您做什么？
+                  </h1>
+
+                  {/* 快捷选项 */}
+                  <div className="grid grid-cols-1 gap-3">
+                    {/* 数字镜像 */}
+                    <button
+                      onClick={() => handleQuickAction('timeline')}
+                      className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors text-left group"
+                    >
+                      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                        <Activity className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">数字镜像</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">查看今天的活动时间线</p>
+                      </div>
+                    </button>
+
+                    {/* 应用分析 */}
+                    <button
+                      onClick={() => handleQuickAction('analytics')}
+                      className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors text-left group"
+                    >
+                      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                        <TrendingUp className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">应用分析</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">分析应用使用情况和趋势</p>
+                      </div>
+                    </button>
+
+                    {/* 内容搜索 */}
+                    <button
+                      onClick={() => handleQuickAction('search')}
+                      className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors text-left group"
+                    >
+                      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                        <Search className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">内容搜索</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">搜索包含特定内容的截图</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="px-4 py-4 space-y-3 pr-2">
+                {messages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`flex gap-2 ${
+                      message.role === 'user' ? 'justify-end' : 'justify-start'
+                    }`}
+                  >
+                    {/* 机器人头像 - 靠左 */}
+                    {message.role === 'assistant' && (
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-md border border-border">
+                        <Bot className="w-4 h-4 text-gray-700" />
+                      </div>
+                    )}
+
+                    <div
+                      className={`max-w-[80%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
+                        message.role === 'user'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-foreground'
+                      }`}
+                    >
+                      {message.role === 'assistant' ? (
+                        <div
+                          className="prose prose-sm max-w-none text-sm prose-p:my-1.5 prose-p:leading-relaxed prose-ul:my-1.5 prose-ol:my-1.5"
+                          dangerouslySetInnerHTML={{
+                            __html: renderMarkdown(message.content),
+                          }}
+                        />
+                      ) : (
+                        <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                      )}
+
+                      {message.sources && message.sources.length > 0 && (
+                        <div className="mt-2 border-t border-border/50 pt-2">
+                          <p className="font-medium text-xs text-muted-foreground mb-1.5">相关截图:</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {message.sources.slice(0, 2).map((source, i: number) => (
+                              <span
+                                key={i}
+                                className="inline-flex items-center rounded-md bg-background/80 px-2 py-0.5 text-[10px] font-medium text-foreground border border-border/50"
+                              >
+                                {(source as { app_name?: string }).app_name || '未知应用'}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 用户头像 - 靠右 */}
+                    {message.role === 'user' && (
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-md border border-border">
+                        <User className="w-4 h-4 text-gray-700" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {chatLoading && <Loading text="正在思考..." size="sm" />}
+
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+          </div>
+
+          {/* 选中的事件上下文 */}
+          {selectedEventsData.length > 0 && (
+            <div className="border-t border-border px-4 py-3 flex-shrink-0 bg-muted/30">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  已选择 {selectedEventsData.length} 个事件
+                </span>
+                <button
+                  onClick={() => {
+                    setSelectedEvents(new Set());
+                    setSelectedEventsData([]);
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  清除
+                </button>
+              </div>
+              <div className="space-y-1.5 max-h-24 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                {selectedEventsData.map((event) => (
+                  <div
+                    key={event.id}
+                    className="flex items-center justify-between rounded-md bg-background px-2 py-1.5 text-xs border-2 border-primary/50 hover:border-primary transition-colors shadow-sm"
+                  >
+                    <span className="truncate flex-1 text-primary font-semibold">
+                      {event.window_title || '未知窗口'} - {event.app_name}
+                      <span className="ml-1 text-primary/60">
+                        ({event.screenshot_count || 0}张)
+                      </span>
+                    </span>
+                    <button
+                      onClick={() => {
+                        const newSet = new Set(selectedEvents);
+                        newSet.delete(event.id);
+                        setSelectedEvents(newSet);
+                        setSelectedEventsData(selectedEventsData.filter(e => e.id !== event.id));
+                      }}
+                      className="ml-2 text-primary/60 hover:text-destructive transition-colors p-0.5 rounded hover:bg-destructive/10"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 输入框 */}
+          <div className="flex gap-2 border-t border-border px-4 py-3 flex-shrink-0 bg-background">
+            <Input
+              type="text"
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+              placeholder="输入消息..."
+              className="flex-1"
+              disabled={chatLoading}
+            />
+            <Button
+              onClick={sendMessage}
+              disabled={chatLoading || !inputMessage.trim()}
+              size="sm"
+              className="h-9 px-3"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

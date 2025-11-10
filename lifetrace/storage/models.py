@@ -95,9 +95,7 @@ class ProcessingQueue(Base):
     id = Column(Integer, primary_key=True)
     screenshot_id = Column(Integer, nullable=False)
     task_type = Column(String(50), nullable=False)  # 任务类型：ocr
-    status = Column(
-        String(20), default="pending"
-    )  # pending, processing, completed, failed
+    status = Column(String(20), default="pending")  # pending, processing, completed, failed
     retry_count = Column(Integer, default=0)
     error_message = Column(Text)
     created_at = Column(DateTime, default=get_local_time)
@@ -113,9 +111,7 @@ class UserBehaviorStats(Base):
     __tablename__ = "user_behavior_stats"
 
     id = Column(Integer, primary_key=True)
-    action_type = Column(
-        String(50), nullable=False
-    )  # search, chat, view_screenshot, etc.
+    action_type = Column(String(50), nullable=False)  # search, chat, view_screenshot, etc.
     action_details = Column(Text)  # JSON格式的详细信息
     session_id = Column(String(100))  # 会话ID
     user_agent = Column(String(500))  # 用户代理
@@ -137,9 +133,7 @@ class AppUsageLog(Base):
     app_name = Column(String(200), nullable=False)  # 应用名称
     window_title = Column(String(500))  # 窗口标题
     timestamp = Column(DateTime, default=get_local_time, nullable=False)  # 记录时间戳
-    duration_seconds = Column(
-        Integer, default=0
-    )  # 持续时间（秒），用于记录从上次记录到现在的时长
+    duration_seconds = Column(Integer, default=0)  # 持续时间（秒），用于记录从上次记录到现在的时长
     is_active = Column(Boolean, default=True)  # 是否为活跃状态
     screen_id = Column(Integer, default=0)  # 屏幕ID
     created_at = Column(DateTime, default=get_local_time)
@@ -199,9 +193,7 @@ class Task(Base):
     )  # 任务状态：pending, in_progress, completed, cancelled
     parent_task_id = Column(Integer, ForeignKey("tasks.id"))  # 父任务ID（自关联，用于子任务）
     created_at = Column(DateTime, default=get_local_time, nullable=False)
-    updated_at = Column(
-        DateTime, default=get_local_time, onupdate=get_local_time, nullable=False
-    )
+    updated_at = Column(DateTime, default=get_local_time, onupdate=get_local_time, nullable=False)
 
     def __repr__(self):
         return f"<Task(id={self.id}, name={self.name}, project_id={self.project_id})>"

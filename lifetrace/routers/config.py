@@ -1,7 +1,7 @@
 """配置相关路由"""
 
 import os
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
@@ -24,15 +24,15 @@ async def get_config():
             "debug": deps.config.get("server.debug", False),
         },
         record={
-            "interval": deps.config.get("record.interval"),
-            "screens": deps.config.get("record.screens"),
-            "format": deps.config.get("record.format"),
+            "interval": deps.config.get("jobs.recorder.interval"),
+            "screens": deps.config.get("jobs.recorder.screens"),
+            "format": deps.config.get("jobs.recorder.format"),
         },
         ocr={
-            "enabled": deps.config.get("ocr.enabled"),
-            "use_gpu": deps.config.get("ocr.use_gpu"),
-            "language": deps.config.get("ocr.language"),
-            "confidence_threshold": deps.config.get("ocr.confidence_threshold"),
+            "enabled": deps.config.get("jobs.ocr.enabled"),
+            "use_gpu": deps.config.get("jobs.ocr.use_gpu"),
+            "language": deps.config.get("jobs.ocr.language"),
+            "confidence_threshold": deps.config.get("jobs.ocr.confidence_threshold"),
         },
         storage={
             "max_days": deps.config.get("storage.max_days"),
@@ -43,7 +43,7 @@ async def get_config():
 
 
 @router.post("/test-llm-config")
-async def test_llm_config(config_data: Dict[str, str]):
+async def test_llm_config(config_data: dict[str, str]):
     """测试LLM配置是否可用（仅验证认证）"""
     try:
         from openai import OpenAI
@@ -86,12 +86,12 @@ async def get_config_detailed():
                 "soundEnabled": deps.config.get("ui.sound_enabled", True),
                 "autoSave": deps.config.get("ui.auto_save", True),
                 # 录制配置
-                "autoExcludeSelf": deps.config.get("record.auto_exclude_self", True),
-                "blacklistEnabled": deps.config.get("record.blacklist.enabled", False),
-                "blacklistApps": deps.config.get("record.blacklist.apps", ""),
-                "recordingEnabled": deps.config.get("record.enabled", True),
-                "recordInterval": deps.config.get("record.interval", 1),
-                "screenSelection": deps.config.get("record.screens", "all"),
+                "autoExcludeSelf": deps.config.get("jobs.recorder.auto_exclude_self", True),
+                "blacklistEnabled": deps.config.get("jobs.recorder.blacklist.enabled", False),
+                "blacklistApps": deps.config.get("jobs.recorder.blacklist.apps", ""),
+                "recordingEnabled": deps.config.get("jobs.recorder.enabled", True),
+                "recordInterval": deps.config.get("jobs.recorder.interval", 1),
+                "screenSelection": deps.config.get("jobs.recorder.screens", "all"),
                 # 存储配置
                 "storageEnabled": deps.config.get("storage.enabled", True),
                 "maxDays": deps.config.get("storage.max_days", 30),
@@ -117,7 +117,7 @@ async def get_config_detailed():
 
 
 @router.post("/save-and-init-llm")
-async def save_and_init_llm(config_data: Dict[str, str]):
+async def save_and_init_llm(config_data: dict[str, str]):
     """保存配置并重新初始化LLM服务"""
     try:
         # 验证必需字段
@@ -130,10 +130,7 @@ async def save_and_init_llm(config_data: Dict[str, str]):
             }
 
         # 验证字段类型和内容
-        if (
-            not isinstance(config_data.get("llmKey"), str)
-            or not config_data.get("llmKey").strip()
-        ):
+        if not isinstance(config_data.get("llmKey"), str) or not config_data.get("llmKey").strip():
             return {"success": False, "error": "LLM Key必须是非空字符串"}
 
         if (
@@ -142,10 +139,7 @@ async def save_and_init_llm(config_data: Dict[str, str]):
         ):
             return {"success": False, "error": "Base URL必须是非空字符串"}
 
-        if (
-            not isinstance(config_data.get("model"), str)
-            or not config_data.get("model").strip()
-        ):
+        if not isinstance(config_data.get("model"), str) or not config_data.get("model").strip():
             return {"success": False, "error": "模型名称必须是非空字符串"}
 
         # 1. 先测试配置
@@ -174,9 +168,6 @@ async def save_and_init_llm(config_data: Dict[str, str]):
 
         deps.rag_service = RAGService(
             db_manager=deps.db_manager,
-            api_key=deps.config.llm_api_key,
-            base_url=deps.config.llm_base_url,
-            model=deps.config.llm_model,
         )
         deps.logger.info(f"RAG服务已重新初始化 - 模型: {deps.config.llm_model}")
 
@@ -193,7 +184,7 @@ async def save_and_init_llm(config_data: Dict[str, str]):
 
 
 @router.post("/save-config")
-async def save_config(settings: Dict[str, Any]):
+async def save_config(settings: dict[str, Any]):
     """保存配置到config.yaml文件"""
     try:
         import yaml
@@ -206,7 +197,7 @@ async def save_config(settings: Dict[str, Any]):
             deps.config.save_config()
 
         # 读取现有配置
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             current_config = yaml.safe_load(f) or {}
 
         # 更新配置项
@@ -215,11 +206,11 @@ async def save_config(settings: Dict[str, Any]):
             "isDark": "ui.dark_mode",
             "darkMode": "ui.dark_mode",
             "language": "ui.language",
-            "blacklistEnabled": "record.blacklist.enabled",
-            "blacklistApps": "record.blacklist.apps",
-            "recordingEnabled": "record.enabled",
-            "recordInterval": "record.interval",
-            "screenSelection": "record.screens",
+            "blacklistEnabled": "jobs.recorder.blacklist.enabled",
+            "blacklistApps": "jobs.recorder.blacklist.apps",
+            "recordingEnabled": "jobs.recorder.enabled",
+            "recordInterval": "jobs.recorder.interval",
+            "screenSelection": "jobs.recorder.screens",
             "storageEnabled": "storage.enabled",
             "maxDays": "storage.max_days",
             "deduplicateEnabled": "storage.deduplicate",
@@ -238,7 +229,7 @@ async def save_config(settings: Dict[str, Any]):
             # 服务器配置
             "serverHost": "server.host",
             "serverPort": "server.port",
-            "autoExcludeSelf": "record.auto_exclude_self",
+            "autoExcludeSelf": "jobs.recorder.auto_exclude_self",
         }
 
         # 更新配置

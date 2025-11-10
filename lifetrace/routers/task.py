@@ -1,7 +1,5 @@
 """任务管理相关路由"""
 
-from typing import Optional
-
 from fastapi import APIRouter, HTTPException, Path, Query
 
 from lifetrace.routers import dependencies as deps
@@ -64,7 +62,7 @@ async def create_task(
         raise
     except Exception as e:
         deps.logger.error(f"创建任务失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"创建任务失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"创建任务失败: {str(e)}") from e
 
 
 @router.get("/api/projects/{project_id}/tasks", response_model=TaskListResponse)
@@ -72,7 +70,7 @@ async def get_project_tasks(
     project_id: int = Path(..., description="项目ID"),
     limit: int = Query(100, ge=1, le=1000, description="返回数量限制"),
     offset: int = Query(0, ge=0, description="偏移量"),
-    parent_task_id: Optional[int] = Query(None, description="父任务ID（获取子任务）"),
+    parent_task_id: int | None = Query(None, description="父任务ID（获取子任务）"),
     include_subtasks: bool = Query(True, description="是否包含所有子任务"),
 ):
     """
@@ -104,9 +102,7 @@ async def get_project_tasks(
         )
 
         # 统计总数
-        total = deps.db_manager.count_tasks(
-            project_id=project_id, parent_task_id=parent_task_id
-        )
+        total = deps.db_manager.count_tasks(project_id=project_id, parent_task_id=parent_task_id)
 
         deps.logger.info(f"获取项目 {project_id} 的任务列表，返回 {len(tasks)} 个任务")
 
@@ -119,7 +115,7 @@ async def get_project_tasks(
         raise
     except Exception as e:
         deps.logger.error(f"获取任务列表失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"获取任务列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取任务列表失败: {str(e)}") from e
 
 
 @router.get(
@@ -156,7 +152,7 @@ async def get_task(
         raise
     except Exception as e:
         deps.logger.error(f"获取任务详情失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"获取任务详情失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取任务详情失败: {str(e)}") from e
 
 
 @router.put(
@@ -213,7 +209,7 @@ async def update_task(
         raise
     except Exception as e:
         deps.logger.error(f"更新任务失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"更新任务失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"更新任务失败: {str(e)}") from e
 
 
 @router.delete(
@@ -257,7 +253,7 @@ async def delete_task(
         raise
     except Exception as e:
         deps.logger.error(f"删除任务失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"删除任务失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"删除任务失败: {str(e)}") from e
 
 
 @router.get(
@@ -302,5 +298,4 @@ async def get_task_children(
         raise
     except Exception as e:
         deps.logger.error(f"获取子任务失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"获取子任务失败: {str(e)}")
-
+        raise HTTPException(status_code=500, detail=f"获取子任务失败: {str(e)}") from e

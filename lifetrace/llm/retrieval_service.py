@@ -2,7 +2,7 @@ import logging
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 # 添加项目根目录到Python路径，以便直接运行此文件
 if __name__ == "__main__":
@@ -11,9 +11,9 @@ if __name__ == "__main__":
 
 from sqlalchemy import func, or_
 
+from lifetrace.storage import DatabaseManager
 from lifetrace.storage.models import OCRResult, Screenshot
 from lifetrace.util.query_parser import QueryConditions, QueryParser
-from lifetrace.storage import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class RetrievalService:
 
     def search_by_conditions(
         self, conditions: QueryConditions, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         根据查询条件检索数据
 
@@ -63,8 +63,7 @@ class RetrievalService:
                 # 添加应用名称过滤
                 if conditions.app_names:
                     app_filters = [
-                        Screenshot.app_name.ilike(f"%{app}%")
-                        for app in conditions.app_names
+                        Screenshot.app_name.ilike(f"%{app}%") for app in conditions.app_names
                     ]
                     query = query.filter(or_(*app_filters))
 
@@ -72,9 +71,7 @@ class RetrievalService:
                 if conditions.keywords:
                     keyword_filters = []
                     for keyword in conditions.keywords:
-                        keyword_filters.append(
-                            OCRResult.text_content.ilike(f"%{keyword}%")
-                        )
+                        keyword_filters.append(OCRResult.text_content.ilike(f"%{keyword}%"))
 
                     if len(keyword_filters) > 1:
                         # 多个关键词使用OR连接
@@ -159,7 +156,7 @@ class RetrievalService:
             logger.error(f"数据检索失败: {e}")
             return []
 
-    def search_by_query(self, user_query: str, limit: int = 50) -> List[Dict[str, Any]]:
+    def search_by_query(self, user_query: str, limit: int = 50) -> list[dict[str, Any]]:
         """
         根据用户查询检索数据
 
@@ -179,7 +176,7 @@ class RetrievalService:
 
     def search_recent(
         self, hours: int = 24, app_name: str = None, limit: int = 20
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         检索最近的记录
 
@@ -202,9 +199,7 @@ class RetrievalService:
 
         return self.search_by_conditions(conditions, limit)
 
-    def search_by_app(
-        self, app_name: str, days: int = 7, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    def search_by_app(self, app_name: str, days: int = 7, limit: int = 50) -> list[dict[str, Any]]:
         """
         按应用名称检索记录
 
@@ -228,8 +223,8 @@ class RetrievalService:
         return self.search_by_conditions(conditions, limit)
 
     def search_by_keywords(
-        self, keywords: List[str], days: int = 30, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+        self, keywords: list[str], days: int = 30, limit: int = 50
+    ) -> list[dict[str, Any]]:
         """
         按关键词检索记录
 
@@ -244,13 +239,11 @@ class RetrievalService:
         end_time = datetime.now()
         start_time = end_time - timedelta(days=days)
 
-        conditions = QueryConditions(
-            start_date=start_time, end_date=end_time, keywords=keywords
-        )
+        conditions = QueryConditions(start_date=start_time, end_date=end_time, keywords=keywords)
 
         return self.search_by_conditions(conditions, limit)
 
-    def get_statistics(self, conditions: QueryConditions = None) -> Dict[str, Any]:
+    def get_statistics(self, conditions: QueryConditions = None) -> dict[str, Any]:
         """
         获取统计信息
 
@@ -273,18 +266,13 @@ class RetrievalService:
                 # 应用条件过滤
                 if conditions:
                     if conditions.start_date:
-                        query = query.filter(
-                            Screenshot.created_at >= conditions.start_date
-                        )
+                        query = query.filter(Screenshot.created_at >= conditions.start_date)
                     if conditions.end_date:
-                        query = query.filter(
-                            Screenshot.created_at <= conditions.end_date
-                        )
+                        query = query.filter(Screenshot.created_at <= conditions.end_date)
                     if conditions.app_names:
                         # 支持多个应用名称过滤
                         app_filters = [
-                            Screenshot.app_name.ilike(f"%{app}%")
-                            for app in conditions.app_names
+                            Screenshot.app_name.ilike(f"%{app}%") for app in conditions.app_names
                         ]
                         query = query.filter(or_(*app_filters))
 
@@ -298,13 +286,9 @@ class RetrievalService:
 
                 if conditions:
                     if conditions.start_date:
-                        app_stats = app_stats.filter(
-                            Screenshot.created_at >= conditions.start_date
-                        )
+                        app_stats = app_stats.filter(Screenshot.created_at >= conditions.start_date)
                     if conditions.end_date:
-                        app_stats = app_stats.filter(
-                            Screenshot.created_at <= conditions.end_date
-                        )
+                        app_stats = app_stats.filter(Screenshot.created_at <= conditions.end_date)
 
                 app_stats = app_stats.all()
 
@@ -316,14 +300,12 @@ class RetrievalService:
 
                 stats = {
                     "total_screenshots": total_count,
-                    "app_distribution": {app: count for app, count in app_stats},
+                    "app_distribution": dict(app_stats),
                     "time_range": {
                         "earliest": time_range.earliest.isoformat()
                         if time_range.earliest
                         else None,
-                        "latest": time_range.latest.isoformat()
-                        if time_range.latest
-                        else None,
+                        "latest": time_range.latest.isoformat() if time_range.latest else None,
                     },
                     "query_conditions": {
                         "start_date": conditions.start_date.isoformat()
@@ -378,10 +360,7 @@ class RetrievalService:
 
         # 应用名称匹配加分
         if conditions.app_names and screenshot.app_name:
-            if any(
-                app.lower() in screenshot.app_name.lower()
-                for app in conditions.app_names
-            ):
+            if any(app.lower() in screenshot.app_name.lower() for app in conditions.app_names):
                 score += 0.3
 
         # 关键词匹配加分

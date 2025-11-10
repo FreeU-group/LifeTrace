@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -20,18 +19,18 @@ class TaskCreate(BaseModel):
     """创建任务请求模型"""
 
     name: str = Field(..., min_length=1, max_length=200, description="任务名称")
-    description: Optional[str] = Field(None, description="任务描述")
+    description: str | None = Field(None, description="任务描述")
     status: TaskStatus = Field(TaskStatus.PENDING, description="任务状态")
-    parent_task_id: Optional[int] = Field(None, description="父任务ID（用于子任务）")
+    parent_task_id: int | None = Field(None, description="父任务ID（用于子任务）")
 
 
 class TaskUpdate(BaseModel):
     """更新任务请求模型"""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=200, description="任务名称")
-    description: Optional[str] = Field(None, description="任务描述")
-    status: Optional[TaskStatus] = Field(None, description="任务状态")
-    parent_task_id: Optional[int] = Field(None, description="父任务ID")
+    name: str | None = Field(None, min_length=1, max_length=200, description="任务名称")
+    description: str | None = Field(None, description="任务描述")
+    status: TaskStatus | None = Field(None, description="任务状态")
+    parent_task_id: int | None = Field(None, description="父任务ID")
 
 
 class TaskResponse(BaseModel):
@@ -40,9 +39,9 @@ class TaskResponse(BaseModel):
     id: int = Field(..., description="任务ID")
     project_id: int = Field(..., description="项目ID")
     name: str = Field(..., description="任务名称")
-    description: Optional[str] = Field(None, description="任务描述")
+    description: str | None = Field(None, description="任务描述")
     status: str = Field(..., description="任务状态")
-    parent_task_id: Optional[int] = Field(None, description="父任务ID")
+    parent_task_id: int | None = Field(None, description="父任务ID")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
@@ -64,4 +63,3 @@ class TaskWithChildren(TaskResponse):
 
     class Config:
         from_attributes = True
-

@@ -1,7 +1,6 @@
 """项目管理相关的 Pydantic 模型"""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -10,14 +9,14 @@ class ProjectCreate(BaseModel):
     """创建项目请求模型"""
 
     name: str = Field(..., min_length=1, max_length=200, description="项目名称")
-    goal: Optional[str] = Field(None, description="项目目标")
+    goal: str | None = Field(None, description="项目目标")
 
 
 class ProjectUpdate(BaseModel):
     """更新项目请求模型"""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=200, description="项目名称")
-    goal: Optional[str] = Field(None, description="项目目标")
+    name: str | None = Field(None, min_length=1, max_length=200, description="项目名称")
+    goal: str | None = Field(None, description="项目目标")
 
 
 class ProjectResponse(BaseModel):
@@ -25,7 +24,7 @@ class ProjectResponse(BaseModel):
 
     id: int = Field(..., description="项目ID")
     name: str = Field(..., description="项目名称")
-    goal: Optional[str] = Field(None, description="项目目标")
+    goal: str | None = Field(None, description="项目目标")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 

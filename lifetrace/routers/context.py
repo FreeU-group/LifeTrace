@@ -1,7 +1,5 @@
 """上下文管理相关路由"""
 
-from typing import Optional
-
 from fastapi import APIRouter, HTTPException, Path, Query
 
 from lifetrace.routers import dependencies as deps
@@ -16,8 +14,8 @@ router = APIRouter(prefix="/api/contexts", tags=["contexts"])
 
 @router.get("", response_model=ContextListResponse)
 async def get_contexts(
-    associated: Optional[bool] = Query(None, description="是否已关联任务（true/false）"),
-    task_id: Optional[int] = Query(None, description="按任务ID过滤"),
+    associated: bool | None = Query(None, description="是否已关联任务（true/false）"),
+    task_id: int | None = Query(None, description="按任务ID过滤"),
     limit: int = Query(100, ge=1, le=1000, description="返回数量限制"),
     offset: int = Query(0, ge=0, description="偏移量"),
 ):
@@ -65,7 +63,7 @@ async def get_contexts(
 
     except Exception as e:
         deps.logger.error(f"获取上下文记录列表失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"获取上下文记录列表失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取上下文记录列表失败: {str(e)}") from e
 
 
 @router.get("/{context_id}", response_model=ContextResponse)
@@ -93,7 +91,7 @@ async def get_context(
         raise
     except Exception as e:
         deps.logger.error(f"获取上下文记录详情失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"获取上下文记录详情失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取上下文记录详情失败: {str(e)}") from e
 
 
 @router.put("/{context_id}", response_model=ContextResponse)
@@ -151,5 +149,4 @@ async def update_context(
         raise
     except Exception as e:
         deps.logger.error(f"更新上下文记录失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"更新上下文记录失败: {str(e)}")
-
+        raise HTTPException(status_code=500, detail=f"更新上下文记录失败: {str(e)}") from e
