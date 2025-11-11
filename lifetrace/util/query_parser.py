@@ -4,13 +4,15 @@
 使用LLM理解用户意图并提取查询参数。
 """
 
-import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
 from lifetrace.util.app_utils import app_mapper
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 
 @dataclass
@@ -52,7 +54,6 @@ class QueryParser:
     """查询解析器"""
 
     def __init__(self, llm_client=None):
-        self.logger = logging.getLogger(__name__)
         self.llm_client = llm_client
 
         # 应用名称映射（常见的应用别名）
@@ -95,7 +96,7 @@ class QueryParser:
         Returns:
             QueryConditions: 解析后的查询条件
         """
-        self.logger.info(f"解析查询: {query}")
+        logger.info(f"解析查询: {query}")
 
         # 如果有LLM客户端，使用LLM解析
         if self.llm_client:
@@ -108,26 +109,25 @@ class QueryParser:
                 has_time_info = parsed_data.get("start_date") or parsed_data.get("end_date")
 
                 if has_keywords or has_app_names or has_time_info:
-                    print("LLM解析结果有效，构建QueryConditions")
+                    logger.info("LLM解析结果有效，构建QueryConditions")
                     try:
                         result = self._build_query_conditions(parsed_data)
-                        print("\n=== 最终查询条件 (LLM解析) ===")
-                        print(f"查询条件: {result}")
+                        logger.info("=== 最终查询条件 (LLM解析) ===")
+                        logger.info(f"查询条件: {result}")
                         return result
                     except Exception as e:
-                        self.logger.warning(f"构建查询条件失败: {e}")
+                        logger.warning(f"构建查询条件失败: {e}")
                         pass
                 else:
-                    print("缺乏有效查询条件")
+                    logger.warning("缺乏有效查询条件")
                     # return "缺乏有效查询条件"
             except Exception as e:
-                self.logger.warning(f"LLM解析失败: {e}")
-                print(f"LLM解析失败: {e}")
+                logger.warning(f"LLM解析失败: {e}")
 
         # 回退到规则解析
         result = self._parse_with_rules(query)
-        print("\n=== 最终查询条件 (规则解析) ===")
-        print(f"查询条件: {result}")
+        logger.info("=== 最终查询条件 (规则解析) ===")
+        logger.info(f"查询条件: {result}")
         return result
 
     def _parse_with_rules(self, query: str) -> QueryConditions:

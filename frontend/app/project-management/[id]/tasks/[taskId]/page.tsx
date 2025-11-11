@@ -18,8 +18,8 @@ dayjs.locale('zh-cn');
 export default function TaskDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const projectId = parseInt(params.id as string);
-  const taskId = parseInt(params.taskId as string);
+  const projectId = parseInt((params?.id as string) || '0');
+  const taskId = parseInt((params?.taskId as string) || '0');
 
   const [task, setTask] = useState<Task | null>(null);
   const [project, setProject] = useState<Project | null>(null);
@@ -293,4 +293,3 @@ export default function TaskDetailPage() {
     </div>
   );
 }
-

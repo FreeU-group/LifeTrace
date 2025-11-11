@@ -18,6 +18,12 @@ class LLMClient:
         """
         初始化LLM客户端，从配置文件读取所有配置
         """
+        self._initialize_client()
+        # 初始化token使用量记录器
+        setup_token_logger()
+
+    def _initialize_client(self):
+        """内部方法：初始化或重新初始化客户端"""
         try:
             # 从配置文件读取配置
             self.api_key = config.llm_api_key
@@ -53,8 +59,23 @@ class LLMClient:
             logger.error(f"LLM客户端初始化失败: {e}")
             self.client = None
 
-        # 初始化token使用量记录器
-        setup_token_logger()
+    def reinitialize(self):
+        """重新初始化LLM客户端（从配置文件重新读取配置）"""
+        logger.info("正在重新初始化LLM客户端...")
+        old_api_key = self.api_key if hasattr(self, "api_key") else None
+        old_model = self.model if hasattr(self, "model") else None
+
+        self._initialize_client()
+
+        # 记录变更信息
+        if old_api_key != self.api_key:
+            logger.info(
+                f"API Key已更新: {old_api_key[:10] if old_api_key else 'None'}... -> {self.api_key[:10]}..."
+            )
+        if old_model != self.model:
+            logger.info(f"模型已更新: {old_model} -> {self.model}")
+
+        return self.is_available()
 
     def is_available(self) -> bool:
         """检查LLM客户端是否可用"""
@@ -123,12 +144,11 @@ class LLMClient:
 
             result_text = response.choices[0].message.content.strip()
 
-            # 打印LLM响应到控制台和日志
-            print("\n=== LLM意图分类响应 ===")
-            print(f"用户输入: {user_query}")
-            print(f"LLM回复: {result_text}")
-            # print(result_text)
-            print("=== 响应结束 ===\n")
+            # 记录LLM响应到日志
+            logger.info("=== LLM意图分类响应 ===")
+            logger.info(f"用户输入: {user_query}")
+            logger.info(f"LLM回复: {result_text}")
+            logger.info("=== 响应结束 ===")
 
             logger.info(f"LLM意图分类 - 用户输入: {user_query}")
             logger.info(f"LLM意图分类 - 原始响应: {result_text}")
@@ -232,12 +252,11 @@ class LLMClient:
 
             result_text = response.choices[0].message.content.strip()
 
-            # 打印LLM响应到控制台和日志
-            print("\n=== LLM查询解析响应 ===")
-            print(f"用户查询: {user_query}")
-            print(f"LLM回复: {result_text}")
-            # print(result_text)
-            print("=== 响应结束 ===\n")
+            # 记录LLM响应到日志
+            logger.info("=== LLM查询解析响应 ===")
+            logger.info(f"用户查询: {user_query}")
+            logger.info(f"LLM回复: {result_text}")
+            logger.info("=== 响应结束 ===")
 
             logger.info(f"LLM查询解析 - 用户查询: {user_query}")
             logger.info(f"LLM查询解析 - 原始响应: {result_text}")
@@ -367,11 +386,11 @@ class LLMClient:
 
             result = response.choices[0].message.content.strip()
 
-            # 打印LLM响应到控制台和日志
-            print("\n=== LLM总结生成响应 ===")
-            print(f"用户查询: {query}")
-            print(f"LLM回复: {result}")
-            print("=== 响应结束 ===\n")
+            # 记录LLM响应到日志
+            logger.info("=== LLM总结生成响应 ===")
+            logger.info(f"用户查询: {query}")
+            logger.info(f"LLM回复: {result}")
+            logger.info("=== 响应结束 ===")
 
             logger.info(f"LLM总结生成 - 用户查询: {query}")
             logger.info(f"LLM总结生成 - 生成结果: {result}")

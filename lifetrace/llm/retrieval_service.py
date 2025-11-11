@@ -120,34 +120,34 @@ class RetrievalService:
                 data_list.sort(key=lambda x: x["timestamp"], reverse=True)
 
                 # 记录查询结果
-                print(f"\n{'=' * 60}")
-                print(f"📊 查询结果: 找到 {len(data_list)} 条记录")
-                print(f"{'=' * 60}")
+                logger.info("=" * 60)
+                logger.info(f"📊 查询结果: 找到 {len(data_list)} 条记录")
+                logger.info("=" * 60)
 
                 if data_list:
-                    print("\n📝 OCR内容详情 (前3条):")
+                    logger.info("📝 OCR内容详情 (前3条):")
                     for i, item in enumerate(data_list[:3]):
                         ocr_text = item.get("ocr_text", "")
-                        print(f"\n  [{i + 1}] 截图ID: {item['screenshot_id']}")
-                        print(f"      应用: {item['app_name']}")
-                        print(f"      时间: {item['timestamp']}")
-                        print(f"      OCR文本长度: {len(ocr_text)} 字符")
-                        print(
+                        logger.info(f"  [{i + 1}] 截图ID: {item['screenshot_id']}")
+                        logger.info(f"      应用: {item['app_name']}")
+                        logger.info(f"      时间: {item['timestamp']}")
+                        logger.info(f"      OCR文本长度: {len(ocr_text)} 字符")
+                        logger.info(
                             f"      OCR文本预览: {ocr_text[:100] if ocr_text else '❌ 无OCR内容'}"
                         )
                         if not ocr_text:
-                            print("      ⚠️  警告: 这条记录没有OCR文本！")
+                            logger.warning("      ⚠️  警告: 这条记录没有OCR文本！")
 
                     # 统计有无OCR内容的记录
                     has_ocr = sum(1 for item in data_list if item.get("ocr_text"))
                     no_ocr = len(data_list) - has_ocr
-                    print("\n📈 OCR统计:")
-                    print(f"   ✅ 有OCR内容: {has_ocr} 条")
-                    print(f"   ❌ 无OCR内容: {no_ocr} 条")
+                    logger.info("📈 OCR统计:")
+                    logger.info(f"   ✅ 有OCR内容: {has_ocr} 条")
+                    logger.info(f"   ❌ 无OCR内容: {no_ocr} 条")
 
-                print(f"\n{'=' * 60}")
-                print("=== 查询完成 ===")
-                print(f"{'=' * 60}\n")
+                logger.info("=" * 60)
+                logger.info("=== 查询完成 ===")
+                logger.info("=" * 60)
 
                 logger.info(f"检索完成，找到 {len(data_list)} 条记录")
                 return data_list
@@ -255,8 +255,8 @@ class RetrievalService:
         """
         try:
             # 记录统计查询条件
-            print("\n=== 数据库查询 - get_statistics ===")
-            print(f"统计查询条件: {conditions}")
+            logger.info("=== 数据库查询 - get_statistics ===")
+            logger.info(f"统计查询条件: {conditions}")
             logger.info(f"执行统计查询 - 条件: {conditions}")
 
             with self.db_manager.get_session() as session:
@@ -320,15 +320,15 @@ class RetrievalService:
                 }
 
                 # 记录统计结果
-                print("统计结果:")
-                print(f"  总截图数: {total_count}")
-                print(
+                logger.info("统计结果:")
+                logger.info(f"  总截图数: {total_count}")
+                logger.info(
                     f"  应用分布: {dict(list(stats['app_distribution'].items())[:5])}{'...' if len(stats['app_distribution']) > 5 else ''}"
                 )
-                print(
+                logger.info(
                     f"  时间范围: {stats['time_range']['earliest']} 到 {stats['time_range']['latest']}"
                 )
-                print("=== 统计查询完成 ===")
+                logger.info("=== 统计查询完成 ===")
 
                 logger.info(f"统计信息获取完成: {total_count} 条记录")
                 return stats

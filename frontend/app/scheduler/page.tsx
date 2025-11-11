@@ -11,6 +11,7 @@ import {
   XCircle,
   Clock,
 } from 'lucide-react';
+import { api } from '@/lib/api';
 
 interface Job {
   id: string;
@@ -48,13 +49,8 @@ export default function SchedulerPage() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('http://localhost:8000/api/scheduler/jobs');
-      if (!response.ok) {
-        throw new Error('获取任务列表失败');
-      }
-
-      const data = await response.json();
-      setJobs(data.jobs);
+      const response = await api.getSchedulerJobs();
+      setJobs(response.data.jobs);
     } catch (err) {
       setError(err instanceof Error ? err.message : '未知错误');
     } finally {
@@ -65,13 +61,8 @@ export default function SchedulerPage() {
   // 加载调度器状态
   const loadStatus = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/scheduler/status');
-      if (!response.ok) {
-        throw new Error('获取状态失败');
-      }
-
-      const data = await response.json();
-      setStatus(data);
+      const response = await api.getSchedulerStatus();
+      setStatus(response.data);
     } catch (err) {
       console.error('加载状态失败:', err);
     }
@@ -87,15 +78,7 @@ export default function SchedulerPage() {
   const handlePauseJob = async (jobId: string) => {
     try {
       setError(null);
-      const response = await fetch(
-        `http://localhost:8000/api/scheduler/jobs/${jobId}/pause`,
-        { method: 'POST' }
-      );
-
-      if (!response.ok) {
-        throw new Error('暂停任务失败');
-      }
-
+      await api.pauseSchedulerJob(jobId);
       setSuccess(`任务 ${jobId} 已暂停`);
       loadJobs();
       loadStatus();
@@ -108,15 +91,7 @@ export default function SchedulerPage() {
   const handleResumeJob = async (jobId: string) => {
     try {
       setError(null);
-      const response = await fetch(
-        `http://localhost:8000/api/scheduler/jobs/${jobId}/resume`,
-        { method: 'POST' }
-      );
-
-      if (!response.ok) {
-        throw new Error('恢复任务失败');
-      }
-
+      await api.resumeSchedulerJob(jobId);
       setSuccess(`任务 ${jobId} 已恢复`);
       loadJobs();
       loadStatus();
@@ -133,15 +108,7 @@ export default function SchedulerPage() {
 
     try {
       setError(null);
-      const response = await fetch(
-        `http://localhost:8000/api/scheduler/jobs/${jobId}`,
-        { method: 'DELETE' }
-      );
-
-      if (!response.ok) {
-        throw new Error('删除任务失败');
-      }
-
+      await api.deleteSchedulerJob(jobId);
       setSuccess(`任务 ${jobId} 已删除`);
       loadJobs();
       loadStatus();
@@ -191,26 +158,13 @@ export default function SchedulerPage() {
 
     try {
       setError(null);
-      const response = await fetch(
-        `http://localhost:8000/api/scheduler/jobs/${editingJob.id}/interval`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            job_id: editingJob.id,
-            seconds,
-            minutes,
-            hours,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('更新任务间隔失败');
-      }
-
-      const result = await response.json();
-      setSuccess(result.message);
+      const response = await api.updateSchedulerJobInterval(editingJob.id, {
+        job_id: editingJob.id,
+        seconds,
+        minutes,
+        hours,
+      });
+      setSuccess(response.data.message);
       handleCloseEditDialog();
       loadJobs();
     } catch (err) {
@@ -226,17 +180,8 @@ export default function SchedulerPage() {
 
     try {
       setError(null);
-      const response = await fetch(
-        'http://localhost:8000/api/scheduler/jobs/pause-all',
-        { method: 'POST' }
-      );
-
-      if (!response.ok) {
-        throw new Error('批量暂停任务失败');
-      }
-
-      const result = await response.json();
-      setSuccess(result.message);
+      const response = await api.pauseAllSchedulerJobs();
+      setSuccess(response.data.message);
       loadJobs();
       loadStatus();
     } catch (err) {
@@ -252,17 +197,8 @@ export default function SchedulerPage() {
 
     try {
       setError(null);
-      const response = await fetch(
-        'http://localhost:8000/api/scheduler/jobs/resume-all',
-        { method: 'POST' }
-      );
-
-      if (!response.ok) {
-        throw new Error('批量启动任务失败');
-      }
-
-      const result = await response.json();
-      setSuccess(result.message);
+      const response = await api.resumeAllSchedulerJobs();
+      setSuccess(response.data.message);
       loadJobs();
       loadStatus();
     } catch (err) {

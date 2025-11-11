@@ -65,9 +65,11 @@ function AppLayoutInner({ children }: AppLayoutInnerProps) {
 
   // 根据当前路径设置激活的菜单项
   useEffect(() => {
-    const currentMenuItem = allMenuItems.find(item => pathname.startsWith(item.path));
-    if (currentMenuItem) {
-      setActiveMenu(currentMenuItem.id as MenuType);
+    if (pathname) {
+      const currentMenuItem = allMenuItems.find(item => pathname.startsWith(item.path));
+      if (currentMenuItem) {
+        setActiveMenu(currentMenuItem.id as MenuType);
+      }
     }
   }, [pathname]);
 

@@ -15,7 +15,7 @@ import { toast } from '@/lib/toast';
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const projectId = parseInt(params.id as string);
+  const projectId = parseInt((params?.id as string) || '0');
 
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -198,4 +198,3 @@ export default function ProjectDetailPage() {
     </div>
   );
 }
-

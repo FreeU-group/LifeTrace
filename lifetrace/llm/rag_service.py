@@ -90,7 +90,7 @@ class RAGService:
 
             # 3. 数据检索 - 使用已解析的查询条件，避免重复解析
             logger.info("开始数据检索")
-            print(parsed_query)
+            logger.info(f"解析后的查询条件: {parsed_query}")
 
             retrieved_data = self.retrieval_service.search_by_conditions(parsed_query, max_results)
 
@@ -600,9 +600,9 @@ class RAGService:
                 max_tokens=500,
             )
 
-            # 记录LLM响应到控制台和日志
+            # 记录LLM响应到日志
             llm_response = response.choices[0].message.content.strip()
-            print(f"[LLM Direct Response] {llm_response}")
+            logger.info(f"[LLM Direct Response] {llm_response}")
             logger.info(f"LLM直接响应: {llm_response}")
 
             return llm_response
@@ -716,7 +716,7 @@ LifeTrace是一个生活轨迹记录和分析系统，主要功能包括：
                     context_text = self.context_builder.build_search_context(
                         user_query, retrieved_data
                     )
-                print(context_text)
+                logger.debug(f"构建的上下文内容: {context_text}")
                 messages = [
                     {"role": "system", "content": context_text},
                     {"role": "user", "content": user_query},

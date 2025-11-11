@@ -21,6 +21,7 @@ interface ConfigSettings {
   maxTokens: number;
   recordInterval: number;
   maxDays: number;
+  blacklistApps: string[];
 }
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
@@ -32,6 +33,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     maxTokens: 2048,
     recordInterval: 5,
     maxDays: 30,
+    blacklistApps: [],
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -39,6 +41,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showScheduler, setShowScheduler] = useState(false);
   const [initialShowScheduler, setInitialShowScheduler] = useState(false); // 记录初始值
+  const [blacklistInput, setBlacklistInput] = useState(''); // 黑名单输入框的值
+  const [initialLlmConfig, setInitialLlmConfig] = useState<{ llmKey: string; baseUrl: string; model: string }>({
+    llmKey: '',
+    baseUrl: '',
+    model: 'qwen3-max',
+  }); // 记录初始 LLM 配置
 
   // 加载配置
   useEffect(() => {
@@ -58,7 +66,11 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       const response = await api.getConfig();
       if (response.data.success) {
         const config = response.data.config;
-        setSettings({
+        // 处理黑名单应用列表
+        const apps = config.blacklistApps || [];
+        const blacklistAppsArray = Array.isArray(apps) ? apps : (typeof apps === 'string' ? apps.split(',').map((s: string) => s.trim()).filter((s: string) => s) : []);
+
+        const newSettings = {
           llmKey: config.llmKey || '',
           baseUrl: config.baseUrl || '',
           model: config.model || 'qwen3-max',
@@ -66,6 +78,16 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           maxTokens: config.maxTokens || 2048,
           recordInterval: config.recordInterval || 5,
           maxDays: config.maxDays || 30,
+          blacklistApps: blacklistAppsArray,
+        };
+
+        setSettings(newSettings);
+
+        // 记录初始 LLM 配置
+        setInitialLlmConfig({
+          llmKey: newSettings.llmKey,
+          baseUrl: newSettings.baseUrl,
+          model: newSettings.model,
         });
       }
     } catch (error) {
@@ -113,7 +135,39 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setSaving(true);
     setMessage(null);
     try {
-      const response = await api.saveConfig(settings);
+      // 检查是否有 LLM 配置
+      const hasLlmConfig = settings.llmKey && settings.baseUrl;
+
+      // 检查 LLM 配置是否发生变化
+      const llmConfigChanged = hasLlmConfig && (
+        settings.llmKey !== initialLlmConfig.llmKey ||
+        settings.baseUrl !== initialLlmConfig.baseUrl ||
+        settings.model !== initialLlmConfig.model
+      );
+
+      let response;
+      if (hasLlmConfig) {
+        // 如果有 LLM 配置，使用 save-and-init-llm 接口
+        // 该接口会保存配置并重新初始化 LLM 客户端
+        response = await api.saveAndInitLlm({
+          llmKey: settings.llmKey,
+          baseUrl: settings.baseUrl,
+          model: settings.model,
+        });
+
+        // 同时保存其他配置
+        await api.saveConfig({
+          temperature: settings.temperature,
+          maxTokens: settings.maxTokens,
+          recordInterval: settings.recordInterval,
+          maxDays: settings.maxDays,
+          blacklistApps: settings.blacklistApps,
+        });
+      } else {
+        // 如果没有 LLM 配置，使用普通的保存接口
+        response = await api.saveConfig(settings);
+      }
+
       if (response.data.success) {
         // 保存定时任务显示设置
         const schedulerChanged = showScheduler !== initialShowScheduler;
@@ -132,9 +186,20 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         }
 
         toast.configSaved();
-        setTimeout(() => {
-          onClose();
-        }, 1500);
+        onClose(); // 立即关闭弹窗
+
+        // 只有在 LLM 配置实际发生变化时才刷新页面
+        if (llmConfigChanged) {
+          setTimeout(() => {
+            window.location.reload();
+          }, 500); // 延迟 500ms 以确保 toast 消息能显示
+        }
+      } else {
+        // 如果返回了错误信息
+        setMessage({
+          type: 'error',
+          text: response.data.error || '保存失败'
+        });
       }
     } catch (error) {
       console.error('保存配置失败:', error);
@@ -145,8 +210,40 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   };
 
-  const handleChange = (key: keyof ConfigSettings, value: string | number) => {
+  const handleChange = (key: keyof ConfigSettings, value: string | number | string[]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // 添加黑名单应用
+  const handleAddBlacklistApp = (app: string) => {
+    const trimmedApp = app.trim();
+    if (trimmedApp && !settings.blacklistApps.includes(trimmedApp)) {
+      setSettings((prev) => ({
+        ...prev,
+        blacklistApps: [...prev.blacklistApps, trimmedApp]
+      }));
+    }
+  };
+
+  // 移除黑名单应用
+  const handleRemoveBlacklistApp = (app: string) => {
+    setSettings((prev) => ({
+      ...prev,
+      blacklistApps: prev.blacklistApps.filter(a => a !== app)
+    }));
+  };
+
+  // 处理黑名单输入框的键盘事件
+  const handleBlacklistKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && blacklistInput.trim()) {
+      e.preventDefault();
+      handleAddBlacklistApp(blacklistInput);
+      setBlacklistInput('');
+    } else if (e.key === 'Backspace' && !blacklistInput && settings.blacklistApps.length > 0) {
+      // 如果输入框为空且按下 Backspace，删除最后一个标签
+      const lastApp = settings.blacklistApps[settings.blacklistApps.length - 1];
+      handleRemoveBlacklistApp(lastApp);
+    }
   };
 
   // 处理定时任务显示开关（仅更新状态，不立即保存）
@@ -297,28 +394,64 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <CardTitle className="text-base">基础设置</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-foreground">
-                        截图间隔（秒）
-                      </label>
-                      <Input
-                        type="number"
-                        className="px-3 py-2 h-9"
-                        value={settings.recordInterval}
-                        onChange={(e) => handleChange('recordInterval', parseInt(e.target.value))}
-                      />
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-foreground">
+                          截图间隔（秒）
+                        </label>
+                        <Input
+                          type="number"
+                          className="px-3 py-2 h-9"
+                          value={settings.recordInterval}
+                          onChange={(e) => handleChange('recordInterval', parseInt(e.target.value))}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-foreground">
+                          自动清理（天）
+                        </label>
+                        <Input
+                          type="number"
+                          className="px-3 py-2 h-9"
+                          value={settings.maxDays}
+                          onChange={(e) => handleChange('maxDays', parseInt(e.target.value))}
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className="mb-1 block text-sm font-medium text-foreground">
-                        自动清理（天）
+                        应用黑名单
                       </label>
-                      <Input
-                        type="number"
-                        className="px-3 py-2 h-9"
-                        value={settings.maxDays}
-                        onChange={(e) => handleChange('maxDays', parseInt(e.target.value))}
-                      />
+                      <div className="border border-input rounded-md px-2 py-1.5 min-h-[38px] flex flex-wrap gap-1.5 items-center bg-background focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
+                        {settings.blacklistApps.map((app) => (
+                          <span
+                            key={app}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 text-sm bg-primary/10 text-primary rounded-md border border-primary/20"
+                          >
+                            {app}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveBlacklistApp(app)}
+                              className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                              aria-label={`删除 ${app}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                        <input
+                          type="text"
+                          className="flex-1 min-w-[120px] outline-none bg-transparent text-sm placeholder:text-muted-foreground px-1"
+                          placeholder={settings.blacklistApps.length === 0 ? "输入应用名称后按回车添加" : "继续添加..."}
+                          value={blacklistInput}
+                          onChange={(e) => setBlacklistInput(e.target.value)}
+                          onKeyDown={handleBlacklistKeyDown}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        这些应用的窗口将不会被截图记录，输入应用名称后按回车添加（例如：微信、QQ、钉钉）
+                      </p>
                     </div>
                   </div>
                 </CardContent>

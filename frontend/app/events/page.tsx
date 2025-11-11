@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Event, Screenshot, ChatMessage } from '@/lib/types';
-import { api, API_BASE_URL } from '@/lib/api';
+import { api } from '@/lib/api';
 import { formatDateTime, formatDuration, calculateDuration } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/common/Card';
 import { FormField } from '@/components/common/Input';
@@ -15,6 +15,7 @@ import ScreenshotModal from '@/components/screenshot/ScreenshotModal';
 import { useSelectedEvents } from '@/lib/context/SelectedEventsContext';
 import { marked } from 'marked';
 import { toast } from '@/lib/toast';
+import MessageContent from '@/components/common/MessageContent';
 
 export default function EventsPage() {
   const router = useRouter();
@@ -38,10 +39,12 @@ export default function EventsPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [useRAG, setUseRAG] = useState(true);
   const [llmHealthy, setLlmHealthy] = useState(true);
   const [llmHealthChecked, setLlmHealthChecked] = useState(false);
+  const [activeQuickAction, setActiveQuickAction] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const pageSize = 10; // 每次加载10条
@@ -92,6 +95,7 @@ export default function EventsPage() {
         break;
     }
     setInputMessage(message);
+    setActiveQuickAction(action);
   };
 
   // 发送消息（支持事件上下文和流式响应）
@@ -118,52 +122,37 @@ export default function EventsPage() {
     const currentInput = inputMessage;
     setInputMessage('');
     setChatLoading(true);
+    setIsStreaming(true);
+
+    // 创建助手消息占位（显示 loading 提示）
+    const assistantMessage: ChatMessage = {
+      role: 'assistant',
+      content: '正在思考...',
+      timestamp: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, assistantMessage]);
 
     try {
       // 如果有选中的事件，使用流式接口并附带上下文
       if (selectedEventsData.length > 0) {
         const eventContext = selectedEventsData.map((event) => ({
           event_id: event.id,
-          text: event.ai_summary || event.summary || '',
+          text: event.ai_summary || '',
         }));
 
-        // 使用流式接口
-        const response = await fetch(`${API_BASE_URL}/api/chat/stream-with-context`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message: currentInput,
-            event_context: eventContext,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('请求失败');
-        }
-
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
+        // 累积内容
         let assistantContent = '';
+        let isFirstChunk = true;
 
-        // 创建助手消息占位
-        const assistantMessage: ChatMessage = {
-          role: 'assistant',
-          content: '',
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
-
-        // 读取流式响应
-        if (reader) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value, { stream: true });
+        // 使用流式接口
+        await api.sendChatMessageWithContextStream(
+          {
+            message: currentInput,
+            conversation_id: currentConversationId || undefined,
+            event_context: eventContext,
+          },
+          (chunk: string) => {
             assistantContent += chunk;
-
             // 更新消息内容
             setMessages((prev) => {
               const newMessages = [...prev];
@@ -173,39 +162,60 @@ export default function EventsPage() {
               };
               return newMessages;
             });
+
+            // 第一个 chunk 到达时，标记 loading 结束
+            if (isFirstChunk) {
+              setChatLoading(false);
+              isFirstChunk = false;
+            }
           }
-        }
+        );
       } else {
-        // 没有选中事件，使用普通接口
-        const response = await api.sendChatMessage({
-          message: currentInput,
-          conversation_id: currentConversationId || undefined,
-          use_rag: useRAG,
-        });
+        // 没有选中事件，使用流式接口
+        let assistantContent = '';
+        let isFirstChunk = true;
 
-        const assistantMessage: ChatMessage = {
-          role: 'assistant',
-          content: response.data.response || response.data.message,
-          timestamp: new Date().toISOString(),
-          sources: response.data.sources,
-        };
+        // 使用流式接口
+        await api.sendChatMessageStream(
+          {
+            message: currentInput,
+            conversation_id: currentConversationId || undefined,
+            use_rag: useRAG,
+          },
+          (chunk: string) => {
+            assistantContent += chunk;
+            // 更新消息内容
+            setMessages((prev) => {
+              const newMessages = [...prev];
+              newMessages[newMessages.length - 1] = {
+                ...newMessages[newMessages.length - 1],
+                content: assistantContent,
+              };
+              return newMessages;
+            });
 
-        setMessages((prev) => [...prev, assistantMessage]);
-
-        if (response.data.conversation_id) {
-          setCurrentConversationId(response.data.conversation_id);
-        }
+            // 第一个 chunk 到达时，标记 loading 结束
+            if (isFirstChunk) {
+              setChatLoading(false);
+              isFirstChunk = false;
+            }
+          }
+        );
       }
     } catch (error) {
       console.error('发送消息失败:', error);
-      const errorMessage: ChatMessage = {
-        role: 'assistant',
-        content: '抱歉，发送消息失败，请重试。',
-        timestamp: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      // 更新最后一条消息为错误信息
+      setMessages((prev) => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1] = {
+          ...newMessages[newMessages.length - 1],
+          content: '抱歉，发送消息失败，请重试。',
+        };
+        return newMessages;
+      });
     } finally {
       setChatLoading(false);
+      setIsStreaming(false);
     }
   };
 
@@ -920,9 +930,17 @@ export default function EventsPage() {
                     {/* 数字镜像 */}
                     <button
                       onClick={() => handleQuickAction('timeline')}
-                      className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors text-left group"
+                      className={`flex items-center gap-3 p-4 rounded-lg border transition-colors text-left group ${
+                        activeQuickAction === 'timeline'
+                          ? 'border-primary bg-primary/10 hover:bg-primary/15'
+                          : 'border-border bg-card hover:bg-muted/50'
+                      }`}
                     >
-                      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                        activeQuickAction === 'timeline'
+                          ? 'bg-primary/20'
+                          : 'bg-primary/10 group-hover:bg-primary/20'
+                      }`}>
                         <Activity className="w-5 h-5 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -934,9 +952,17 @@ export default function EventsPage() {
                     {/* 应用分析 */}
                     <button
                       onClick={() => handleQuickAction('analytics')}
-                      className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors text-left group"
+                      className={`flex items-center gap-3 p-4 rounded-lg border transition-colors text-left group ${
+                        activeQuickAction === 'analytics'
+                          ? 'border-primary bg-primary/10 hover:bg-primary/15'
+                          : 'border-border bg-card hover:bg-muted/50'
+                      }`}
                     >
-                      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                        activeQuickAction === 'analytics'
+                          ? 'bg-primary/20'
+                          : 'bg-primary/10 group-hover:bg-primary/20'
+                      }`}>
                         <TrendingUp className="w-5 h-5 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -948,9 +974,17 @@ export default function EventsPage() {
                     {/* 内容搜索 */}
                     <button
                       onClick={() => handleQuickAction('search')}
-                      className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors text-left group"
+                      className={`flex items-center gap-3 p-4 rounded-lg border transition-colors text-left group ${
+                        activeQuickAction === 'search'
+                          ? 'border-primary bg-primary/10 hover:bg-primary/15'
+                          : 'border-border bg-card hover:bg-muted/50'
+                      }`}
                     >
-                      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                        activeQuickAction === 'search'
+                          ? 'bg-primary/20'
+                          : 'bg-primary/10 group-hover:bg-primary/20'
+                      }`}>
                         <Search className="w-5 h-5 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -985,14 +1019,24 @@ export default function EventsPage() {
                       }`}
                     >
                       {message.role === 'assistant' ? (
-                        <div
-                          className="prose prose-sm max-w-none text-sm prose-p:my-1.5 prose-p:leading-relaxed prose-ul:my-1.5 prose-ol:my-1.5"
-                          dangerouslySetInnerHTML={{
-                            __html: renderMarkdown(message.content),
-                          }}
-                        />
+                        message.content === '正在思考...' ? (
+                          <span className="inline-flex items-center gap-1 text-muted-foreground">
+                            <span className="animate-pulse">正在思考</span>
+                            <span className="flex gap-0.5">
+                              <span className="animate-bounce" style={{ animationDelay: '0ms' }}>.</span>
+                              <span className="animate-bounce" style={{ animationDelay: '150ms' }}>.</span>
+                              <span className="animate-bounce" style={{ animationDelay: '300ms' }}>.</span>
+                            </span>
+                          </span>
+                        ) : (
+                          <MessageContent
+                            content={message.content}
+                            isMarkdown={true}
+                            isStreaming={index === messages.length - 1 && isStreaming}
+                          />
+                        )
                       ) : (
-                        <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                        <MessageContent content={message.content} isMarkdown={false} />
                       )}
 
                       {message.sources && message.sources.length > 0 && (
@@ -1020,8 +1064,6 @@ export default function EventsPage() {
                     )}
                   </div>
                 ))}
-
-                {chatLoading && <Loading text="正在思考..." size="sm" />}
 
                 <div ref={messagesEndRef} />
               </div>

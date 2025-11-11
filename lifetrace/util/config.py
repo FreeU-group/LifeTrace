@@ -393,7 +393,7 @@ class LifeTraceConfig:
     @property
     def llm_api_key(self) -> str:
         """LLM 密钥"""
-        return self.get("llm.llm_key", "")
+        return self.get("llm.api_key", "")
 
     @property
     def llm_base_url(self) -> str:
