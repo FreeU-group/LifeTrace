@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './Card';
 import Input from './Input';
 import Button from './Button';
-import { api } from '@/lib/api';
+import { api, getApiBaseUrl, setApiBaseUrl } from '@/lib/api';
 import { toast } from '@/lib/toast';
 
 interface SettingsModalProps {
@@ -51,6 +51,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showScheduler, setShowScheduler] = useState(false);
   const [initialShowScheduler, setInitialShowScheduler] = useState(false); // 记录初始值
+  const [initialServerPort, setInitialServerPort] = useState(8000);
   const [blacklistInput, setBlacklistInput] = useState(''); // 黑名单输入框的值
   const [initialLlmConfig, setInitialLlmConfig] = useState<{ llmKey: string; baseUrl: string; model: string }>({
     llmKey: '',
@@ -101,6 +102,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         };
 
         setSettings(newSettings);
+        setInitialServerPort(newSettings.serverPort);
 
         // 记录初始 LLM 配置
         setInitialLlmConfig({
@@ -209,6 +211,24 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         }
 
         toast.configSaved();
+
+        if (settings.serverPort && settings.serverPort !== initialServerPort) {
+          try {
+            const currentBase = getApiBaseUrl();
+            const nextUrl = new URL(currentBase);
+            nextUrl.port = String(settings.serverPort);
+            setApiBaseUrl(nextUrl.toString().replace(/\/$/, ''));
+            setInitialServerPort(settings.serverPort);
+          } catch (error) {
+            const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
+            const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+            const fallbackUrl = `${protocol}//${hostname}:${settings.serverPort}`;
+            setApiBaseUrl(fallbackUrl);
+            setInitialServerPort(settings.serverPort);
+            console.warn('更新 API 基础地址失败，已使用回退地址:', error);
+          }
+        }
+
         onClose(); // 立即关闭弹窗
 
         // 只有在 LLM 配置实际发生变化时才刷新页面
@@ -472,8 +492,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       </label>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="col-span-1">
                         <label className="mb-1 block text-sm font-medium text-foreground">
                           服务器端口
                         </label>
@@ -484,6 +504,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                           value={settings.serverPort}
                           onChange={(e) => handleChange('serverPort', parseInt(e.target.value))}
                         />
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          服务器监听端口，修改后需要重启服务
+                        </p>
                       </div>
                     </div>
 
