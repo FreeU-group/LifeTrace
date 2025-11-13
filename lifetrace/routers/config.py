@@ -305,6 +305,9 @@ async def save_config(settings: dict[str, Any]):
             "autoExcludeSelf": "jobs.recorder.auto_exclude_self",
         }
 
+        def is_valid_port(port: int) -> bool:
+            return isinstance(port, int) and 1 <= port <= 65535
+
         def is_port_in_use(port: int) -> bool:
             import socket
 
@@ -315,12 +318,26 @@ async def save_config(settings: dict[str, Any]):
 
         requested_port = settings.get("serverPort")
         if requested_port is not None:
-            current_port = deps.config.get("server.port", 8000)
-            if requested_port != current_port and is_port_in_use(int(requested_port)):
+            try:
+                requested_port_int = int(requested_port)
+            except (TypeError, ValueError) as exc:
                 raise HTTPException(
-                    status_code=500,
-                    detail="保存配置失败，端口已被占用",
-                )
+                    status_code=400,
+                    detail="端口号必须为整数",
+                ) from exc
+
+            current_port = int(deps.config.get("server.port", 8000))
+            if requested_port_int != current_port:
+                if not is_valid_port(requested_port_int):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="端口号需在 1-65535 之间",
+                    )
+                if is_port_in_use(requested_port_int):
+                    raise HTTPException(
+                        status_code=409,
+                        detail="保存配置失败，端口已被占用",
+                    )
 
         # 更新配置
         for frontend_key, config_key in config_mapping.items():
@@ -362,6 +379,9 @@ async def save_config(settings: dict[str, Any]):
 
         return {"success": True, "message": "配置保存成功"}
 
+    except HTTPException as exc:
+        # 直接透传业务异常（如端口校验失败）
+        raise exc
     except Exception as e:
         deps.logger.error(f"保存配置失败: {e}")
         raise HTTPException(status_code=500, detail=f"保存配置失败: {str(e)}") from e
