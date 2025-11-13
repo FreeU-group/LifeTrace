@@ -1,7 +1,19 @@
 import axios from 'axios';
 
-// API 基础地址
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const DEFAULT_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const STORAGE_KEY = 'lifetrace.apiBaseUrl';
+
+const resolveInitialBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return stored;
+    }
+  }
+  return DEFAULT_API_BASE_URL;
+};
+
+let API_BASE_URL = resolveInitialBaseUrl();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -19,6 +31,17 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export const setApiBaseUrl = (url: string) => {
+  API_BASE_URL = url;
+  apiClient.defaults.baseURL = url;
+
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(STORAGE_KEY, url);
+  }
+};
+
+export const getApiBaseUrl = () => API_BASE_URL;
 
 export default apiClient;
 export { API_BASE_URL };
@@ -39,7 +62,7 @@ export const api = {
 
   getScreenshot: (id: number) => apiClient.get(`/api/screenshots/${id}`),
 
-  getScreenshotImage: (id: number) => `${API_BASE_URL}/api/screenshots/${id}/image`,
+  getScreenshotImage: (id: number) => `${getApiBaseUrl()}/api/screenshots/${id}/image`,
 
   // 搜索相关
   search: (params: {
@@ -119,7 +142,7 @@ export const api = {
     conversation_id?: string;
     use_rag?: boolean;
   }, onChunk: (chunk: string) => void): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/chat/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -151,7 +174,7 @@ export const api = {
     conversation_id?: string;
     event_context?: Array<{ event_id: number; text: string }>;
   }, onChunk: (chunk: string) => void): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/api/chat/stream-with-context`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/chat/stream-with-context`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -230,6 +253,9 @@ export const api = {
 
   saveAndInitLlm: (config: { llmKey: string; baseUrl: string; model: string }) =>
     apiClient.post('/api/save-and-init-llm', config),
+
+  // 数据清理
+  clearData: () => apiClient.post('/api/clear-data'),
 
   // 健康检查
   healthCheck: () => apiClient.get('/health'),
