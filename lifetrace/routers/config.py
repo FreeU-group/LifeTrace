@@ -34,11 +34,6 @@ async def get_config():
             "language": deps.config.get("jobs.ocr.language"),
             "confidence_threshold": deps.config.get("jobs.ocr.confidence_threshold"),
         },
-        storage={
-            "max_days": deps.config.get("storage.max_days"),
-            "deduplicate": deps.config.get("storage.deduplicate"),
-            "hash_threshold": deps.config.get("storage.hash_threshold"),
-        },
     )
 
 
@@ -121,9 +116,6 @@ async def get_config_detailed():
                 "recordInterval": deps.config.get("jobs.recorder.interval", 1),
                 "screenSelection": deps.config.get("jobs.recorder.screens", "all"),
                 # 存储配置
-                "storageEnabled": deps.config.get("storage.enabled", True),
-                "maxDays": deps.config.get("storage.max_days", 30),
-                "deduplicateEnabled": deps.config.get("storage.deduplicate", True),
                 # LLM配置
                 "llmKey": deps.config.llm_api_key,
                 "baseUrl": deps.config.llm_base_url,
@@ -134,9 +126,11 @@ async def get_config_detailed():
                 # 服务器配置
                 "serverHost": deps.config.server_host,
                 "serverPort": deps.config.server_port,
-                # 聊天配置
-                "localHistory": deps.config.chat_local_history,
-                "historyLimit": deps.config.chat_history_limit,
+                # Recorder 配置
+                "deduplicate": deps.config.get("jobs.recorder.deduplicate", True),
+                # Clean data 配置
+                "maxDays": deps.config.get("jobs.clean_data.max_days", 30),
+                "maxScreenshots": deps.config.get("jobs.clean_data.max_screenshots", 10000),
             },
         }
     except Exception as e:
@@ -239,17 +233,15 @@ async def save_config(settings: dict[str, Any]):
             "recordingEnabled": "jobs.recorder.enabled",
             "recordInterval": "jobs.recorder.interval",
             "screenSelection": "jobs.recorder.screens",
-            "storageEnabled": "storage.enabled",
-            "maxDays": "storage.max_days",
-            "deduplicateEnabled": "storage.deduplicate",
+            "deduplicate": "jobs.recorder.deduplicate",
+            "maxDays": "jobs.clean_data.max_days",
+            "maxScreenshots": "jobs.clean_data.max_screenshots",
             "model": "llm.model",
             "temperature": "llm.temperature",
             "maxTokens": "llm.max_tokens",
             "notifications": "ui.notifications",
             "soundEnabled": "ui.sound_enabled",
             "autoSave": "ui.auto_save",
-            "localHistory": "chat.local_history",
-            "historyLimit": "chat.history_limit",
             # API配置
             "llmKey": "llm.api_key",
             "baseUrl": "llm.base_url",

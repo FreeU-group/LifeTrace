@@ -114,11 +114,6 @@ export default function TaskEmptyState({ onCreateTask, onQuickCreate }: TaskEmpt
             <Plus className="h-5 w-5" />
             创建自定义任务
           </Button>
-
-          <p className="text-xs text-muted-foreground">
-            💡 提示：使用快捷键 <kbd className="px-2 py-1 text-xs bg-muted rounded border">Ctrl</kbd> +
-            <kbd className="px-2 py-1 text-xs bg-muted rounded border ml-1">N</kbd> 快速创建
-          </p>
         </div>
       </div>
     </div>

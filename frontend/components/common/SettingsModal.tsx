@@ -41,6 +41,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showScheduler, setShowScheduler] = useState(false);
   const [initialShowScheduler, setInitialShowScheduler] = useState(false); // 记录初始值
+  const [showCostTracking, setShowCostTracking] = useState(false);
+  const [initialShowCostTracking, setInitialShowCostTracking] = useState(false); // 记录初始值
   const [blacklistInput, setBlacklistInput] = useState(''); // 黑名单输入框的值
   const [initialLlmConfig, setInitialLlmConfig] = useState<{ llmKey: string; baseUrl: string; model: string }>({
     llmKey: '',
@@ -53,10 +55,16 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     if (isOpen) {
       loadConfig();
       // 从 localStorage 读取定时任务显示设置
-      const saved = localStorage.getItem('showScheduler');
-      const savedValue = saved === 'true';
-      setShowScheduler(savedValue);
-      setInitialShowScheduler(savedValue); // 记录初始值
+      const savedScheduler = localStorage.getItem('showScheduler');
+      const savedSchedulerValue = savedScheduler === 'true';
+      setShowScheduler(savedSchedulerValue);
+      setInitialShowScheduler(savedSchedulerValue); // 记录初始值
+
+      // 从 localStorage 读取费用统计显示设置
+      const savedCostTracking = localStorage.getItem('showCostTracking');
+      const savedCostTrackingValue = savedCostTracking === 'true';
+      setShowCostTracking(savedCostTrackingValue);
+      setInitialShowCostTracking(savedCostTrackingValue); // 记录初始值
     }
   }, [isOpen]);
 
@@ -185,6 +193,22 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           }));
         }
 
+        // 保存费用统计显示设置
+        const costTrackingChanged = showCostTracking !== initialShowCostTracking;
+        if (costTrackingChanged) {
+          localStorage.setItem('showCostTracking', String(showCostTracking));
+          setInitialShowCostTracking(showCostTracking); // 更新初始值
+
+          // 触发自定义事件通知其他组件
+          const currentPath = window.location.pathname;
+          window.dispatchEvent(new CustomEvent('costTrackingVisibilityChange', {
+            detail: {
+              visible: showCostTracking,
+              currentPath: currentPath
+            }
+          }));
+        }
+
         toast.configSaved();
         onClose(); // 立即关闭弹窗
 
@@ -251,10 +275,17 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setShowScheduler(checked);
   };
 
+  // 处理费用统计显示开关（仅更新状态，不立即保存）
+  const handleCostTrackingToggle = (checked: boolean) => {
+    setShowCostTracking(checked);
+  };
+
   // 处理取消操作
   const handleCancel = () => {
     // 恢复定时任务开关到初始状态
     setShowScheduler(initialShowScheduler);
+    // 恢复费用统计开关到初始状态
+    setShowCostTracking(initialShowCostTracking);
     onClose();
   };
 
@@ -462,7 +493,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">开发者选项</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <label className="block text-sm font-medium text-foreground">
@@ -478,6 +509,26 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         className="sr-only peer"
                         checked={showScheduler}
                         onChange={(e) => handleSchedulerToggle(e.target.checked)}
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground">
+                        显示费用统计
+                      </label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        开启后在侧边栏显示 LLM 费用统计菜单
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={showCostTracking}
+                        onChange={(e) => handleCostTrackingToggle(e.target.checked)}
                       />
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                     </label>

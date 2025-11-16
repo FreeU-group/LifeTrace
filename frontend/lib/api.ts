@@ -57,14 +57,6 @@ export const api = {
     filters?: any;
   }) => apiClient.post('/api/semantic-search', params),
 
-  multimodalSearch: (params: {
-    query: string;
-    top_k?: number;
-    text_weight?: number;
-    image_weight?: number;
-    filters?: any;
-  }) => apiClient.post('/api/multimodal-search', params),
-
   eventSearch: (params: {
     query?: string;
     limit?: number;
@@ -118,6 +110,8 @@ export const api = {
     message: string;
     conversation_id?: string;
     use_rag?: boolean;
+    project_id?: number;
+    task_ids?: number[];
   }, onChunk: (chunk: string) => void): Promise<void> => {
     const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
       method: 'POST',
@@ -210,15 +204,6 @@ export const api = {
     start_date?: string;
     end_date?: string;
   }) => apiClient.get('/api/analytics', { params }),
-
-  // 工作计划
-  savePlan: (plan: { title: string; todos: any[] }) =>
-    apiClient.post('/api/plan/save', plan),
-
-  loadPlan: (planId: string) =>
-    apiClient.get('/api/plan/load', { params: { plan_id: planId } }),
-
-  listPlans: () => apiClient.get('/api/plan/list'),
 
   // 配置相关
   getConfig: () => apiClient.get('/api/get-config'),
@@ -317,4 +302,11 @@ export const api = {
 
   resumeAllSchedulerJobs: () =>
     apiClient.post('/api/scheduler/jobs/resume-all'),
+
+  // 费用统计
+  getCostStats: (days?: number) =>
+    apiClient.get('/api/cost-tracking/stats', { params: { days } }),
+
+  getCostConfig: () =>
+    apiClient.get('/api/cost-tracking/config'),
 };

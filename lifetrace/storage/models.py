@@ -25,7 +25,10 @@ class Event(Base):
     created_at = Column(DateTime, default=get_local_time)
     ai_title = Column(String(50))  # LLM生成的事件标题（≤10字）
     ai_summary = Column(Text)  # LLM生成的事件摘要（≤30字，支持markdown）
-    task_id = Column(Integer, ForeignKey("tasks.id"))  # 关联的任务ID（可为空）
+    # 注意：task_id 已移除，改用 event_associations 表记录关联关系
+    auto_association_attempted = Column(
+        Boolean, default=False
+    )  # 是否已尝试过自动关联（task_context_mapper）
 
     def __repr__(self):
         return f"<Event(id={self.id}, app={self.app_name})>"
@@ -253,3 +256,62 @@ class TaskProgress(Base):
 
     def __repr__(self):
         return f"<TaskProgress(id={self.id}, task_id={self.task_id}, created_at={self.created_at})>"
+
+
+class TokenUsage(Base):
+    """Token使用记录模型"""
+
+    __tablename__ = "token_usage"
+
+    id = Column(Integer, primary_key=True)
+    model = Column(String(100), nullable=False, index=True)  # 使用的模型名称
+    input_tokens = Column(Integer, nullable=False, default=0)  # 输入token数量
+    output_tokens = Column(Integer, nullable=False, default=0)  # 输出token数量
+    total_tokens = Column(Integer, nullable=False, default=0)  # 总token数量
+    endpoint = Column(String(100))  # API端点
+    response_type = Column(String(50))  # 响应类型
+    feature_type = Column(String(50), index=True)  # 功能类型
+    user_query_preview = Column(String(200))  # 用户查询预览
+    query_length = Column(Integer)  # 查询长度
+    input_cost = Column(Float, default=0.0)  # 输入成本（元）
+    output_cost = Column(Float, default=0.0)  # 输出成本（元）
+    total_cost = Column(Float, default=0.0)  # 总成本（元）
+    created_at = Column(DateTime, default=get_local_time, nullable=False, index=True)
+
+    def __repr__(self):
+        return f"<TokenUsage(id={self.id}, model={self.model}, total_tokens={self.total_tokens}, cost={self.total_cost})>"
+
+
+class EventAssociation(Base):
+    """事件关联表 - 记录 event 与 project/task 的关联关系及元数据"""
+
+    __tablename__ = "event_associations"
+
+    id = Column(Integer, primary_key=True)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False, index=True)  # 事件ID
+    project_id = Column(
+        Integer, ForeignKey("projects.id"), nullable=True, index=True
+    )  # 项目ID（可为空）
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True, index=True)  # 任务ID（可为空）
+
+    # 关联元数据（来自 LLM 判断）
+    project_confidence = Column(Float)  # 项目判断置信度（0-1）
+    task_confidence = Column(Float)  # 任务判断置信度（0-1）
+    reasoning = Column(Text)  # LLM 的判断理由
+
+    # 关联方式
+    association_method = Column(
+        String(20), default="auto", nullable=False
+    )  # auto: 自动关联, manual: 手动关联
+
+    # 摘要状态
+    used_in_summary = Column(
+        Boolean, default=False, nullable=False, index=True
+    )  # 是否已用于任务摘要
+
+    # 时间戳
+    created_at = Column(DateTime, default=get_local_time, nullable=False)
+    updated_at = Column(DateTime, default=get_local_time, onupdate=get_local_time, nullable=False)
+
+    def __repr__(self):
+        return f"<EventAssociation(event_id={self.event_id}, project_id={self.project_id}, task_id={self.task_id})>"

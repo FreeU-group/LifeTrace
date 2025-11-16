@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, FolderOpen, MessageSquare, ChevronRight, History, Send, User, Bot, X, Activity, TrendingUp, Search, Clock } from 'lucide-react';
+import { ArrowLeft, Plus, FolderOpen, MessageSquare, ChevronRight, ChevronLeft, History, Send, User, Bot, X, Activity, TrendingUp, Search, Clock } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Loading from '@/components/common/Loading';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/common/Card';
-import TaskList from '@/components/task/TaskList';
+import TaskBoard from '@/components/task/TaskBoard';
 import CreateTaskModal from '@/components/task/CreateTaskModal';
 import TaskStats from '@/components/task/TaskStats';
 import TaskEmptyState, { TaskTemplate } from '@/components/task/TaskEmptyState';
@@ -185,6 +185,8 @@ export default function ProjectDetailPage() {
           message: currentInput,
           conversation_id: sessionId || undefined,
           use_rag: useRAG,
+          project_id: projectId,
+          task_ids: selectedTasks.size > 0 ? Array.from(selectedTasks) : undefined,
         },
         (chunk: string) => {
           assistantContent += chunk;
@@ -212,6 +214,9 @@ export default function ProjectDetailPage() {
           console.error('保存消息到会话失败:', error);
         }
       }
+
+      // 发送成功后清空选中的任务
+      handleClearSelectedTasks();
     } catch (error) {
       console.error('发送消息失败:', error);
       setMessages((prev) => {
@@ -418,9 +423,9 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="flex h-full overflow-hidden relative">
-      {/* 左侧任务管理区域 - 占2/3或全屏 */}
+      {/* 左侧任务管理区域 - 占2/3或更宽 */}
       <div className={`flex flex-col overflow-hidden border-r transition-all duration-300 ${
-        isChatCollapsed ? 'w-full' : 'w-2/3'
+        isChatCollapsed ? 'flex-1' : 'w-2/3'
       }`}>
         {/* 固定顶部区域 */}
         <div className="flex-shrink-0 p-6 pb-4 border-b">
@@ -459,9 +464,9 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        {/* 可滚动的任务列表区域 */}
-        <div className="flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-          <div className="mx-auto max-w-7xl w-full p-6 pt-4">
+        {/* 可滚动的任务看板区域 */}
+        <div className="flex-1 overflow-hidden min-h-0">
+          <div className="h-full overflow-y-auto mx-auto max-w-7xl w-full p-6 pt-4">
             {loading ? (
               <div className="flex items-center justify-center py-20">
                 <Loading />
@@ -473,13 +478,12 @@ export default function ProjectDetailPage() {
                 onQuickCreate={handleQuickCreateTask}
               />
             ) : (
-              // 任务列表
-              <TaskList
+              // 任务看板
+              <TaskBoard
                 tasks={tasks}
                 onEdit={handleEditTask}
                 onDelete={handleDeleteTask}
                 onStatusChange={handleTaskStatusChange}
-                onCreateSubtask={handleCreateTask}
                 projectId={projectId}
                 selectedTaskIds={selectedTasks}
                 onToggleSelect={handleToggleTaskSelect}
@@ -499,36 +503,36 @@ export default function ProjectDetailPage() {
         />
       </div>
 
-      {/* 折叠状态：右下角悬浮按钮 */}
-      {isChatCollapsed && (
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setIsChatCollapsed(false)}
-          className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full p-0 shadow-lg hover:shadow-xl transition-all duration-300"
-          title="展开对话"
-        >
-          <MessageSquare className="h-6 w-6" />
-        </Button>
-      )}
-
-      {/* 右侧聊天区域 - 占1/3或收起 */}
+      {/* 右侧聊天区域 - 占1/3或窄列 */}
       <div className={`bg-card flex flex-col flex-shrink-0 h-full overflow-hidden transition-all duration-300 ${
-        isChatCollapsed ? 'w-0' : 'w-1/3'
+        isChatCollapsed ? 'w-16' : 'w-1/3'
       }`}>
+        {/* 折叠状态：显示展开按钮 */}
+        {isChatCollapsed && (
+          <div className="flex flex-col items-center h-full">
+            {/* 与展开状态工具栏同高度的区域 */}
+            <div className="flex items-center justify-center px-2 py-3 border-b border-border flex-shrink-0 w-full">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsChatCollapsed(false)}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-accent"
+                title="展开 AI 助手"
+              >
+                <Bot className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* 展开状态：显示完整聊天界面 */}
         <div className={`flex flex-1 flex-col h-full overflow-hidden ${isChatCollapsed ? 'hidden' : ''}`}>
           {/* 顶部工具栏 */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
             <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsChatCollapsed(true)}
-                className="h-8 w-8 p-0"
-                title="收起对话"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              <div className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center">
+                <Bot className="w-4 h-4" />
+              </div>
               <h2 className="text-sm font-semibold text-foreground">项目助手</h2>
             </div>
             <div className="flex items-center gap-1">
@@ -554,6 +558,15 @@ export default function ProjectDetailPage() {
                 title="新建对话"
               >
                 <Plus className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsChatCollapsed(true)}
+                className="h-8 w-8 p-0"
+                title="收起对话"
+              >
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -780,17 +793,17 @@ export default function ProjectDetailPage() {
                 {selectedTasksData.map((task) => (
                   <div
                     key={task.id}
-                    className="flex items-center justify-between rounded-md bg-background px-2 py-1.5 text-xs border-2 border-primary/50 hover:border-primary transition-colors shadow-sm"
+                    className="flex items-center justify-between rounded-md bg-primary/10 px-2 py-1.5 text-xs border border-primary/30 hover:border-primary/50 transition-colors"
                   >
-                    <span className="truncate flex-1 text-primary font-semibold">
+                    <span className="truncate flex-1 text-primary font-medium">
                       {task.name}
-                      <span className="ml-1 text-primary/60">
+                      <span className="ml-1 text-primary/70 font-normal">
                         ({task.status === 'pending' ? '待办' : task.status === 'in_progress' ? '进行中' : task.status === 'completed' ? '已完成' : '已取消'})
                       </span>
                     </span>
                     <button
                       onClick={() => handleRemoveSelectedTask(task.id)}
-                      className="ml-2 text-primary/60 hover:text-destructive transition-colors p-0.5 rounded hover:bg-destructive/10"
+                      className="ml-2 text-primary/70 hover:text-primary transition-colors p-0.5 rounded hover:bg-primary/20"
                     >
                       <X className="h-3 w-3" />
                     </button>

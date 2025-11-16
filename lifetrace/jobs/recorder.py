@@ -39,8 +39,8 @@ CONFIG_KEY_RECORD_BLACKLIST_WINDOWS = "jobs.recorder.blacklist.windows"
 CONFIG_KEY_RECORD_FILE_IO_TIMEOUT = "jobs.recorder.file_io_timeout"
 CONFIG_KEY_RECORD_DB_TIMEOUT = "jobs.recorder.db_timeout"
 CONFIG_KEY_RECORD_WINDOW_INFO_TIMEOUT = "jobs.recorder.window_info_timeout"
-CONFIG_KEY_STORAGE_HASH_THRESHOLD = "storage.hash_threshold"
-CONFIG_KEY_STORAGE_DEDUPLICATE = "storage.deduplicate"
+CONFIG_KEY_RECORDER_DEDUPLICATE = "jobs.recorder.deduplicate"
+CONFIG_KEY_RECORDER_HASH_THRESHOLD = "jobs.recorder.hash_threshold"
 
 # LifeTrace窗口识别模式
 LIFETRACE_WINDOW_PATTERNS = [
@@ -94,8 +94,8 @@ class ScreenRecorder:
         self.screenshots_dir = self.config.screenshots_dir
         self.interval = self.config.get(CONFIG_KEY_RECORD_INTERVAL, 1)
         self.screens = self._get_screen_list()
-        self.hash_threshold = self.config.get(CONFIG_KEY_STORAGE_HASH_THRESHOLD, 5)
-        self.deduplicate = self.config.get(CONFIG_KEY_STORAGE_DEDUPLICATE, True)
+        self.deduplicate = self.config.get(CONFIG_KEY_RECORDER_DEDUPLICATE, True)
+        self.hash_threshold = self.config.get(CONFIG_KEY_RECORDER_HASH_THRESHOLD, 5)
 
         # 超时配置
         self.file_io_timeout = self.config.get(CONFIG_KEY_RECORD_FILE_IO_TIMEOUT, 15)
@@ -153,14 +153,14 @@ class ScreenRecorder:
 
     def _update_deduplication_config(self, new_config: dict):
         """更新去重配置"""
-        storage_config = new_config.get("storage", {})
         # 更新去重功能
-        new_deduplicate = storage_config.get("deduplicate", True)
+        recorder_config = new_config.get("jobs", {}).get("recorder", {})
+        new_deduplicate = recorder_config.get("deduplicate", True)
         if new_deduplicate != self.deduplicate:
             self.deduplicate = new_deduplicate
             logger.info(f"去重功能已{'启用' if new_deduplicate else '禁用'}")
         # 更新去重阈值
-        new_threshold = storage_config.get("hash_threshold", 5)
+        new_threshold = recorder_config.get("hash_threshold", 5)
         if new_threshold != self.hash_threshold:
             old_threshold = self.hash_threshold
             self.hash_threshold = new_threshold

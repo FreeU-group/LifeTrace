@@ -15,6 +15,7 @@ from lifetrace.llm.context_builder import ContextBuilder
 from lifetrace.llm.llm_client import LLMClient
 from lifetrace.llm.retrieval_service import RetrievalService
 from lifetrace.storage import DatabaseManager
+from lifetrace.util.prompt_loader import get_prompt
 from lifetrace.util.query_parser import QueryConditions, QueryParser
 
 logger = logging.getLogger(__name__)
@@ -252,20 +253,9 @@ class RAGService:
                 # 系统提示与 _generate_direct_response 保持一致
                 intent_type = intent_result.get("intent_type", "general_chat")
                 if intent_type == "system_help":
-                    system_prompt = """
-你是LifeTrace的智能助手。LifeTrace是一个生活轨迹记录和分析系统，主要功能包括：
-1. 自动截图记录用户的屏幕活动
-2. OCR文字识别和内容分析
-3. 应用使用情况统计
-4. 智能搜索和查询功能
-
-请根据用户的问题提供有用的帮助信息。
-"""
+                    system_prompt = get_prompt("rag", "system_help")
                 else:
-                    system_prompt = """
-你是LifeTrace的智能助手，请以友好、自然的方式与用户对话。
-如果用户需要查询数据或统计信息，请引导他们使用具体的查询语句。
-"""
+                    system_prompt = get_prompt("rag", "general_chat")
                 messages = [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_query},
@@ -324,31 +314,10 @@ class RAGService:
                 return
 
             # 4) 生成阶段：流式输出
-            system_prompt = """
-你是一个智能助手，专门帮助用户分析和总结历史记录数据。
-
-用户会提供一个查询和相关的历史数据，你需要：
-1. 理解用户的查询意图
-2. 分析提供的历史数据
-3. 生成准确、有用的总结
-
-**强制性要求 - 必须严格遵守：**
-- 每当引用或提到任何具体信息时，必须标注截图ID来源，格式为：[截图ID: xxx]
-- 不允许提及任何信息而不标注其来源截图ID
-- 如果历史数据中包含截图ID信息，必须在相关内容后立即添加引用
-- 这是为了确保信息的可追溯性和准确性
-- 示例："用户在微信中发送了消息 [截图ID: 12345]"
-
-请用中文回答，保持简洁明了，重点突出关键信息。
-"""
-            user_prompt = f"""
-用户查询：{user_query}
-
-相关历史数据：
-{context_text}
-
-请基于以上数据回答用户的查询。
-"""
+            system_prompt = get_prompt("rag", "history_analysis")
+            user_prompt = get_prompt(
+                "rag", "user_query_template", query=user_query, context=context_text
+            )
             messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -662,45 +631,127 @@ LifeTrace是一个生活轨迹记录和分析系统，主要功能包括：
         else:
             return "我理解您的问题，但可能需要更多信息才能提供准确的回答。您可以尝试更具体的查询，比如搜索特定内容或统计使用情况。"
 
-    async def process_query_stream(self, user_query: str) -> dict[str, Any]:
+    async def process_query_stream(
+        self, user_query: str, project_id: int | None = None, task_ids: list[int] | None = None
+    ) -> dict[str, Any]:
         """
         为流式接口处理查询，返回构建好的messages和temperature
         避免重复的意图识别调用
+
+        Args:
+            user_query: 用户查询
+            project_id: 可选的项目ID，用于过滤上下文
+            task_ids: 可选的任务ID列表，表示选中的任务
         """
         try:
             # 1. 意图识别
-            logger.info(f"[stream] 开始处理查询: {user_query}")
+            logger.info(
+                f"[stream] 开始处理查询: {user_query}, project_id: {project_id}, task_ids: {task_ids}"
+            )
             intent_result = self.llm_client.classify_intent(user_query)
             needs_db = intent_result.get("needs_database", True)
 
             messages = []
             temperature = 0.7
 
-            if not needs_db:
-                # 不需要数据库查询的情况
-                intent_type = intent_result.get("intent_type", "general_chat")
-                if intent_type == "system_help":
-                    system_prompt = """
-你是LifeTrace的智能助手。LifeTrace是一个生活轨迹记录和分析系统，主要功能包括：
-1. 自动截图记录用户的屏幕活动
-2. OCR文字识别和内容分析
-3. 应用使用情况统计
-4. 智能搜索和查询功能
+            # 获取项目信息（如果提供了 project_id）
+            project_info = None
+            tasks_info_str = "暂无任务"
+            selected_tasks_info_str = None
 
-请根据用户的问题提供有用的帮助信息。
-"""
+            if project_id:
+                project_info = self.db_manager.get_project(project_id)
+                logger.info(f"[stream] 获取到项目信息: {project_info}")
+
+                # 获取项目的任务列表
+                tasks = self.db_manager.list_tasks(project_id, limit=100)
+                if tasks:
+                    # 格式化任务信息
+                    tasks_list = []
+                    for task in tasks:
+                        status_emoji = {
+                            "pending": "⏳",
+                            "in_progress": "🔄",
+                            "completed": "✅",
+                            "cancelled": "❌",
+                        }.get(task.get("status", "pending"), "📝")
+
+                        task_line = f"{status_emoji} [{task.get('status', 'pending')}] {task.get('name', '未命名任务')}"
+                        if task.get("description"):
+                            # 限制描述为前50个字符
+                            description = task.get("description")
+                            if len(description) > 50:
+                                description = description[:50] + "..."
+                            task_line += f"\n   描述: {description}"
+                        tasks_list.append(task_line)
+
+                    tasks_info_str = "\n".join(tasks_list)
+                    logger.info(f"[stream] 获取到 {len(tasks)} 个任务")
                 else:
-                    system_prompt = """
-你是LifeTrace的智能助手，请以友好、自然的方式与用户对话。
-如果用户需要查询数据或统计信息，请引导他们使用具体的查询语句。
-"""
+                    logger.info(f"[stream] 项目 {project_id} 暂无任务")
+
+                # 如果提供了选中的任务ID，获取这些任务的详细信息
+                if task_ids and len(task_ids) > 0:
+                    selected_tasks_list = []
+                    for task_id in task_ids:
+                        task = self.db_manager.get_task(task_id)
+                        if task:
+                            status_emoji = {
+                                "pending": "⏳",
+                                "in_progress": "🔄",
+                                "completed": "✅",
+                                "cancelled": "❌",
+                            }.get(task.get("status", "pending"), "📝")
+
+                            # 选中的任务显示完整描述（不限制字符）
+                            task_line = f"{status_emoji} [{task.get('status', 'pending')}] {task.get('name', '未命名任务')}"
+                            if task.get("description"):
+                                task_line += f"\n   描述: {task.get('description')}"
+                            selected_tasks_list.append(task_line)
+
+                    if selected_tasks_list:
+                        selected_tasks_info_str = "\n\n".join(selected_tasks_list)
+                        logger.info(f"[stream] 获取到 {len(selected_tasks_list)} 个选中的任务")
+
+            if not needs_db:
+                # 不需要数据库查询的情况（不会检索历史数据）
+                intent_type = intent_result.get("intent_type", "general_chat")
+
+                # 如果是项目对话，使用项目助手提示词（无历史数据版本）
+                if project_info:
+                    # 如果有选中的任务，使用带选中任务的提示词
+                    if selected_tasks_info_str:
+                        system_prompt = get_prompt(
+                            "project_assistant",
+                            "system_prompt_with_selected_tasks",
+                            project_name=project_info.get("name", "未命名项目"),
+                            project_goal=project_info.get("goal", "暂无目标描述"),
+                            selected_tasks_info=selected_tasks_info_str,
+                            tasks_info=tasks_info_str,
+                        )
+                    else:
+                        system_prompt = get_prompt(
+                            "project_assistant",
+                            "system_prompt",
+                            project_name=project_info.get("name", "未命名项目"),
+                            project_goal=project_info.get("goal", "暂无目标描述"),
+                            tasks_info=tasks_info_str,
+                        )
+                elif intent_type == "system_help":
+                    system_prompt = get_prompt("rag", "system_help")
+                else:
+                    system_prompt = get_prompt("rag", "general_chat")
+
                 messages = [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_query},
                 ]
             else:
-                # 需要数据库查询的情况
+                # 需要数据库查询的情况（会检索历史数据）
                 parsed_query = self.query_parser.parse_query(user_query)
+                # 如果提供了 project_id，添加到查询条件中
+                if project_id:
+                    parsed_query.project_id = project_id
                 query_type = "statistics" if "统计" in user_query else "search"
                 retrieved_data = self.retrieval_service.search_by_conditions(parsed_query, 500)
 
@@ -717,8 +768,35 @@ LifeTrace是一个生活轨迹记录和分析系统，主要功能包括：
                         user_query, retrieved_data
                     )
                 logger.debug(f"构建的上下文内容: {context_text}")
+
+                # 如果是项目对话，使用带历史数据的项目助手提示词
+                if project_info:
+                    # 如果有选中的任务，使用带历史数据和选中任务的提示词
+                    if selected_tasks_info_str:
+                        project_context = get_prompt(
+                            "project_assistant",
+                            "system_prompt_with_data_and_selected_tasks",
+                            project_name=project_info.get("name", "未命名项目"),
+                            project_goal=project_info.get("goal", "暂无目标描述"),
+                            selected_tasks_info=selected_tasks_info_str,
+                            tasks_info=tasks_info_str,
+                        )
+                    else:
+                        project_context = get_prompt(
+                            "project_assistant",
+                            "system_prompt_with_data",
+                            project_name=project_info.get("name", "未命名项目"),
+                            project_goal=project_info.get("goal", "暂无目标描述"),
+                            tasks_info=tasks_info_str,
+                        )
+                    # 将项目上下文和数据上下文结合
+                    system_content = f"{project_context}\n\n{context_text}"
+                else:
+                    # 非项目对话，使用事件助手的提示词
+                    system_content = context_text
+
                 messages = [
-                    {"role": "system", "content": context_text},
+                    {"role": "system", "content": system_content},
                     {"role": "user", "content": user_query},
                 ]
                 temperature = 0.3

@@ -640,9 +640,9 @@ export default function EventsPage() {
 
   return (
     <div className="flex h-full overflow-hidden relative">
-      {/* 左侧事件管理区域 - 占2/3或全屏 */}
+      {/* 左侧事件管理区域 - 占2/3或更宽 */}
       <div className={`flex flex-col overflow-hidden p-4 border-r transition-all duration-300 ${
-        isChatCollapsed ? 'w-full' : 'w-2/3'
+        isChatCollapsed ? 'flex-1' : 'w-2/3'
       }`}>
         {/* 选中事件提示 */}
         {selectedEvents.size > 0 && (
@@ -961,38 +961,37 @@ export default function EventsPage() {
         })()}
       </div>
 
-      {/* 折叠状态：右下角悬浮按钮 */}
-      {isChatCollapsed && (
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setIsChatCollapsed(false)}
-          className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full p-0 shadow-lg hover:shadow-xl transition-all duration-300"
-          title="展开对话"
-        >
-          <MessageSquare className="h-6 w-6" />
-        </Button>
-      )}
-
-      {/* 右侧聊天区域 - 占1/3或收起 */}
+      {/* 右侧聊天区域 - 占1/3或窄列 */}
       <div className={`bg-card flex flex-col flex-shrink-0 h-full overflow-hidden transition-all duration-300 ${
-        isChatCollapsed ? 'w-0' : 'w-1/3'
+        isChatCollapsed ? 'w-16' : 'w-1/3'
       }`}>
+        {/* 折叠状态：显示展开按钮 */}
+        {isChatCollapsed && (
+          <div className="flex flex-col items-center h-full">
+            {/* 与展开状态工具栏同高度的区域 */}
+            <div className="flex items-center justify-center px-2 py-3 border-b border-border flex-shrink-0 w-full">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsChatCollapsed(false)}
+                className="h-8 w-8 p-0 rounded-lg hover:bg-accent"
+                title="展开 AI 助手"
+              >
+                <Bot className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* 展开状态：显示完整聊天界面 */}
         <div className={`flex flex-1 flex-col h-full overflow-hidden ${isChatCollapsed ? 'hidden' : ''}`}>
           {/* 顶部工具栏 */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
             <div className="flex items-center gap-2">
-              {/* 折叠按钮 - 对话框内部左上角 */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsChatCollapsed(true)}
-                className="h-8 w-8 p-0"
-                title="收起对话"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <h2 className="text-sm font-semibold text-foreground">Chat with AI</h2>
+              <div className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center">
+                <Bot className="w-4 h-4" />
+              </div>
+              <h2 className="text-sm font-semibold text-foreground">事件助手</h2>
             </div>
             <div className="flex items-center gap-1">
               <Button
@@ -1017,6 +1016,15 @@ export default function EventsPage() {
                 title="新建对话"
               >
                 <Plus className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsChatCollapsed(true)}
+                className="h-8 w-8 p-0"
+                title="收起对话"
+              >
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>

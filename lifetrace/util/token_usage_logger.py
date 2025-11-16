@@ -4,12 +4,11 @@ Token使用量记录器
 记录LLM API调用的token使用情况，便于后续统计分析
 """
 
-import json
-import os
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
+from lifetrace.storage.database import db_manager
+from lifetrace.storage.models import TokenUsage
 from lifetrace.util.logging_config import get_logger
 
 logger = get_logger()
@@ -20,22 +19,32 @@ class TokenUsageLogger:
 
     def __init__(self, config=None):
         self.config = config
-        self._setup_log_file()
 
-    def _setup_log_file(self):
-        """设置token使用量日志文件路径"""
-        if self.config:
-            base_dir = getattr(self.config, "base_dir", "data")
-        else:
-            base_dir = os.path.join(Path(__file__).parent.parent, "data")
+    def _get_model_price(self, model: str) -> tuple[float, float]:
+        """获取模型价格（元/千token）
 
-        # token使用量日志存储在logs/core目录下
-        self.log_dir = os.path.join(base_dir, "logs", "core")
-        os.makedirs(self.log_dir, exist_ok=True)
+        Args:
+            model: 模型名称
 
-        # 使用日期作为文件名的一部分，便于按日期统计
-        today = datetime.now().strftime("%Y-%m")
-        self.token_log_file = os.path.join(self.log_dir, f"token_usage_{today}.jsonl")
+        Returns:
+            (input_price, output_price) 元组
+        """
+        if not self.config:
+            return 0.0, 0.0
+
+        model_prices = self.config.get("llm.model_prices", {})
+
+        # 先尝试获取指定模型的价格
+        if model in model_prices:
+            prices = model_prices[model]
+            return prices.get("input_price", 0.0), prices.get("output_price", 0.0)
+
+        # 如果没有找到，使用默认价格
+        if "default" in model_prices:
+            prices = model_prices["default"]
+            return prices.get("input_price", 0.0), prices.get("output_price", 0.0)
+
+        return 0.0, 0.0
 
     def log_token_usage(
         self,
@@ -45,6 +54,7 @@ class TokenUsageLogger:
         endpoint: str = None,
         user_query: str = None,
         response_type: str = None,
+        feature_type: str = None,
         additional_info: dict[str, Any] = None,
     ):
         """
@@ -57,38 +67,48 @@ class TokenUsageLogger:
             endpoint: API端点（如 /api/chat, /api/chat/stream）
             user_query: 用户查询内容（可选，用于分析）
             response_type: 响应类型（如 chat, search, classify）
+            feature_type: 功能类型（如 event_assistant, project_assistant, job_task_context_mapper, job_task_summary）
             additional_info: 额外信息字典
         """
         try:
-            # 构建记录数据
-            usage_record = {
-                "timestamp": datetime.now().isoformat(),
-                "model": model,
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
-                "total_tokens": input_tokens + output_tokens,
-                "endpoint": endpoint,
-                "response_type": response_type,
-            }
+            # 计算成本
+            input_price, output_price = self._get_model_price(model)
+            input_cost = (input_tokens / 1000) * input_price
+            output_cost = (output_tokens / 1000) * output_price
+            total_cost = input_cost + output_cost
 
-            # 添加可选字段
+            # 准备用户查询预览
+            user_query_preview = None
+            query_length = None
             if user_query:
-                # 只记录查询的前100个字符，避免日志过大
-                usage_record["user_query_preview"] = user_query[:100] + (
-                    "..." if len(user_query) > 100 else ""
+                # 只记录查询的前200个字符
+                user_query_preview = user_query[:200] + ("..." if len(user_query) > 200 else "")
+                query_length = len(user_query)
+
+            # 写入数据库
+            with db_manager.get_session() as session:
+                token_usage = TokenUsage(
+                    model=model,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    total_tokens=input_tokens + output_tokens,
+                    endpoint=endpoint,
+                    response_type=response_type,
+                    feature_type=feature_type,
+                    user_query_preview=user_query_preview,
+                    query_length=query_length,
+                    input_cost=input_cost,
+                    output_cost=output_cost,
+                    total_cost=total_cost,
+                    created_at=datetime.now(),
                 )
-                usage_record["query_length"] = len(user_query)
+                session.add(token_usage)
+                session.flush()
 
-            if additional_info:
-                usage_record["additional_info"] = additional_info
-
-            # 写入JSONL格式文件（每行一个JSON对象）
-            with open(self.token_log_file, "a", encoding="utf-8") as f:
-                f.write(json.dumps(usage_record, ensure_ascii=False) + "\n")
-
-            # 同时记录到标准日志
+            # 记录到标准日志
             logger.info(
-                f"Token usage - Model: {model}, Input: {input_tokens}, Output: {output_tokens}, Total: {input_tokens + output_tokens}"
+                f"Token usage - Model: {model}, Input: {input_tokens}, Output: {output_tokens}, "
+                f"Total: {input_tokens + output_tokens}, Cost: ¥{total_cost:.4f}"
             )
 
         except Exception as e:
@@ -106,108 +126,104 @@ class TokenUsageLogger:
             统计结果字典
         """
         try:
+            from datetime import timedelta
+
             stats = {
                 "total_input_tokens": 0,
                 "total_output_tokens": 0,
                 "total_tokens": 0,
                 "total_requests": 0,
+                "total_cost": 0.0,
                 "model_stats": {},
                 "endpoint_stats": {},
+                "feature_stats": {},
                 "daily_stats": {},
             }
-
-            # 读取最近的日志文件
-            from datetime import timedelta
 
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
 
-            # 遍历可能的日志文件
-            for i in range(days + 1):
-                check_date = start_date + timedelta(days=i)
-                month_str = check_date.strftime("%Y-%m")
-                log_file = os.path.join(self.log_dir, f"token_usage_{month_str}.jsonl")
+            # 从数据库查询
+            with db_manager.get_session() as session:
+                # 查询时间范围内的所有记录
+                records = (
+                    session.query(TokenUsage)
+                    .filter(TokenUsage.created_at >= start_date)
+                    .filter(TokenUsage.created_at <= end_date)
+                    .all()
+                )
 
-                if os.path.exists(log_file):
-                    with open(log_file, encoding="utf-8") as f:
-                        for line in f:
-                            try:
-                                record = json.loads(line.strip())
-                                record_date = datetime.fromisoformat(record["timestamp"])
+                for record in records:
+                    # 更新总计
+                    stats["total_input_tokens"] += record.input_tokens
+                    stats["total_output_tokens"] += record.output_tokens
+                    stats["total_tokens"] += record.total_tokens
+                    stats["total_cost"] += record.total_cost
+                    stats["total_requests"] += 1
 
-                                # 检查是否在统计范围内
-                                if start_date <= record_date <= end_date:
-                                    # 更新总计
-                                    stats["total_input_tokens"] += record["input_tokens"]
-                                    stats["total_output_tokens"] += record["output_tokens"]
-                                    stats["total_tokens"] += record["total_tokens"]
-                                    stats["total_requests"] += 1
+                    # 按模型统计
+                    model = record.model
+                    if model not in stats["model_stats"]:
+                        stats["model_stats"][model] = {
+                            "input_tokens": 0,
+                            "output_tokens": 0,
+                            "total_tokens": 0,
+                            "requests": 0,
+                            "total_cost": 0.0,
+                        }
+                    stats["model_stats"][model]["input_tokens"] += record.input_tokens
+                    stats["model_stats"][model]["output_tokens"] += record.output_tokens
+                    stats["model_stats"][model]["total_tokens"] += record.total_tokens
+                    stats["model_stats"][model]["total_cost"] += record.total_cost
+                    stats["model_stats"][model]["requests"] += 1
 
-                                    # 按模型统计
-                                    model = record["model"]
-                                    if model not in stats["model_stats"]:
-                                        stats["model_stats"][model] = {
-                                            "input_tokens": 0,
-                                            "output_tokens": 0,
-                                            "total_tokens": 0,
-                                            "requests": 0,
-                                        }
-                                    stats["model_stats"][model]["input_tokens"] += record[
-                                        "input_tokens"
-                                    ]
-                                    stats["model_stats"][model]["output_tokens"] += record[
-                                        "output_tokens"
-                                    ]
-                                    stats["model_stats"][model]["total_tokens"] += record[
-                                        "total_tokens"
-                                    ]
-                                    stats["model_stats"][model]["requests"] += 1
+                    # 按端点统计
+                    endpoint = record.endpoint or "unknown"
+                    if endpoint not in stats["endpoint_stats"]:
+                        stats["endpoint_stats"][endpoint] = {
+                            "input_tokens": 0,
+                            "output_tokens": 0,
+                            "total_tokens": 0,
+                            "requests": 0,
+                            "total_cost": 0.0,
+                        }
+                    stats["endpoint_stats"][endpoint]["input_tokens"] += record.input_tokens
+                    stats["endpoint_stats"][endpoint]["output_tokens"] += record.output_tokens
+                    stats["endpoint_stats"][endpoint]["total_tokens"] += record.total_tokens
+                    stats["endpoint_stats"][endpoint]["total_cost"] += record.total_cost
+                    stats["endpoint_stats"][endpoint]["requests"] += 1
 
-                                    # 按端点统计
-                                    endpoint = record.get("endpoint", "unknown")
-                                    if endpoint not in stats["endpoint_stats"]:
-                                        stats["endpoint_stats"][endpoint] = {
-                                            "input_tokens": 0,
-                                            "output_tokens": 0,
-                                            "total_tokens": 0,
-                                            "requests": 0,
-                                        }
-                                    stats["endpoint_stats"][endpoint]["input_tokens"] += record[
-                                        "input_tokens"
-                                    ]
-                                    stats["endpoint_stats"][endpoint]["output_tokens"] += record[
-                                        "output_tokens"
-                                    ]
-                                    stats["endpoint_stats"][endpoint]["total_tokens"] += record[
-                                        "total_tokens"
-                                    ]
-                                    stats["endpoint_stats"][endpoint]["requests"] += 1
+                    # 按功能类型统计
+                    feature_type = record.feature_type or "unknown"
+                    if feature_type not in stats["feature_stats"]:
+                        stats["feature_stats"][feature_type] = {
+                            "input_tokens": 0,
+                            "output_tokens": 0,
+                            "total_tokens": 0,
+                            "requests": 0,
+                            "total_cost": 0.0,
+                        }
+                    stats["feature_stats"][feature_type]["input_tokens"] += record.input_tokens
+                    stats["feature_stats"][feature_type]["output_tokens"] += record.output_tokens
+                    stats["feature_stats"][feature_type]["total_tokens"] += record.total_tokens
+                    stats["feature_stats"][feature_type]["total_cost"] += record.total_cost
+                    stats["feature_stats"][feature_type]["requests"] += 1
 
-                                    # 按日期统计
-                                    date_str = record_date.strftime("%Y-%m-%d")
-                                    if date_str not in stats["daily_stats"]:
-                                        stats["daily_stats"][date_str] = {
-                                            "input_tokens": 0,
-                                            "output_tokens": 0,
-                                            "total_tokens": 0,
-                                            "requests": 0,
-                                        }
-                                    stats["daily_stats"][date_str]["input_tokens"] += record[
-                                        "input_tokens"
-                                    ]
-                                    stats["daily_stats"][date_str]["output_tokens"] += record[
-                                        "output_tokens"
-                                    ]
-                                    stats["daily_stats"][date_str]["total_tokens"] += record[
-                                        "total_tokens"
-                                    ]
-                                    stats["daily_stats"][date_str]["requests"] += 1
-
-                            except (json.JSONDecodeError, KeyError, ValueError) as e:
-                                logger.warning(
-                                    f"Failed to parse log line: {line.strip()}, error: {e}"
-                                )
-                                continue
+                    # 按日期统计
+                    date_str = record.created_at.strftime("%Y-%m-%d")
+                    if date_str not in stats["daily_stats"]:
+                        stats["daily_stats"][date_str] = {
+                            "input_tokens": 0,
+                            "output_tokens": 0,
+                            "total_tokens": 0,
+                            "requests": 0,
+                            "total_cost": 0.0,
+                        }
+                    stats["daily_stats"][date_str]["input_tokens"] += record.input_tokens
+                    stats["daily_stats"][date_str]["output_tokens"] += record.output_tokens
+                    stats["daily_stats"][date_str]["total_tokens"] += record.total_tokens
+                    stats["daily_stats"][date_str]["total_cost"] += record.total_cost
+                    stats["daily_stats"][date_str]["requests"] += 1
 
             return stats
 
@@ -225,6 +241,9 @@ def setup_token_logger(config=None) -> TokenUsageLogger:
     global _token_logger
     if _token_logger is None:
         _token_logger = TokenUsageLogger(config)
+    elif config is not None:
+        # 如果传入了新的config，更新现有logger的config
+        _token_logger.config = config
     return _token_logger
 
 

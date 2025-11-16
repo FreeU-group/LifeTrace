@@ -335,10 +335,20 @@ class JobManager:
         # 检查其他配置参数（如阈值、批次大小等）
         if new_enabled:
             mapper_instance = get_mapper_instance()
-            if old_mapper.get("confidence_threshold") != new_mapper.get("confidence_threshold"):
-                threshold = new_mapper.get("confidence_threshold", 0.7)
-                logger.info(f"更新任务上下文映射置信度阈值: {threshold}")
-                mapper_instance.confidence_threshold = threshold
+            # 检查项目置信度阈值
+            if old_mapper.get("project_confidence_threshold") != new_mapper.get(
+                "project_confidence_threshold"
+            ):
+                threshold = new_mapper.get("project_confidence_threshold", 0.7)
+                logger.info(f"更新任务上下文映射项目置信度阈值: {threshold}")
+                mapper_instance.project_confidence_threshold = threshold
+            # 检查任务置信度阈值
+            if old_mapper.get("task_confidence_threshold") != new_mapper.get(
+                "task_confidence_threshold"
+            ):
+                threshold = new_mapper.get("task_confidence_threshold", 0.7)
+                logger.info(f"更新任务上下文映射任务置信度阈值: {threshold}")
+                mapper_instance.task_confidence_threshold = threshold
 
     def _handle_task_summary_config_change_in_jobs(self, old_jobs: dict, new_jobs: dict):
         """处理任务摘要配置变更（在 jobs 配置中）

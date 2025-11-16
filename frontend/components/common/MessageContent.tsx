@@ -128,7 +128,7 @@ export default function MessageContent({ content, isMarkdown = true, isStreaming
   return (
     <div
       ref={containerRef}
-      className="prose prose-sm max-w-none text-sm prose-p:my-1.5 prose-p:leading-relaxed prose-ul:my-1.5 prose-ol:my-1.5"
+      className="markdown-content prose prose-sm max-w-none text-sm prose-p:my-1.5 prose-p:leading-relaxed prose-ul:my-1.5 prose-ol:my-1.5"
     />
   );
 }

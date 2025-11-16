@@ -8,6 +8,8 @@ from pydantic import BaseModel
 
 class ChatMessage(BaseModel):
     message: str
+    project_id: int | None = None  # 项目ID，用于过滤上下文
+    task_ids: list[int] | None = None  # 选中的任务ID列表
 
 
 class ChatMessageWithContext(BaseModel):

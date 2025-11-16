@@ -51,7 +51,7 @@
     </div>
     <div>
       <h1 className="text-lg font-bold">LifeTrace</h1>
-      <p className="text-xs text-muted-foreground">生活追踪系统</p>
+      <p className="text-xs text-muted-foreground">智能生活记录系统</p>
     </div>
   </div>
 </SidebarHeader>

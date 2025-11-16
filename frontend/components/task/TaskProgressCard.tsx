@@ -19,6 +19,17 @@ export default function TaskProgressCard({ projectId, taskId }: TaskProgressCard
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [contextCount, setContextCount] = useState<number>(0);
+
+  const loadContextCount = useCallback(async () => {
+    try {
+      const response = await api.getContexts({ task_id: taskId, limit: 1 });
+      setContextCount(response.data.total || 0);
+    } catch (err) {
+      console.error('加载上下文数量失败:', err);
+      setContextCount(0);
+    }
+  }, [taskId]);
 
   const loadLatestProgress = useCallback(async () => {
     setLoading(true);
@@ -28,6 +39,9 @@ export default function TaskProgressCard({ projectId, taskId }: TaskProgressCard
       console.log('任务进展数据:', response.data);
       // API 现在返回 null 而不是 404 错误
       setLatestProgress(response.data || null);
+      if (response.data) {
+        setContextCount(response.data.context_count);
+      }
     } catch (err) {
         console.error('加载任务进展失败:', err);
         setError('加载失败');
@@ -58,7 +72,8 @@ export default function TaskProgressCard({ projectId, taskId }: TaskProgressCard
 
   useEffect(() => {
     loadLatestProgress();
-  }, [loadLatestProgress]);
+    loadContextCount();
+  }, [loadLatestProgress, loadContextCount]);
 
   const formatDateTime = (dateString: string) => {
     try {
@@ -86,12 +101,12 @@ export default function TaskProgressCard({ projectId, taskId }: TaskProgressCard
             </CardTitle>
             <button
               onClick={handleGenerateSummary}
-              disabled={generating}
+              disabled={generating || contextCount === 0}
               className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="手动生成进度总结"
+              title={contextCount === 0 ? '暂无关联的上下文' : '手动生成进度总结'}
             >
               <RefreshCw className={`h-3.5 w-3.5 ${generating ? 'animate-spin' : ''}`} />
-              生成总结
+              手动更新
             </button>
           </div>
         </CardHeader>
@@ -115,12 +130,12 @@ export default function TaskProgressCard({ projectId, taskId }: TaskProgressCard
             </CardTitle>
             <button
               onClick={handleGenerateSummary}
-              disabled={generating}
+              disabled={generating || contextCount === 0}
               className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="手动生成进度总结"
+              title={contextCount === 0 ? '暂无关联的上下文' : '手动生成进度总结'}
             >
               <RefreshCw className={`h-3.5 w-3.5 ${generating ? 'animate-spin' : ''}`} />
-              生成总结
+              手动更新
             </button>
           </div>
         </CardHeader>
@@ -142,12 +157,12 @@ export default function TaskProgressCard({ projectId, taskId }: TaskProgressCard
             </CardTitle>
             <button
               onClick={handleGenerateSummary}
-              disabled={generating}
+              disabled={generating || contextCount === 0}
               className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="手动生成进度总结"
+              title={contextCount === 0 ? '暂无关联的上下文' : '手动生成进度总结'}
             >
               <RefreshCw className={`h-3.5 w-3.5 ${generating ? 'animate-spin' : ''}`} />
-              生成总结
+              手动更新
             </button>
           </div>
         </CardHeader>
@@ -188,12 +203,12 @@ export default function TaskProgressCard({ projectId, taskId }: TaskProgressCard
           </div>
           <button
             onClick={handleGenerateSummary}
-            disabled={generating}
+            disabled={generating || contextCount === 0}
             className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-            title="手动生成进度总结"
+            title={contextCount === 0 ? '暂无关联的上下文' : '手动生成进度总结'}
           >
             <RefreshCw className={`h-3.5 w-3.5 ${generating ? 'animate-spin' : ''}`} />
-            生成总结
+            手动更新
           </button>
         </div>
       </CardHeader>

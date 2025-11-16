@@ -12,7 +12,7 @@ if __name__ == "__main__":
 from sqlalchemy import func, or_
 
 from lifetrace.storage import DatabaseManager
-from lifetrace.storage.models import OCRResult, Screenshot
+from lifetrace.storage.models import Event, EventAssociation, OCRResult, Screenshot, Task
 from lifetrace.util.query_parser import QueryConditions, QueryParser
 
 logger = logging.getLogger(__name__)
@@ -53,6 +53,15 @@ class RetrievalService:
                 query = session.query(Screenshot).join(
                     OCRResult, Screenshot.id == OCRResult.screenshot_id
                 )
+
+                # 添加项目过滤（通过 Screenshot -> Event -> EventAssociation -> Task -> Project 的关联）
+                if conditions.project_id:
+                    query = (
+                        query.join(Event, Screenshot.event_id == Event.id)
+                        .join(EventAssociation, Event.id == EventAssociation.event_id)
+                        .join(Task, EventAssociation.task_id == Task.id)
+                        .filter(Task.project_id == conditions.project_id)
+                    )
 
                 # 添加时间范围过滤
                 if conditions.start_date:
@@ -265,6 +274,14 @@ class RetrievalService:
 
                 # 应用条件过滤
                 if conditions:
+                    # 添加项目过滤
+                    if conditions.project_id:
+                        query = (
+                            query.join(Event, Screenshot.event_id == Event.id)
+                            .join(EventAssociation, Event.id == EventAssociation.event_id)
+                            .join(Task, EventAssociation.task_id == Task.id)
+                            .filter(Task.project_id == conditions.project_id)
+                        )
                     if conditions.start_date:
                         query = query.filter(Screenshot.created_at >= conditions.start_date)
                     if conditions.end_date:
@@ -285,6 +302,14 @@ class RetrievalService:
                 ).group_by(Screenshot.app_name)
 
                 if conditions:
+                    # 添加项目过滤
+                    if conditions.project_id:
+                        app_stats = (
+                            app_stats.join(Event, Screenshot.event_id == Event.id)
+                            .join(EventAssociation, Event.id == EventAssociation.event_id)
+                            .join(Task, EventAssociation.task_id == Task.id)
+                            .filter(Task.project_id == conditions.project_id)
+                        )
                     if conditions.start_date:
                         app_stats = app_stats.filter(Screenshot.created_at >= conditions.start_date)
                     if conditions.end_date:

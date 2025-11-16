@@ -122,10 +122,14 @@ async def chat_with_llm(message: ChatMessage, request: Request):
 async def chat_with_llm_stream(message: ChatMessage):
     """与LLM聊天接口（流式输出）"""
     try:
-        deps.logger.info(f"[stream] 收到聊天消息: {message.message}")
+        deps.logger.info(
+            f"[stream] 收到聊天消息: {message.message}, project_id: {message.project_id}, task_ids: {message.task_ids}"
+        )
 
         # 使用RAG服务的流式处理方法，避免重复的意图识别
-        rag_result = await deps.rag_service.process_query_stream(message.message)
+        rag_result = await deps.rag_service.process_query_stream(
+            message.message, message.project_id, message.task_ids
+        )
 
         if not rag_result.get("success", False):
             # 如果RAG处理失败，返回错误信息
@@ -175,6 +179,11 @@ async def chat_with_llm_stream(message: ChatMessage):
                     try:
                         from lifetrace.util.token_usage_logger import log_token_usage
 
+                        # 根据是否有 project_id 判断是项目助手还是事件助手
+                        feature_type = (
+                            "project_assistant" if message.project_id else "event_assistant"
+                        )
+
                         log_token_usage(
                             model=deps.rag_service.llm_client.model,
                             input_tokens=usage_info.prompt_tokens,
@@ -182,10 +191,16 @@ async def chat_with_llm_stream(message: ChatMessage):
                             endpoint="stream_chat",
                             user_query=message.message,
                             response_type="stream",
+                            feature_type=feature_type,
                             additional_info={
                                 "total_tokens": usage_info.total_tokens,
                                 "temperature": temperature,
                                 "response_length": len(total_content),
+                                "project_id": message.project_id,
+                                "task_ids": message.task_ids,
+                                "selected_tasks_count": len(message.task_ids)
+                                if message.task_ids
+                                else 0,
                             },
                         )
                         deps.logger.info(
@@ -297,6 +312,7 @@ async def chat_with_context_stream(message: ChatMessageWithContext):
                             endpoint="stream_chat_with_context",
                             user_query=message.message,
                             response_type="stream",
+                            feature_type="event_assistant",
                             additional_info={
                                 "total_tokens": usage_info.total_tokens,
                                 "temperature": temperature,

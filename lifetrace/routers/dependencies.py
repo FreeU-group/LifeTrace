@@ -9,7 +9,6 @@ from typing import Any
 db_manager = None
 ocr_processor = None
 vector_service = None
-multimodal_vector_service = None
 rag_service = None
 behavior_tracker = None
 config = None
@@ -84,20 +83,18 @@ def init_dependencies(
     db_mgr,
     ocr_proc,
     vec_service,
-    mm_vec_service,
     rag_svc,
     cfg,
     log,
     is_llm_config,
 ):
     """初始化全局依赖"""
-    global db_manager, ocr_processor, vector_service, multimodal_vector_service
+    global db_manager, ocr_processor, vector_service
     global rag_service, config, logger, is_llm_configured
 
     db_manager = db_mgr
     ocr_processor = ocr_proc
     vector_service = vec_service
-    multimodal_vector_service = mm_vec_service
     rag_service = rag_svc
     config = cfg
     logger = log

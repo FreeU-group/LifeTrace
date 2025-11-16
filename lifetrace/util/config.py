@@ -1,6 +1,7 @@
 import copy
 import logging
 import os
+import shutil
 import sys
 import threading
 import time
@@ -81,119 +82,45 @@ class LifeTraceConfig:
 
         # 检查default_config.yaml是否存在
         if not os.path.exists(default_config_path):
-            logging.warning(f"默认配置文件不存在: {default_config_path}，将使用内置默认配置")
-            return
+            raise FileNotFoundError(
+                f"默认配置文件不存在: {default_config_path}\n"
+                "请确保 default_config.yaml 文件存在于 config 目录中"
+            )
 
         try:
             # 复制default_config.yaml到config.yaml
-            import shutil
 
             shutil.copy2(default_config_path, self.config_path)
             logging.info(f"已从默认配置创建配置文件: {self.config_path}")
         except Exception as e:
-            logging.error(f"初始化配置文件失败: {e}")
+            raise RuntimeError(f"初始化配置文件失败: {e}") from e
 
     def _load_config(self) -> dict:
         """加载配置文件
-        直接加载配置文件，不进行配置合并
+        只从 config.yaml 加载配置，不存在则报错
         """
-        # 如果配置文件存在，直接加载
-        if os.path.exists(self.config_path):
+        # 检查配置文件是否存在
+        if not os.path.exists(self.config_path):
+            raise FileNotFoundError(
+                f"配置文件不存在: {self.config_path}\n"
+                "请确保 config.yaml 文件存在，或运行系统初始化从 default_config.yaml 复制"
+            )
+
+        # 加载配置文件
+        try:
             with open(self.config_path, encoding="utf-8") as f:
-                config = yaml.safe_load(f) or {}
+                config = yaml.safe_load(f)
+                if not config:
+                    raise ValueError(f"配置文件内容为空: {self.config_path}")
                 return config
-
-        # 如果配置文件不存在，返回默认配置
-        return self._get_default_config()
-
-    def _merge_configs(self, default_config: dict, user_config: dict):
-        """递归合并配置，用户配置会覆盖默认配置中的同名项"""
-        for key, value in user_config.items():
-            if (
-                isinstance(value, dict)
-                and key in default_config
-                and isinstance(default_config[key], dict)
-            ):
-                # 如果两边都是字典，递归合并
-                self._merge_configs(default_config[key], value)
-            else:
-                # 否则直接覆盖
-                default_config[key] = value
-
-    def _get_default_config(self) -> dict:
-        """默认配置"""
-        return {
-            "base_dir": "lifetrace/data",
-            "database_path": "lifetrace.db",
-            "screenshots_dir": "screenshots/",
-            "plans_dir": "plans/",
-            "plan_images_dir": "plan_images/",
-            "server": {"host": "127.0.0.1", "port": 8000},
-            "logging": {
-                "level": "INFO",
-                "log_path": "logs/",
-            },
-            "scheduler": {
-                "enabled": True,  # 启用调度器
-                "database_path": "scheduler.db",  # 调度器数据库路径
-                "max_workers": 10,  # 最大工作线程数
-                "coalesce": True,  # 合并错过的任务
-                "max_instances": 1,  # 同一任务同时只能有一个实例
-                "misfire_grace_time": 60,  # 错过触发时间的容忍度（秒）
-                "timezone": "Asia/Shanghai",  # 时区
-            },
-            "jobs": {
-                "recorder": {
-                    "enabled": True,
-                    "interval": 1,  # 截图间隔（秒）
-                    "screens": "all",  # 截图屏幕：all 或屏幕编号列表
-                    "auto_exclude_self": True,  # 自动排除LifeTrace自身窗口
-                    "blacklist": {
-                        "enabled": False,  # 是否启用黑名单功能
-                        "apps": [],  # 应用黑名单
-                        "windows": [],  # 窗口标题黑名单
-                    },
-                },
-                "ocr": {
-                    "enabled": True,
-                    "use_gpu": False,
-                    "language": ["ch", "en"],
-                    "interval": 5,  # 数据库检查间隔（秒）
-                    "confidence_threshold": 0.5,
-                },
-            },
-            "storage": {
-                "max_days": 30,  # 数据保留天数
-                "deduplicate": True,  # 启用去重
-            },
-            "processing": {"batch_size": 10, "queue_size": 100},
-            "consistency_check": {"interval": 300},  # 一致性检查间隔（秒）
-            "vector_db": {
-                "enabled": True,  # 启用向量数据库
-                "collection_name": "lifetrace_ocr",  # 集合名称
-                "embedding_model": "shibing624/text2vec-base-chinese",  # 嵌入模型
-                "rerank_model": "BAAI/bge-reranker-base",  # 重排序模型
-                "persist_directory": "vector_db",  # 持久化目录
-                "chunk_size": 512,  # 文本块大小
-                "chunk_overlap": 50,  # 文本块重叠
-                "batch_size": 32,  # 批处理大小
-                "auto_sync": True,  # 自动同步
-                "sync_interval": 300,  # 同步间隔（秒）
-            },
-            "sync_service": {
-                "enable_file_monitor": True,  # 启用文件监控
-                "enable_consistency_check": True,  # 启用一致性检查
-                "consistency_check_interval": 300,  # 一致性检查间隔（秒）
-                "vector_sync_interval": 600,  # 向量数据库同步间隔（秒）
-                "file_monitor_delay": 2.0,  # 文件监控延迟（秒）
-                "cleanup_orphaned_files": True,  # 清理孤立文件
-                "log_level": "INFO",  # 日志级别
-            },
-        }
+        except yaml.YAMLError as e:
+            raise ValueError(f"配置文件格式错误: {e}") from e
+        except Exception as e:
+            raise RuntimeError(f"读取配置文件失败: {e}") from e
 
     def save_config(self):
         """保存配置文件
-        如果配置文件不存在，则创建默认配置文件
+        如果配置文件不存在，则从 default_config.yaml 复制
         配置文件保存在config目录下，而不是~目录
         """
         # 获取默认配置文件路径
@@ -201,13 +128,20 @@ class LifeTraceConfig:
             self._get_application_path(), "config", "default_config.yaml"
         )
 
+        # 检查默认配置文件是否存在
+        if not os.path.exists(default_config_path):
+            raise FileNotFoundError(
+                f"默认配置文件不存在: {default_config_path}\n"
+                "请确保 default_config.yaml 文件存在于 config 目录中"
+            )
+
         # 确保配置目录存在
         os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
 
-        # 如果默认配置文件存在，复制并修改
-        if os.path.exists(default_config_path):
+        try:
             import shutil
 
+            # 从 default_config.yaml 复制到 config.yaml
             shutil.copy2(default_config_path, self.config_path)
 
             # 读取复制后的配置文件
@@ -230,17 +164,8 @@ class LifeTraceConfig:
 
             # 重新加载配置
             self._config = self._load_config()
-            return
-
-        # 如果默认配置文件不存在，创建默认配置
-        default_config = self._get_default_config()
-        # 确保base_dir、database_path和screenshots_dir使用相对路径（相对于base_dir）
-        default_config["base_dir"] = "lifetrace/data"
-        default_config["database_path"] = "lifetrace.db"
-        default_config["screenshots_dir"] = "screenshots/"
-
-        with open(self.config_path, "w", encoding="utf-8") as f:
-            yaml.dump(default_config, f, allow_unicode=True, sort_keys=False)
+        except Exception as e:
+            raise RuntimeError(f"保存配置文件失败: {e}") from e
 
     def get(self, key: str, default=None):
         """获取配置值"""
@@ -300,24 +225,6 @@ class LifeTraceConfig:
         return log_path
 
     @property
-    def plans_dir(self) -> str:
-        """计划文件目录路径"""
-        plans_dir = self.get("plans_dir", "plans/")
-        if not os.path.isabs(plans_dir):
-            # 如果是相对路径，基于base_dir拼接
-            plans_dir = os.path.join(self.base_dir, plans_dir)
-        return plans_dir
-
-    @property
-    def plan_images_dir(self) -> str:
-        """计划图片目录路径"""
-        plan_images_dir = self.get("plan_images_dir", "plan_images/")
-        if not os.path.isabs(plan_images_dir):
-            # 如果是相对路径，基于base_dir拼接
-            plan_images_dir = os.path.join(self.base_dir, plan_images_dir)
-        return plan_images_dir
-
-    @property
     def vector_db_enabled(self) -> bool:
         return self.get("vector_db.enabled", True)
 
@@ -339,55 +246,6 @@ class LifeTraceConfig:
         if not os.path.isabs(persist_dir):
             return os.path.join(self.base_dir, persist_dir)
         return persist_dir
-
-    @property
-    def vector_db_chunk_size(self) -> int:
-        return self.get("vector_db.chunk_size", 512)
-
-    @property
-    def vector_db_chunk_overlap(self) -> int:
-        return self.get("vector_db.chunk_overlap", 50)
-
-    @property
-    def vector_db_batch_size(self) -> int:
-        return self.get("vector_db.batch_size", 32)
-
-    @property
-    def vector_db_auto_sync(self) -> bool:
-        return self.get("vector_db.auto_sync", True)
-
-    @property
-    def vector_db_sync_interval(self) -> int:
-        return self.get("vector_db.sync_interval", 300)
-
-    # 同步服务配置属性
-    @property
-    def enable_file_monitor(self) -> bool:
-        return self.get("sync_service.enable_file_monitor", True)
-
-    @property
-    def enable_consistency_check(self) -> bool:
-        return self.get("sync_service.enable_consistency_check", True)
-
-    @property
-    def consistency_check_interval(self) -> int:
-        return self.get("sync_service.consistency_check_interval", 300)
-
-    @property
-    def vector_sync_interval(self) -> int:
-        return self.get("sync_service.vector_sync_interval", 600)
-
-    @property
-    def file_monitor_delay(self) -> float:
-        return self.get("sync_service.file_monitor_delay", 2.0)
-
-    @property
-    def cleanup_orphaned_files(self) -> bool:
-        return self.get("sync_service.cleanup_orphaned_files", True)
-
-    @property
-    def sync_service_log_level(self) -> str:
-        return self.get("sync_service.log_level", "INFO")
 
     # LLM配置属性
     @property
@@ -426,16 +284,52 @@ class LifeTraceConfig:
         """服务器端口"""
         return self.get("server.port", 8000)
 
-    # 聊天配置属性
     @property
-    def chat_local_history(self) -> bool:
-        """是否启用本地历史记录"""
-        return self.get("chat.local_history", True)
+    def server_debug(self) -> bool:
+        """服务器调试模式"""
+        return self.get("server.debug", False)
 
     @property
-    def chat_history_limit(self) -> int:
-        """历史记录条数限制"""
-        return self.get("chat.history_limit", 6)
+    def llm_input_token_price(self) -> float:
+        """LLM输入token价格（元/千token）
+
+        根据当前使用的模型从model_prices中获取价格，
+        如果找不到对应模型的价格，则使用default价格
+        """
+        model_prices = self.get("llm.model_prices", {})
+        current_model = self.llm_model
+
+        # 先尝试获取当前模型的价格
+        if current_model in model_prices:
+            return model_prices[current_model].get("input_price", 0.0)
+
+        # 如果没有找到，使用默认价格
+        if "default" in model_prices:
+            return model_prices["default"].get("input_price", 0.0)
+
+        # 兼容旧的配置方式
+        return self.get("llm.input_token_price", 0.0)
+
+    @property
+    def llm_output_token_price(self) -> float:
+        """LLM输出token价格（元/千token）
+
+        根据当前使用的模型从model_prices中获取价格，
+        如果找不到对应模型的价格，则使用default价格
+        """
+        model_prices = self.get("llm.model_prices", {})
+        current_model = self.llm_model
+
+        # 先尝试获取当前模型的价格
+        if current_model in model_prices:
+            return model_prices[current_model].get("output_price", 0.0)
+
+        # 如果没有找到，使用默认价格
+        if "default" in model_prices:
+            return model_prices["default"].get("output_price", 0.0)
+
+        # 兼容旧的配置方式
+        return self.get("llm.output_token_price", 0.0)
 
     # 调度器配置属性
     @property

@@ -19,9 +19,13 @@ class DataCleaner:
     def __init__(self):
         """初始化数据清理服务"""
         self.max_screenshots = config.get("jobs.clean_data.max_screenshots", 10000)
+        self.max_days = config.get("jobs.clean_data.max_days", 0)
         self.delete_file_only = config.get("jobs.clean_data.delete_file_only", True)
         mode = "只删除文件" if self.delete_file_only else "删除文件和记录"
-        logger.info(f"数据清理服务已初始化，最大截图数量: {self.max_screenshots}，清理模式: {mode}")
+        logger.info(
+            f"数据清理服务已初始化，最大截图数量: {self.max_screenshots}，"
+            f"最大保留天数: {self.max_days}，清理模式: {mode}"
+        )
 
     def clean_old_screenshots(self):
         """清理超出限制的旧截图"""
@@ -163,13 +167,104 @@ class DataCleaner:
         except Exception as e:
             logger.error(f"清理孤立文件失败: {e}", exc_info=True)
 
+    def clean_old_screenshots_by_days(self):
+        """按天数清理旧截图"""
+        if self.max_days <= 0:
+            logger.debug("未配置最大保留天数，跳过按天数清理")
+            return
+
+        try:
+            from datetime import timedelta
+
+            cutoff_date = datetime.now() - timedelta(days=self.max_days)
+            logger.info(f"开始清理 {cutoff_date.strftime('%Y-%m-%d')} 之前的截图")
+
+            with db_manager.get_session() as session:
+                from lifetrace.storage.models import Screenshot
+
+                # 获取需要删除的旧截图
+                old_screenshots = (
+                    session.query(Screenshot).filter(Screenshot.created_at < cutoff_date).all()
+                )
+
+                if not old_screenshots:
+                    logger.info("未发现超过保留天数的截图")
+                    return
+
+                mode_desc = (
+                    "文件（保留数据库记录）" if self.delete_file_only else "文件和数据库记录"
+                )
+                logger.info(
+                    f"发现 {len(old_screenshots)} 张超过 {self.max_days} 天的截图，开始删除{mode_desc}"
+                )
+
+                deleted_files = 0
+                deleted_records = 0
+
+                for screenshot in old_screenshots:
+                    try:
+                        # 删除文件
+                        if os.path.exists(screenshot.file_path):
+                            try:
+                                os.remove(screenshot.file_path)
+                                deleted_files += 1
+                                logger.debug(f"已删除文件: {screenshot.file_path}")
+                            except Exception as e:
+                                logger.error(f"删除文件失败 {screenshot.file_path}: {e}")
+
+                        # 如果配置为同时删除记录
+                        if not self.delete_file_only:
+                            from lifetrace.storage.models import (
+                                OCRResult,
+                                ProcessingQueue,
+                                SearchIndex,
+                            )
+
+                            # 删除相关的OCR结果
+                            session.query(OCRResult).filter_by(screenshot_id=screenshot.id).delete()
+
+                            # 删除相关的搜索索引
+                            session.query(SearchIndex).filter_by(
+                                screenshot_id=screenshot.id
+                            ).delete()
+
+                            # 删除相关的处理队列
+                            session.query(ProcessingQueue).filter_by(
+                                screenshot_id=screenshot.id
+                            ).delete()
+
+                            # 删除截图记录
+                            session.delete(screenshot)
+                            deleted_records += 1
+
+                    except Exception as e:
+                        logger.error(f"处理截图失败 (id={screenshot.id}): {e}")
+                        continue
+
+                session.commit()
+
+                if self.delete_file_only:
+                    logger.info(
+                        f"按天数清理完成: 删除了 {deleted_files} 个截图文件（保留了数据库记录）"
+                    )
+                else:
+                    logger.info(
+                        f"按天数清理完成: 删除了 {deleted_files} 个文件，{deleted_records} 条数据库记录"
+                    )
+
+        except Exception as e:
+            logger.error(f"按天数清理旧截图失败: {e}", exc_info=True)
+
     def run(self):
         """执行清理任务"""
         logger.info("开始执行数据清理任务")
         start_time = datetime.now()
 
-        # 清理超出限制的旧截图
+        # 清理超出数量限制的旧截图
         self.clean_old_screenshots()
+
+        # 清理超出天数限制的旧截图
+        self.clean_old_screenshots_by_days()
 
         # 清理孤立文件（可选，不在每次都执行）
         # self.clean_orphaned_files()

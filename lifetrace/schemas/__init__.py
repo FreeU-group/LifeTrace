@@ -9,7 +9,6 @@ from lifetrace.schemas.chat import (
 )
 from lifetrace.schemas.config import ConfigResponse
 from lifetrace.schemas.event import EventDetailResponse, EventResponse
-from lifetrace.schemas.plan import PlanContent, TodoItem
 from lifetrace.schemas.screenshot import ScreenshotResponse
 from lifetrace.schemas.search import SearchRequest
 from lifetrace.schemas.stats import (
@@ -20,9 +19,6 @@ from lifetrace.schemas.stats import (
 )
 from lifetrace.schemas.system import ProcessInfo, SystemResourcesResponse
 from lifetrace.schemas.vector import (
-    MultimodalSearchRequest,
-    MultimodalSearchResult,
-    MultimodalStatsResponse,
     SemanticSearchRequest,
     SemanticSearchResult,
     VectorStatsResponse,
@@ -40,9 +36,6 @@ __all__ = [
     # Event
     "EventResponse",
     "EventDetailResponse",
-    # Plan
-    "TodoItem",
-    "PlanContent",
     # Screenshot
     "ScreenshotResponse",
     # Search
@@ -58,8 +51,5 @@ __all__ = [
     # Vector
     "SemanticSearchRequest",
     "SemanticSearchResult",
-    "MultimodalSearchRequest",
-    "MultimodalSearchResult",
     "VectorStatsResponse",
-    "MultimodalStatsResponse",
 ]

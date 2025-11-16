@@ -29,6 +29,9 @@ class QueryConditions:
     # 文本内容
     keywords: list[str] | None = None
 
+    # 项目过滤
+    project_id: int | None = None
+
     # 其他条件
     limit: int = 1000
 
@@ -44,6 +47,8 @@ class QueryConditions:
             result["app_names"] = self.app_names
         if self.keywords:
             result["keywords"] = self.keywords
+        if self.project_id:
+            result["project_id"] = self.project_id
         if self.limit:
             result["limit"] = self.limit
 

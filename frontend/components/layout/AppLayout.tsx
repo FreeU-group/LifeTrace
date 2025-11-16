@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Calendar, FolderKanban, Clock, PanelLeftClose, PanelLeft, Settings } from 'lucide-react';
+import { Calendar, FolderKanban, Clock, PanelLeftClose, PanelLeft, Settings, DollarSign } from 'lucide-react';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { SelectedEventsProvider } from '@/lib/context/SelectedEventsContext';
@@ -14,13 +14,14 @@ import ThemeToggle from '@/components/common/ThemeToggle';
 const EventsPage = dynamic(() => import('@/app/page'), { ssr: false });
 const ProjectManagementPage = dynamic(() => import('@/app/project-management/page'), { ssr: false });
 
-type MenuType = 'events' | 'project-management' | 'scheduler';
+type MenuType = 'events' | 'project-management' | 'scheduler' | 'cost-tracking';
 
 // 所有菜单项配置（包含路由路径）
 const allMenuItems: (SidebarNavItem & { path: string })[] = [
   { id: 'events', label: '事件管理', icon: Calendar, path: '/' },
   { id: 'project-management', label: '项目管理', icon: FolderKanban, path: '/project-management' },
   { id: 'scheduler', label: '定时任务', icon: Clock, path: '/scheduler' },
+  { id: 'cost-tracking', label: '费用统计', icon: DollarSign, path: '/cost-tracking' },
 ];
 
 interface AppLayoutInnerProps {
@@ -33,6 +34,7 @@ function AppLayoutInner({ children, onSettingsClick }: AppLayoutInnerProps) {
   const pathname = usePathname();
   const [activeMenu, setActiveMenu] = useState<MenuType>('events');
   const [showScheduler, setShowScheduler] = useState(false);
+  const [showCostTracking, setShowCostTracking] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // 从 localStorage 读取侧边栏折叠状态
@@ -48,18 +50,26 @@ function AppLayoutInner({ children, onSettingsClick }: AppLayoutInnerProps) {
     if (item.id === 'scheduler') {
       return showScheduler;
     }
+    if (item.id === 'cost-tracking') {
+      return showCostTracking;
+    }
     return true;
   });
 
-  // 从 localStorage 读取定时任务显示设置
+  // 从 localStorage 读取定时任务和费用统计显示设置
   useEffect(() => {
-    const saved = localStorage.getItem('showScheduler');
-    if (saved !== null) {
-      setShowScheduler(saved === 'true');
+    const savedScheduler = localStorage.getItem('showScheduler');
+    if (savedScheduler !== null) {
+      setShowScheduler(savedScheduler === 'true');
     }
 
-    // 监听设置变化
-    const handleVisibilityChange = (event: CustomEvent) => {
+    const savedCostTracking = localStorage.getItem('showCostTracking');
+    if (savedCostTracking !== null) {
+      setShowCostTracking(savedCostTracking === 'true');
+    }
+
+    // 监听定时任务设置变化
+    const handleSchedulerVisibilityChange = (event: CustomEvent) => {
       const { visible, currentPath } = event.detail;
       setShowScheduler(visible);
 
@@ -69,9 +79,22 @@ function AppLayoutInner({ children, onSettingsClick }: AppLayoutInnerProps) {
       }
     };
 
-    window.addEventListener('schedulerVisibilityChange', handleVisibilityChange as EventListener);
+    // 监听费用统计设置变化
+    const handleCostTrackingVisibilityChange = (event: CustomEvent) => {
+      const { visible, currentPath } = event.detail;
+      setShowCostTracking(visible);
+
+      // 如果关闭了费用统计开关，且当前在费用统计页面，则跳转到事件管理页面
+      if (!visible && currentPath?.startsWith('/cost-tracking')) {
+        router.push('/');
+      }
+    };
+
+    window.addEventListener('schedulerVisibilityChange', handleSchedulerVisibilityChange as EventListener);
+    window.addEventListener('costTrackingVisibilityChange', handleCostTrackingVisibilityChange as EventListener);
     return () => {
-      window.removeEventListener('schedulerVisibilityChange', handleVisibilityChange as EventListener);
+      window.removeEventListener('schedulerVisibilityChange', handleSchedulerVisibilityChange as EventListener);
+      window.removeEventListener('costTrackingVisibilityChange', handleCostTrackingVisibilityChange as EventListener);
     };
   }, [router]);
 
@@ -136,8 +159,8 @@ function AppLayoutInner({ children, onSettingsClick }: AppLayoutInnerProps) {
       >
         {/* Logo 区域 */}
         <SidebarHeader>
-          <div className="flex items-center gap-3">
-            <div className="relative h-7 w-7 flex-shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="relative h-7 w-7 flex-shrink-0 ml-2">
               <Image
                 src="/logo.png"
                 alt="LifeTrace Logo"
@@ -148,7 +171,7 @@ function AppLayoutInner({ children, onSettingsClick }: AppLayoutInnerProps) {
             </div>
             <div>
               <h1 className="text-base font-bold text-foreground">LifeTrace</h1>
-              <p className="text-[11px] text-muted-foreground leading-tight">生活追踪系统</p>
+              <p className="text-[11px] text-muted-foreground leading-tight">智能生活记录系统</p>
             </div>
           </div>
         </SidebarHeader>
@@ -182,7 +205,7 @@ function AppLayoutInner({ children, onSettingsClick }: AppLayoutInnerProps) {
           </button>
 
           {/* 右侧：主题切换和设置 */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-5">
             <ThemeToggle />
 
             <button
