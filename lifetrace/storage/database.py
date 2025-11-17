@@ -1,15 +1,8 @@
 import logging
 import os
-import sys
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any
-
-# 添加项目根目录到Python路径，以便直接运行此文件
-if __name__ == "__main__":
-    project_root = Path(__file__).parent.parent
-    sys.path.insert(0, str(project_root))
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -18,7 +11,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from lifetrace.storage.models import (
     AppUsageLog,
     Base,
+    Chat,
     Event,
+    EventAssociation,
+    Message,
     OCRResult,
     ProcessingQueue,
     Project,
@@ -89,6 +85,50 @@ class DatabaseManager:
                             logging.info("已为 events 表添加 task_id 列")
             except Exception as me:
                 logging.warning(f"检查/添加 events.task_id 列失败: {me}")
+
+            # 轻量级迁移：检查并创建/更新 task_progress 表
+            try:
+                if self.database_url.startswith("sqlite:///"):
+                    with self.engine.connect() as conn:
+                        # 检查表是否存在
+                        table_exists = conn.execute(
+                            text(
+                                "SELECT name FROM sqlite_master WHERE type='table' AND name='task_progress'"
+                            )
+                        ).fetchone()
+
+                        if table_exists:
+                            # 表存在，检查列
+                            cols = {
+                                row[1]: row
+                                for row in conn.execute(
+                                    text("PRAGMA table_info('task_progress')")
+                                ).fetchall()
+                            }
+
+                            # 检查并添加缺失的列
+                            if "generated_at" not in cols:
+                                # SQLite 不支持 ALTER TABLE 时使用 CURRENT_TIMESTAMP
+                                # 所以先添加为可空列
+                                conn.execute(
+                                    text(
+                                        "ALTER TABLE task_progress ADD COLUMN generated_at DATETIME"
+                                    )
+                                )
+                                # 然后为现有记录设置默认值（使用 created_at）
+                                conn.execute(
+                                    text(
+                                        "UPDATE task_progress SET generated_at = created_at WHERE generated_at IS NULL"
+                                    )
+                                )
+                                logging.info("已为 task_progress 表添加 generated_at 列")
+                        else:
+                            # 表不存在，create_all 已经创建了
+                            logging.info("task_progress 表已通过 create_all 创建")
+
+                        conn.commit()
+            except Exception as me:
+                logging.warning(f"检查/更新 task_progress 表失败: {me}")
 
             # 性能优化：添加关键索引
             self._create_performance_indexes()
@@ -187,7 +227,7 @@ class DatabaseManager:
 
                 # 检查是否已存在相同哈希的截图
                 existing_hash = session.query(Screenshot).filter_by(file_hash=file_hash).first()
-                if existing_hash and config.get("storage.deduplicate", True):
+                if existing_hash and config.get("jobs.recorder.deduplicate", True):
                     logging.debug(f"跳过重复哈希截图: {file_path}")
                     return existing_hash.id
 
@@ -807,6 +847,20 @@ class DatabaseManager:
         except SQLAlchemyError as e:
             logging.error(f"更新截图处理状态失败: {e}")
 
+    def get_screenshot_count(self) -> int:
+        """获取截图总数
+
+        Returns:
+            截图总数
+        """
+        try:
+            with self.get_session() as session:
+                count = session.query(Screenshot).count()
+                return count
+        except SQLAlchemyError as e:
+            logging.error(f"获取截图总数失败: {e}")
+            return 0
+
     def get_ocr_results_by_screenshot(self, screenshot_id: int) -> list[dict[str, Any]]:
         """根据截图ID获取OCR结果"""
         try:
@@ -1393,37 +1447,194 @@ class DatabaseManager:
             logging.error(f"获取子任务失败: {e}")
             return []
 
+    # 任务进展管理
+    def create_task_progress(
+        self,
+        task_id: int,
+        summary: str,
+        context_count: int = 0,
+        generated_at: datetime | None = None,
+    ) -> int | None:
+        """创建任务进展记录
+
+        Args:
+            task_id: 任务ID
+            summary: 进展摘要内容
+            context_count: 基于多少个上下文生成
+            generated_at: 生成时间（可选，默认为当前时间）
+
+        Returns:
+            进展记录ID，失败返回None
+        """
+        try:
+            from lifetrace.storage.models import TaskProgress
+
+            with self.get_session() as session:
+                progress = TaskProgress(
+                    task_id=task_id,
+                    summary=summary,
+                    context_count=context_count,
+                    generated_at=generated_at or datetime.now(),
+                )
+                session.add(progress)
+                session.commit()
+                logging.info(f"创建任务进展记录成功: task_id={task_id}, progress_id={progress.id}")
+                return progress.id
+        except SQLAlchemyError as e:
+            logging.error(f"创建任务进展记录失败: {e}")
+            return None
+
+    def get_task_progress_list(
+        self,
+        task_id: int,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """获取任务的进展记录列表
+
+        Args:
+            task_id: 任务ID
+            limit: 返回数量限制
+            offset: 偏移量
+
+        Returns:
+            进展记录列表
+        """
+        try:
+            from lifetrace.storage.models import TaskProgress
+
+            with self.get_session() as session:
+                progress_list = (
+                    session.query(TaskProgress)
+                    .filter_by(task_id=task_id)
+                    .order_by(TaskProgress.generated_at.desc())
+                    .limit(limit)
+                    .offset(offset)
+                    .all()
+                )
+                return [
+                    {
+                        "id": p.id,
+                        "task_id": p.task_id,
+                        "summary": p.summary,
+                        "context_count": p.context_count,
+                        "generated_at": p.generated_at,
+                        "created_at": p.created_at,
+                    }
+                    for p in progress_list
+                ]
+        except SQLAlchemyError as e:
+            logging.error(f"获取任务进展记录列表失败: {e}")
+            return []
+
+    def get_task_progress_latest(self, task_id: int) -> dict[str, Any] | None:
+        """获取任务最新的进展记录
+
+        Args:
+            task_id: 任务ID
+
+        Returns:
+            最新的进展记录，无记录返回None
+        """
+        try:
+            from lifetrace.storage.models import TaskProgress
+
+            with self.get_session() as session:
+                progress = (
+                    session.query(TaskProgress)
+                    .filter_by(task_id=task_id)
+                    .order_by(TaskProgress.generated_at.desc())
+                    .first()
+                )
+                if progress:
+                    return {
+                        "id": progress.id,
+                        "task_id": progress.task_id,
+                        "summary": progress.summary,
+                        "context_count": progress.context_count,
+                        "generated_at": progress.generated_at,
+                        "created_at": progress.created_at,
+                    }
+                return None
+        except SQLAlchemyError as e:
+            logging.error(f"获取任务最新进展记录失败: {e}")
+            return None
+
+    def count_task_progress(self, task_id: int) -> int:
+        """统计任务的进展记录数量
+
+        Args:
+            task_id: 任务ID
+
+        Returns:
+            进展记录数量
+        """
+        try:
+            from lifetrace.storage.models import TaskProgress
+
+            with self.get_session() as session:
+                count = session.query(TaskProgress).filter_by(task_id=task_id).count()
+                return count
+        except SQLAlchemyError as e:
+            logging.error(f"统计任务进展记录数量失败: {e}")
+            return 0
+
     # 上下文管理（事件与任务关联）
     def list_contexts(
         self,
         associated: bool | None = None,
         task_id: int | None = None,
+        project_id: int | None = None,
         limit: int = 100,
         offset: int = 0,
+        mapping_attempted: bool | None = None,
+        used_in_summary: bool | None = None,
     ) -> list[dict[str, Any]]:
         """列出上下文记录（事件）
 
         Args:
             associated: 是否已关联任务（None表示全部，True表示已关联，False表示未关联）
             task_id: 按任务ID过滤
+            project_id: 按项目ID过滤
             limit: 返回数量限制
             offset: 偏移量
+            mapping_attempted: 是否已尝试过自动关联（None表示全部，True表示已尝试，False表示未尝试）
+            used_in_summary: 是否已用于任务摘要（None表示全部，True表示已使用，False表示未使用）
         """
         try:
             with self.get_session() as session:
-                q = session.query(Event)
+                # LEFT JOIN event_associations 以获取关联信息
+                q = session.query(Event, EventAssociation).outerjoin(
+                    EventAssociation, Event.id == EventAssociation.event_id
+                )
 
                 # 按关联状态过滤
                 if associated is False:
-                    q = q.filter(Event.task_id.is_(None))
+                    q = q.filter(EventAssociation.task_id.is_(None))
                 elif associated is True:
-                    q = q.filter(Event.task_id.isnot(None))
+                    q = q.filter(EventAssociation.task_id.isnot(None))
 
                 # 按任务ID过滤
                 if task_id is not None:
-                    q = q.filter(Event.task_id == task_id)
+                    q = q.filter(EventAssociation.task_id == task_id)
 
-                events = q.order_by(Event.start_time.desc()).offset(offset).limit(limit).all()
+                # 按项目ID过滤
+                if project_id is not None:
+                    q = q.filter(EventAssociation.project_id == project_id)
+
+                # 按自动关联尝试状态过滤
+                if mapping_attempted is False:
+                    q = q.filter(~Event.auto_association_attempted)
+                elif mapping_attempted is True:
+                    q = q.filter(Event.auto_association_attempted)
+
+                # 按是否用于摘要过滤
+                if used_in_summary is False:
+                    q = q.filter(~EventAssociation.used_in_summary)
+                elif used_in_summary is True:
+                    q = q.filter(EventAssociation.used_in_summary)
+
+                results = q.order_by(Event.start_time.desc()).offset(offset).limit(limit).all()
 
                 return [
                     {
@@ -1434,10 +1645,12 @@ class DatabaseManager:
                         "end_time": e.end_time,
                         "ai_title": e.ai_title,
                         "ai_summary": e.ai_summary,
-                        "task_id": e.task_id,
+                        "task_id": assoc.task_id if assoc else None,
+                        "project_id": assoc.project_id if assoc else None,
                         "created_at": e.created_at,
+                        "auto_association_attempted": e.auto_association_attempted,
                     }
-                    for e in events
+                    for e, assoc in results
                 ]
         except SQLAlchemyError as e:
             logging.error(f"列出上下文记录失败: {e}")
@@ -1447,19 +1660,45 @@ class DatabaseManager:
         self,
         associated: bool | None = None,
         task_id: int | None = None,
+        project_id: int | None = None,
+        mapping_attempted: bool | None = None,
+        used_in_summary: bool | None = None,
     ) -> int:
-        """统计上下文记录数量"""
+        """统计上下文记录数量
+
+        Args:
+            associated: 是否已关联任务（None表示全部，True表示已关联，False表示未关联）
+            task_id: 按任务ID过滤
+            project_id: 按项目ID过滤
+            mapping_attempted: 是否已尝试过自动关联（None表示全部，True表示已尝试，False表示未尝试）
+            used_in_summary: 是否已用于任务摘要（None表示全部，True表示已使用，False表示未使用）
+        """
         try:
             with self.get_session() as session:
-                q = session.query(Event)
+                q = session.query(Event).outerjoin(
+                    EventAssociation, Event.id == EventAssociation.event_id
+                )
 
                 if associated is False:
-                    q = q.filter(Event.task_id.is_(None))
+                    q = q.filter(EventAssociation.task_id.is_(None))
                 elif associated is True:
-                    q = q.filter(Event.task_id.isnot(None))
+                    q = q.filter(EventAssociation.task_id.isnot(None))
 
                 if task_id is not None:
-                    q = q.filter(Event.task_id == task_id)
+                    q = q.filter(EventAssociation.task_id == task_id)
+
+                if project_id is not None:
+                    q = q.filter(EventAssociation.project_id == project_id)
+
+                if mapping_attempted is False:
+                    q = q.filter(~Event.auto_association_attempted)
+                elif mapping_attempted is True:
+                    q = q.filter(Event.auto_association_attempted)
+
+                if used_in_summary is False:
+                    q = q.filter(~EventAssociation.used_in_summary)
+                elif used_in_summary is True:
+                    q = q.filter(EventAssociation.used_in_summary)
 
                 return q.count()
         except SQLAlchemyError as e:
@@ -1470,8 +1709,15 @@ class DatabaseManager:
         """获取单个上下文记录"""
         try:
             with self.get_session() as session:
-                event = session.query(Event).filter_by(id=context_id).first()
-                if event:
+                result = (
+                    session.query(Event, EventAssociation)
+                    .outerjoin(EventAssociation, Event.id == EventAssociation.event_id)
+                    .filter(Event.id == context_id)
+                    .first()
+                )
+
+                if result:
+                    event, assoc = result
                     return {
                         "id": event.id,
                         "app_name": event.app_name,
@@ -1480,7 +1726,8 @@ class DatabaseManager:
                         "end_time": event.end_time,
                         "ai_title": event.ai_title,
                         "ai_summary": event.ai_summary,
-                        "task_id": event.task_id,
+                        "task_id": assoc.task_id if assoc else None,
+                        "project_id": assoc.project_id if assoc else None,
                         "created_at": event.created_at,
                     }
                 return None
@@ -1488,12 +1735,74 @@ class DatabaseManager:
             logging.error(f"获取上下文记录失败: {e}")
             return None
 
-    def update_context_task(self, context_id: int, task_id: int | None) -> bool:
+    def mark_context_as_used_in_summary(self, event_id: int) -> bool:
+        """标记单个事件为已用于摘要
+
+        Args:
+            event_id: 事件ID
+
+        Returns:
+            是否成功
+        """
+        try:
+            with self.get_session() as session:
+                # 更新 event_associations 表
+                updated = (
+                    session.query(EventAssociation)
+                    .filter(EventAssociation.event_id == event_id)
+                    .update({EventAssociation.used_in_summary: True}, synchronize_session=False)
+                )
+
+                session.commit()
+                if updated > 0:
+                    logging.info(f"标记事件 {event_id} 为已用于摘要")
+                return True
+
+        except SQLAlchemyError as e:
+            logging.error(f"标记事件为已用于摘要失败: {e}")
+            return False
+
+    def mark_contexts_used_in_summary(self, task_id: int, event_ids: list[int]) -> bool:
+        """标记 event-task 关联为已用于摘要
+
+        Args:
+            task_id: 任务ID
+            event_ids: 事件ID列表
+
+        Returns:
+            是否成功
+        """
+        try:
+            with self.get_session() as session:
+                # 批量更新 event_associations 表
+                updated = (
+                    session.query(EventAssociation)
+                    .filter(
+                        EventAssociation.task_id == task_id,
+                        EventAssociation.event_id.in_(event_ids),
+                    )
+                    .update({EventAssociation.used_in_summary: True}, synchronize_session=False)
+                )
+
+                session.commit()
+                logging.info(f"标记任务 {task_id} 的 {updated} 个事件关联为已用于摘要")
+                return True
+
+        except SQLAlchemyError as e:
+            logging.error(f"标记事件关联为已用于摘要失败: {e}")
+            return False
+
+    def update_context_task(
+        self, context_id: int, task_id: int | None, project_id: int | None = None
+    ) -> bool:
         """更新上下文记录的任务关联
+
+        注意：此方法已改为操作 event_associations 表
 
         Args:
             context_id: 上下文（事件）ID
             task_id: 任务ID（None表示解除关联）
+            project_id: 项目ID（可选，如果不提供会从task推导）
         """
         try:
             with self.get_session() as session:
@@ -1502,21 +1811,474 @@ class DatabaseManager:
                     logging.warning(f"上下文记录不存在: {context_id}")
                     return False
 
-                # 如果指定了task_id，验证任务是否存在
+                # 如果指定了task_id，验证任务是否存在并获取project_id
                 if task_id is not None:
                     task = session.query(Task).filter_by(id=task_id).first()
                     if not task:
                         logging.warning(f"任务不存在: {task_id}")
                         return False
+                    # 如果没有提供project_id，从task获取
+                    if project_id is None:
+                        project_id = task.project_id
 
-                event.task_id = task_id
+                # 查找或创建关联记录
+                assoc = session.query(EventAssociation).filter_by(event_id=context_id).first()
+                if assoc:
+                    # 更新现有关联
+                    assoc.task_id = task_id
+                    if project_id is not None:
+                        assoc.project_id = project_id
+                    assoc.association_method = "manual"
+                    assoc.updated_at = datetime.now()
+                else:
+                    # 创建新关联
+                    assoc = EventAssociation(
+                        event_id=context_id,
+                        task_id=task_id,
+                        project_id=project_id,
+                        association_method="manual",
+                    )
+                    session.add(assoc)
+
                 session.flush()
-                logging.info(f"更新上下文记录 {context_id} 的任务关联: {task_id}")
+                logging.info(
+                    f"更新上下文记录 {context_id} 的任务关联: task_id={task_id}, project_id={project_id}"
+                )
                 return True
         except SQLAlchemyError as e:
             logging.error(f"更新上下文记录失败: {e}")
             return False
 
+    def mark_context_mapping_attempted(self, context_id: int) -> bool:
+        """标记上下文已尝试过自动关联
+
+        无论自动关联成功与否，都应该调用此方法标记，避免重复处理浪费 token
+
+        Args:
+            context_id: 上下文（事件）ID
+
+        Returns:
+            是否成功标记
+        """
+        try:
+            with self.get_session() as session:
+                event = session.query(Event).filter_by(id=context_id).first()
+                if not event:
+                    logging.warning(f"上下文记录不存在: {context_id}")
+                    return False
+
+                event.auto_association_attempted = True
+                session.flush()
+                logging.debug(f"标记上下文 {context_id} 已尝试自动关联")
+                return True
+        except SQLAlchemyError as e:
+            logging.error(f"标记上下文自动关联失败: {e}")
+            return False
+
+    def create_or_update_event_association(
+        self,
+        event_id: int,
+        project_id: int | None = None,
+        task_id: int | None = None,
+        project_confidence: float | None = None,
+        task_confidence: float | None = None,
+        reasoning: str | None = None,
+        association_method: str = "auto",
+    ) -> bool:
+        """创建或更新事件关联记录
+
+        专门用于 task_context_mapper 保存 LLM 判断结果
+
+        Args:
+            event_id: 事件ID
+            project_id: 项目ID
+            task_id: 任务ID
+            project_confidence: 项目判断置信度
+            task_confidence: 任务判断置信度
+            reasoning: LLM 判断理由
+            association_method: 关联方式（auto/manual）
+
+        Returns:
+            是否成功
+        """
+        try:
+            with self.get_session() as session:
+                # 查找现有关联
+                assoc = session.query(EventAssociation).filter_by(event_id=event_id).first()
+
+                if assoc:
+                    # 更新现有关联
+                    if project_id is not None:
+                        assoc.project_id = project_id
+                    if task_id is not None:
+                        assoc.task_id = task_id
+                    if project_confidence is not None:
+                        assoc.project_confidence = project_confidence
+                    if task_confidence is not None:
+                        assoc.task_confidence = task_confidence
+                    if reasoning is not None:
+                        assoc.reasoning = reasoning
+                    assoc.association_method = association_method
+                    assoc.updated_at = datetime.now()
+                    logging.info(
+                        f"更新事件关联: event_id={event_id}, project_id={project_id}, task_id={task_id}"
+                    )
+                else:
+                    # 创建新关联
+                    assoc = EventAssociation(
+                        event_id=event_id,
+                        project_id=project_id,
+                        task_id=task_id,
+                        project_confidence=project_confidence,
+                        task_confidence=task_confidence,
+                        reasoning=reasoning,
+                        association_method=association_method,
+                    )
+                    session.add(assoc)
+                    logging.info(
+                        f"创建事件关联: event_id={event_id}, project_id={project_id}, task_id={task_id}"
+                    )
+
+                session.flush()
+                return True
+        except SQLAlchemyError as e:
+            logging.error(f"创建或更新事件关联失败: {e}")
+            return False
+
+    # ===== 聊天会话管理 =====
+
+    def create_chat(
+        self,
+        session_id: str,
+        chat_type: str = "event",
+        title: str | None = None,
+        context_id: int | None = None,
+        metadata: str | None = None,
+    ) -> dict[str, Any] | None:
+        """创建聊天会话
+
+        Args:
+            session_id: 会话ID（UUID）
+            chat_type: 聊天类型（event, project, general, task等）
+            title: 会话标题
+            context_id: 上下文ID（根据chat_type不同而不同）
+            metadata: JSON格式的元数据
+        """
+        try:
+            with self.get_session() as session:
+                chat = Chat(
+                    session_id=session_id,
+                    chat_type=chat_type,
+                    title=title,
+                    context_id=context_id,
+                    extra_data=metadata,
+                )
+                session.add(chat)
+                session.flush()
+
+                logging.info(f"创建聊天会话: {session_id}, 类型: {chat_type}")
+                return {
+                    "id": chat.id,
+                    "session_id": chat.session_id,
+                    "chat_type": chat.chat_type,
+                    "title": chat.title,
+                    "context_id": chat.context_id,
+                    "extra_data": chat.extra_data,
+                    "created_at": chat.created_at,
+                    "updated_at": chat.updated_at,
+                    "last_message_at": chat.last_message_at,
+                }
+        except SQLAlchemyError as e:
+            logging.error(f"创建聊天会话失败: {e}")
+            return None
+
+    def get_chat_by_session_id(self, session_id: str) -> dict[str, Any] | None:
+        """根据session_id获取聊天会话"""
+        try:
+            with self.get_session() as session:
+                chat = session.query(Chat).filter_by(session_id=session_id).first()
+                if chat:
+                    return {
+                        "id": chat.id,
+                        "session_id": chat.session_id,
+                        "chat_type": chat.chat_type,
+                        "title": chat.title,
+                        "context_id": chat.context_id,
+                        "extra_data": chat.extra_data,
+                        "created_at": chat.created_at,
+                        "updated_at": chat.updated_at,
+                        "last_message_at": chat.last_message_at,
+                    }
+                return None
+        except SQLAlchemyError as e:
+            logging.error(f"获取聊天会话失败: {e}")
+            return None
+
+    def list_chats(
+        self,
+        chat_type: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """列出聊天会话
+
+        Args:
+            chat_type: 聊天类型过滤（可选）
+            limit: 返回数量限制
+            offset: 偏移量
+        """
+        try:
+            with self.get_session() as session:
+                q = session.query(Chat)
+
+                if chat_type:
+                    q = q.filter(Chat.chat_type == chat_type)
+
+                chats = (
+                    q.order_by(Chat.last_message_at.desc().nullslast(), Chat.created_at.desc())
+                    .offset(offset)
+                    .limit(limit)
+                    .all()
+                )
+
+                return [
+                    {
+                        "id": c.id,
+                        "session_id": c.session_id,
+                        "chat_type": c.chat_type,
+                        "title": c.title,
+                        "context_id": c.context_id,
+                        "extra_data": c.extra_data,
+                        "created_at": c.created_at,
+                        "updated_at": c.updated_at,
+                        "last_message_at": c.last_message_at,
+                    }
+                    for c in chats
+                ]
+        except SQLAlchemyError as e:
+            logging.error(f"列出聊天会话失败: {e}")
+            return []
+
+    def update_chat_title(self, session_id: str, title: str) -> bool:
+        """更新聊天会话标题"""
+        try:
+            with self.get_session() as session:
+                chat = session.query(Chat).filter_by(session_id=session_id).first()
+                if chat:
+                    chat.title = title
+                    session.flush()
+                    logging.info(f"更新聊天会话标题: {session_id} -> {title}")
+                    return True
+                return False
+        except SQLAlchemyError as e:
+            logging.error(f"更新聊天会话标题失败: {e}")
+            return False
+
+    def delete_chat(self, session_id: str) -> bool:
+        """删除聊天会话及其所有消息"""
+        try:
+            with self.get_session() as session:
+                chat = session.query(Chat).filter_by(session_id=session_id).first()
+                if chat:
+                    # 删除该会话的所有消息
+                    session.query(Message).filter_by(chat_id=chat.id).delete()
+                    # 删除会话
+                    session.delete(chat)
+                    session.flush()
+                    logging.info(f"删除聊天会话: {session_id}")
+                    return True
+                return False
+        except SQLAlchemyError as e:
+            logging.error(f"删除聊天会话失败: {e}")
+            return False
+
+    # ===== 消息管理 =====
+
+    def add_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        token_count: int | None = None,
+        model: str | None = None,
+        metadata: str | None = None,
+    ) -> dict[str, Any] | None:
+        """添加消息到聊天会话
+
+        Args:
+            session_id: 会话ID
+            role: 消息角色（user, assistant, system）
+            content: 消息内容
+            token_count: token数量
+            model: 使用的模型
+            metadata: JSON格式的元数据
+        """
+        try:
+            with self.get_session() as session:
+                # 获取或创建聊天会话
+                chat = session.query(Chat).filter_by(session_id=session_id).first()
+                if not chat:
+                    # 如果会话不存在，自动创建
+                    chat = Chat(
+                        session_id=session_id,
+                        chat_type="event",  # 默认类型
+                    )
+                    session.add(chat)
+                    session.flush()
+                    logging.info(f"自动创建聊天会话: {session_id}")
+
+                # 添加消息
+                message = Message(
+                    chat_id=chat.id,
+                    role=role,
+                    content=content,
+                    token_count=token_count,
+                    model=model,
+                    extra_data=metadata,
+                )
+                session.add(message)
+
+                # 更新会话的最后消息时间
+                chat.last_message_at = datetime.now()
+
+                # 如果会话没有标题且这是第一条用户消息，可以设置标题
+                if not chat.title and role == "user":
+                    # 使用消息内容的前50个字符作为标题
+                    chat.title = content[:50] + ("..." if len(content) > 50 else "")
+
+                session.flush()
+
+                logging.info(f"添加消息到会话 {session_id}: role={role}")
+                return {
+                    "id": message.id,
+                    "chat_id": message.chat_id,
+                    "role": message.role,
+                    "content": message.content,
+                    "token_count": message.token_count,
+                    "model": message.model,
+                    "extra_data": message.extra_data,
+                    "created_at": message.created_at,
+                }
+        except SQLAlchemyError as e:
+            logging.error(f"添加消息失败: {e}")
+            return None
+
+    def get_messages(
+        self,
+        session_id: str,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """获取聊天会话的消息列表
+
+        Args:
+            session_id: 会话ID
+            limit: 返回数量限制（None表示全部）
+            offset: 偏移量
+        """
+        try:
+            with self.get_session() as session:
+                chat = session.query(Chat).filter_by(session_id=session_id).first()
+                if not chat:
+                    return []
+
+                q = (
+                    session.query(Message)
+                    .filter_by(chat_id=chat.id)
+                    .order_by(Message.created_at.asc())
+                )
+
+                if offset > 0:
+                    q = q.offset(offset)
+                if limit:
+                    q = q.limit(limit)
+
+                messages = q.all()
+
+                return [
+                    {
+                        "id": m.id,
+                        "chat_id": m.chat_id,
+                        "role": m.role,
+                        "content": m.content,
+                        "token_count": m.token_count,
+                        "model": m.model,
+                        "extra_data": m.extra_data,
+                        "created_at": m.created_at,
+                    }
+                    for m in messages
+                ]
+        except SQLAlchemyError as e:
+            logging.error(f"获取消息列表失败: {e}")
+            return []
+
+    def get_message_count(self, session_id: str) -> int:
+        """获取聊天会话的消息数量"""
+        try:
+            with self.get_session() as session:
+                chat = session.query(Chat).filter_by(session_id=session_id).first()
+                if not chat:
+                    return 0
+
+                return session.query(Message).filter_by(chat_id=chat.id).count()
+        except SQLAlchemyError as e:
+            logging.error(f"获取消息数量失败: {e}")
+            return 0
+
+    def get_chat_summaries(
+        self,
+        chat_type: str | None = None,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """获取聊天会话摘要列表（包含消息数量）
+
+        Args:
+            chat_type: 聊天类型过滤（可选）
+            limit: 返回数量限制
+        """
+        try:
+            with self.get_session() as session:
+                q = session.query(Chat)
+
+                if chat_type:
+                    q = q.filter(Chat.chat_type == chat_type)
+
+                chats = (
+                    q.order_by(Chat.last_message_at.desc().nullslast(), Chat.created_at.desc())
+                    .limit(limit)
+                    .all()
+                )
+
+                summaries = []
+                for chat in chats:
+                    message_count = session.query(Message).filter_by(chat_id=chat.id).count()
+                    summaries.append(
+                        {
+                            "session_id": chat.session_id,
+                            "chat_type": chat.chat_type,
+                            "title": chat.title,
+                            "context_id": chat.context_id,
+                            "created_at": chat.created_at,
+                            "last_active": chat.last_message_at or chat.created_at,
+                            "message_count": message_count,
+                        }
+                    )
+
+                return summaries
+        except SQLAlchemyError as e:
+            logging.error(f"获取聊天会话摘要失败: {e}")
+            return []
+
 
 # 全局数据库管理器实例
 db_manager = DatabaseManager()
+
+
+# 数据库会话生成器（用于依赖注入）
+def get_db():
+    """获取数据库会话的生成器函数"""
+    session = db_manager.SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()

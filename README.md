@@ -42,9 +42,6 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Windows
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-# Or with pip
-pip install uv
 ```
 
 **Install dependencies and sync environment:**
@@ -81,6 +78,8 @@ cp lifetrace/config/default_config.yaml lifetrace/config/config.yaml
 ```bash
 python -m lifetrace.server
 ```
+
+> **Customize Prompts**: If you want to modify AI prompts for different features, you can edit `lifetrace/config/prompt.yaml`.
 
 The backend service will start at `http://localhost:8000`.
 

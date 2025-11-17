@@ -174,4 +174,3 @@ export default function TaskItem({
     </div>
   );
 }
-

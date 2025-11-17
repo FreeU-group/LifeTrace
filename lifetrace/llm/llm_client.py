@@ -6,6 +6,7 @@ from openai import OpenAI
 
 from lifetrace.util.config import config
 from lifetrace.util.logging_config import get_logger
+from lifetrace.util.prompt_loader import get_prompt
 from lifetrace.util.token_usage_logger import log_token_usage, setup_token_logger
 
 logger = get_logger()
@@ -19,8 +20,8 @@ class LLMClient:
         初始化LLM客户端，从配置文件读取所有配置
         """
         self._initialize_client()
-        # 初始化token使用量记录器
-        setup_token_logger()
+        # 初始化token使用量记录器，传入config对象以获取价格配置
+        setup_token_logger(config)
 
     def _initialize_client(self):
         """内部方法：初始化或重新初始化客户端"""
@@ -123,7 +124,7 @@ class LLMClient:
                 messages=[
                     {
                         "role": "system",
-                        "content": "你是一个智能助手，专门用于分析用户意图。请严格按照JSON格式返回结果。",
+                        "content": get_prompt("llm_client", "intent_classification"),
                     },
                     {"role": "user", "content": user_content},
                 ],
@@ -140,6 +141,7 @@ class LLMClient:
                     endpoint="classify_intent",
                     user_query=user_query,
                     response_type="intent_classification",
+                    feature_type="event_assistant",
                 )
 
             result_text = response.choices[0].message.content.strip()
@@ -194,38 +196,8 @@ class LLMClient:
         current_time = datetime.now()
         current_date_str = current_time.strftime("%Y-%m-%d %H:%M:%S")
 
-        # 使用普通字符串，避免 f-string 与 JSON 花括号冲突
-        system_prompt = """
-你是一个查询解析助手。用户会提供关于历史记录的查询，你需要从中提取以下信息：
-
-1. 时间范围：开始时间和结束时间（如果有的话）
-2. 应用名称：用户提到的具体应用程序（如微信、QQ、浏览器等）
-3. 关键词：用户想要搜索的具体内容关键词，用数组形式返回。注意区分：
-   - 功能描述词（如"聊天"、"浏览"、"编辑"等）不是搜索关键词
-   - 只有用户明确要搜索特定内容时才提取关键词（如"包含项目报告的文档"中的"项目报告"）
-   - 如果用户只是想查看某应用的活动记录而没有指定搜索内容，keywords应为null
-4. 查询类型：总结、搜索、统计等
-
-请以JSON格式返回结果，包含以下字段：
-{
-  "start_date": "YYYY-MM-DD HH:MM:SS" 或 null,
-  "end_date": "YYYY-MM-DD HH:MM:SS" 或 null,
-  "app_names": ["应用名称1", "应用名称2"] 或 null,
-  "keywords": ["关键词1", "关键词2"] 或 null,
-  "query_type": "summary|search|statistics|other"
-}
-
-注意：
-- 如果没有明确的时间信息，start_date和end_date设为null
-- 如果时间是相对的（如"今天"、"昨天"、"上周"），请基于提供的当前时间转换为具体日期
-- "今天"应该设置为当天的00:00:00到23:59:59
-- 应用名称要标准化，请使用以下标准应用名称：微信、WeChat、QQ、钉钉、企业微信、飞书、Telegram、Discord、记事本、计算器、Word、Excel、PowerPoint、WPS、Chrome、Firefox、Edge、Safari、VS Code、VSCode、PyCharm、IntelliJ IDEA、网易云音乐、QQ音乐、VLC、Steam、Epic Games、任务管理器、命令提示符、PowerShell、360安全卫士、腾讯电脑管家、迅雷、百度网盘
-- 关键词提取原则：
-  * "查看今天微信聊天情况" -> keywords: null（聊天是功能描述）
-  * "搜索包含会议的微信消息" -> keywords: ["会议"]（会议是搜索目标）
-  * "找到关于项目报告的文档" -> keywords: ["项目报告"]（项目报告是搜索目标）
-- 只需要返回json 不要返回其他任何信息
-"""
+        # 从配置文件加载提示词
+        system_prompt = get_prompt("llm_client", "query_parsing")
 
         try:
             # 将当前时间与用户查询一并放入 user 消息，避免在包含花括号的模板里插值
@@ -248,6 +220,7 @@ class LLMClient:
                     endpoint="parse_query",
                     user_query=user_query,
                     response_type="query_parsing",
+                    feature_type="event_assistant",
                 )
 
             result_text = response.choices[0].message.content.strip()
@@ -295,21 +268,7 @@ class LLMClient:
             return self._fallback_summary(query, context_data)
 
         # 构建系统提示，指导LLM生成结构化、重点突出的总结
-        system_prompt = """
-你是一个智能助手，专门帮助用户分析和总结历史记录数据。
-
-用户会提供一个查询和相关的历史数据，你需要：
-1. 理解用户的查询意图
-2. 分析提供的历史数据
-3. 生成准确、有用的总结
-
-重要要求：
-- 在回答中引用具体的截图ID来源，格式为：[截图ID: xxx]
-- 当提到某个具体信息时，请标注它来自哪个截图
-- 这样用户可以知道信息的具体来源
-
-请用中文回答，保持简洁明了，重点突出关键信息。
-"""
+        system_prompt = get_prompt("llm_client", "summary_generation")
 
         # 构建用户提示，包含原始查询和检索结果
         if not context_data:
@@ -381,6 +340,7 @@ class LLMClient:
                     endpoint="generate_summary",
                     user_query=query,
                     response_type="summary_generation",
+                    feature_type="event_assistant",
                     additional_info={"context_records": len(context_data)},
                 )
 

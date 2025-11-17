@@ -374,7 +374,7 @@
   .markdown-content hr,
   .markdown-hr {
     @apply border-0 h-px relative;
-    margin: 1rem 0;
+    margin: 1.5rem 0;
     background: linear-gradient(to right, transparent, #d0d7de 20%, #d0d7de 80%, transparent);
     opacity: 0.8;
   }
@@ -390,7 +390,7 @@
   @media (max-width: 640px) {
     .markdown-content hr,
     .markdown-hr {
-      margin: 0.75rem 0;
+      margin: 1rem 0;
     }
   }
 

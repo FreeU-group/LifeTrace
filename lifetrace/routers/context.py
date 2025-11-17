@@ -132,6 +132,7 @@ async def update_context(
         success = deps.db_manager.update_context_task(
             context_id=context_id,
             task_id=update_data.task_id,
+            project_id=update_data.project_id,
         )
 
         if not success:

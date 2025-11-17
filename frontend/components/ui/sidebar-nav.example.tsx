@@ -102,7 +102,7 @@ export function FullSidebarExample() {
           </div>
           <div>
             <h2 className="text-sm font-semibold">LifeTrace</h2>
-            <p className="text-xs text-muted-foreground">生活追踪系统</p>
+            <p className="text-xs text-muted-foreground">智能生活记录系统</p>
           </div>
         </div>
       </SidebarHeader>

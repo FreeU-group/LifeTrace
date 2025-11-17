@@ -15,6 +15,7 @@ class ContextResponse(BaseModel):
     end_time: datetime | None = Field(None, description="结束时间")
     ai_title: str | None = Field(None, description="AI生成的标题")
     ai_summary: str | None = Field(None, description="AI生成的摘要")
+    project_id: int | None = Field(None, description="关联的项目ID")
     task_id: int | None = Field(None, description="关联的任务ID")
     created_at: datetime | None = Field(None, description="创建时间")
 
@@ -32,4 +33,5 @@ class ContextListResponse(BaseModel):
 class ContextUpdateRequest(BaseModel):
     """上下文更新请求模型"""
 
+    project_id: int | None = Field(None, description="关联的项目ID（可选）")
     task_id: int | None = Field(None, description="关联的任务ID（null表示解除关联）")

@@ -3,6 +3,8 @@ import logging
 from datetime import datetime
 from typing import Any
 
+from lifetrace.util.prompt_loader import get_prompt
+
 logger = logging.getLogger(__name__)
 
 
@@ -65,16 +67,11 @@ class ContextBuilder:
             return "没有找到相关的历史记录数据。"
 
         context_parts = [
-            "你是一个智能助手，专门帮助用户分析和总结历史记录数据。",
+            get_prompt("context_builder", "data_analysis_base"),
             "",
-            "**强制性要求 - 必须严格遵守：**",
-            "- 每当引用或提到任何具体信息时，必须标注截图ID来源，格式为：[截图ID: xxx]",
-            "- 不允许提及任何信息而不标注其来源截图ID",
-            "- 如果历史数据中包含截图ID信息，必须在相关内容后立即添加引用",
-            "- 这是为了确保信息的可追溯性和准确性",
-            '- 示例："用户在微信中发送了消息 [截图ID: 12345]"',
+            get_prompt("context_builder", "citation_requirements"),
             "",
-            "请用中文回答，保持简洁明了，重点突出关键信息。",
+            get_prompt("context_builder", "response_format"),
             "",
             f"用户查询: {query}",
             f"找到 {len(retrieved_data)} 条相关记录:",
@@ -141,16 +138,11 @@ class ContextBuilder:
             return f"查询: {query}\n\n未找到相关记录。"
 
         context_parts = [
-            "你是一个智能助手，专门帮助用户分析和总结历史记录数据。",
+            get_prompt("context_builder", "data_analysis_base"),
             "",
-            "**强制性要求 - 必须严格遵守：**",
-            "- 每当引用或提到任何具体信息时，必须标注截图ID来源，格式为：[截图ID: xxx]",
-            "- 不允许提及任何信息而不标注其来源截图ID",
-            "- 如果历史数据中包含截图ID信息，必须在相关内容后立即添加引用",
-            "- 这是为了确保信息的可追溯性和准确性",
-            '- 示例："用户在微信中发送了消息 [截图ID: 12345]"',
+            get_prompt("context_builder", "citation_requirements"),
             "",
-            "请用中文回答，保持简洁明了，重点突出关键信息。",
+            get_prompt("context_builder", "response_format"),
             "",
             f"搜索查询: {query}",
             f"找到 {len(retrieved_data)} 条匹配结果:",
@@ -209,16 +201,11 @@ class ContextBuilder:
             格式化的上下文文本
         """
         context_parts = [
-            "你是一个智能助手，专门帮助用户分析和总结历史记录数据。",
+            get_prompt("context_builder", "data_analysis_base"),
             "",
-            "**强制性要求 - 必须严格遵守：**",
-            "- 每当引用或提到任何具体信息时，必须标注截图ID来源，格式为：[截图ID: xxx]",
-            "- 不允许提及任何信息而不标注其来源截图ID",
-            "- 如果历史数据中包含截图ID信息，必须在相关内容后立即添加引用",
-            "- 这是为了确保信息的可追溯性和准确性",
-            '- 示例："用户在微信中发送了消息 [截图ID: 12345]"',
+            get_prompt("context_builder", "citation_requirements"),
             "",
-            "请用中文回答，保持简洁明了，重点突出关键信息。",
+            get_prompt("context_builder", "response_format"),
             "",
             f"统计查询: {query}",
             "",

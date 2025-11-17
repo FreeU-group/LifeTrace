@@ -50,10 +50,6 @@ class TaskSummaryService:
         self._stop_event = threading.Event()
         self._running = False
 
-        # 用于标记哪些上下文已被摘要的集合
-        # 格式: {task_id: set(context_ids)}
-        self._summarized_contexts = {}
-
         # 统计信息
         self.stats = {
             "total_tasks_processed": 0,
@@ -149,14 +145,13 @@ class TaskSummaryService:
                 for task in tasks:
                     task_id = task["id"]
 
-                    # 获取该任务关联的所有上下文
-                    contexts = self.db_manager.list_contexts(task_id=task_id, limit=1000, offset=0)
+                    # 获取该任务关联的所有上下文，只获取未被用于摘要的
+                    new_contexts = self.db_manager.list_contexts(
+                        task_id=task_id, used_in_summary=False, limit=1000, offset=0
+                    )
 
-                    if not contexts:
+                    if not new_contexts:
                         continue
-
-                    # 检查有多少新的（未被摘要的）上下文
-                    new_contexts = self._get_new_contexts(task_id, contexts)
 
                     if len(new_contexts) >= self.min_new_contexts:
                         tasks_need_summary.append(
@@ -189,29 +184,6 @@ class TaskSummaryService:
         except Exception as e:
             logger.error(f"处理所有任务时出错: {e}")
             logger.exception(e)
-
-    def _get_new_contexts(
-        self, task_id: int, contexts: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
-        """
-        获取任务的新上下文（尚未被摘要的）
-
-        Args:
-            task_id: 任务ID
-            contexts: 该任务的所有上下文列表
-
-        Returns:
-            新的上下文列表
-        """
-        # 如果该任务还没有摘要记录，所有上下文都是新的
-        if task_id not in self._summarized_contexts:
-            return contexts
-
-        # 过滤出尚未被摘要的上下文
-        summarized_ids = self._summarized_contexts[task_id]
-        new_contexts = [ctx for ctx in contexts if ctx["id"] not in summarized_ids]
-
-        return new_contexts
 
     def _generate_summary_for_task(
         self, task: dict[str, Any], project: dict[str, Any], new_contexts: list[dict[str, Any]]
@@ -279,7 +251,11 @@ class TaskSummaryService:
         success = self._append_summary_to_task(task_id, summary, task_description)
 
         if success:
-            # 标记这些上下文已被摘要
+            # 标记这些上下文已被摘要（在数据库中标记）
+            event_ids = [ctx["id"] for ctx in new_contexts]
+            self.db_manager.mark_contexts_used_in_summary(task_id, event_ids)
+
+            # 同时调用旧的方法以保持兼容性
             self._mark_contexts_as_summarized(task_id, new_contexts)
 
             self.stats["total_summaries_generated"] += 1
@@ -413,6 +389,19 @@ class TaskSummaryService:
                 max_tokens=500,
             )
 
+            # 记录token使用量
+            if hasattr(response, "usage") and response.usage:
+                from lifetrace.util.token_usage_logger import log_token_usage
+
+                log_token_usage(
+                    model=self.llm_client.model,
+                    input_tokens=response.usage.prompt_tokens,
+                    output_tokens=response.usage.completion_tokens,
+                    endpoint="task_summary",
+                    response_type="summary_generation",
+                    feature_type="job_task_summary",
+                )
+
             summary = response.choices[0].message.content.strip()
 
             logger.debug(f"LLM生成的摘要: {summary}")
@@ -462,24 +451,6 @@ class TaskSummaryService:
             logger.exception(e)
             return False
 
-    def _mark_contexts_as_summarized(self, task_id: int, contexts: list[dict[str, Any]]):
-        """
-        标记上下文已被摘要
-
-        设计一个机制来标记哪些上下文已经被摘要过，避免重复处理
-
-        Args:
-            task_id: 任务ID
-            contexts: 上下文列表
-        """
-        if task_id not in self._summarized_contexts:
-            self._summarized_contexts[task_id] = set()
-
-        for context in contexts:
-            self._summarized_contexts[task_id].add(context["id"])
-
-        logger.debug(f"标记任务 {task_id} 的 {len(contexts)} 个上下文为已摘要")
-
     def trigger_manual_summary(self, task_id: int) -> dict[str, Any]:
         """
         手动触发任务摘要生成（供API调用）
@@ -501,14 +472,10 @@ class TaskSummaryService:
             if not project:
                 return {"success": False, "message": f"项目 {task['project_id']} 不存在"}
 
-            # 获取该任务关联的所有上下文
-            contexts = self.db_manager.list_contexts(task_id=task_id, limit=1000, offset=0)
-
-            if not contexts:
-                return {"success": False, "message": f"任务 {task_id} 没有关联的上下文"}
-
-            # 获取新的上下文
-            new_contexts = self._get_new_contexts(task_id, contexts)
+            # 获取该任务关联的所有上下文，只获取未被用于摘要的
+            new_contexts = self.db_manager.list_contexts(
+                task_id=task_id, used_in_summary=False, limit=1000, offset=0
+            )
 
             if not new_contexts:
                 return {"success": False, "message": f"任务 {task_id} 没有新的上下文需要摘要"}
@@ -531,16 +498,38 @@ class TaskSummaryService:
         """
         清除摘要历史记录（用于重新生成摘要）
 
+        将数据库中的 used_in_summary 标记重置为 False
+
         Args:
             task_id: 任务ID，如果为None则清除所有任务的历史
         """
-        if task_id is None:
-            self._summarized_contexts.clear()
-            logger.info("已清除所有任务的摘要历史记录")
-        else:
-            if task_id in self._summarized_contexts:
-                del self._summarized_contexts[task_id]
-                logger.info(f"已清除任务 {task_id} 的摘要历史记录")
+        try:
+            from sqlalchemy import update
+
+            from lifetrace.storage.models import EventAssociation
+
+            with self.db_manager.get_session() as session:
+                if task_id is None:
+                    # 重置所有记录
+                    stmt = update(EventAssociation).values(used_in_summary=False)
+                    result = session.execute(stmt)
+                    session.commit()
+                    logger.info(f"已清除所有任务的摘要历史记录（重置了 {result.rowcount} 条记录）")
+                else:
+                    # 只重置指定任务的记录
+                    stmt = (
+                        update(EventAssociation)
+                        .where(EventAssociation.task_id == task_id)
+                        .values(used_in_summary=False)
+                    )
+                    result = session.execute(stmt)
+                    session.commit()
+                    logger.info(
+                        f"已清除任务 {task_id} 的摘要历史记录（重置了 {result.rowcount} 条记录）"
+                    )
+        except Exception as e:
+            logger.error(f"清除摘要历史记录失败: {e}")
+            logger.exception(e)
 
 
 def get_summary_instance() -> TaskSummaryService:

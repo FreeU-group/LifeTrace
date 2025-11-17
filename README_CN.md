@@ -58,9 +58,6 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Windows
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-# 或使用 pip 安装
-pip install uv
 ```
 
 **安装依赖并同步环境:**
@@ -97,6 +94,8 @@ cp lifetrace/config/default_config.yaml lifetrace/config/config.yaml
 ```bash
 python -m lifetrace.server
 ```
+
+> **自定义提示词**：如果您想修改不同功能的 AI 提示词，可以编辑 `lifetrace/config/prompt.yaml` 文件。
 
 后端服务将在 `http://localhost:8000` 启动。
 

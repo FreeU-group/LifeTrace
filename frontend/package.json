@@ -9,6 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@radix-ui/react-navigation-menu": "^1.2.14",
     "axios": "^1.7.9",
     "class-variance-authority": "^0.7.1",
@@ -19,6 +22,8 @@
     "next": "16.0.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "zustand": "^5.0.2"

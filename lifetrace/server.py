@@ -6,18 +6,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from lifetrace.jobs.job_manager import get_job_manager
 from lifetrace.jobs.ocr import SimpleOCRProcessor
-from lifetrace.llm.multimodal_vector_service import create_multimodal_vector_service
 from lifetrace.llm.rag_service import RAGService
 from lifetrace.llm.vector_service import create_vector_service
 from lifetrace.routers import (
     behavior,
     chat,
     context,
+    cost_tracking,
     event,
     health,
     logs,
     ocr,
-    plan,
     project,
     rag,
     scheduler,
@@ -114,9 +113,6 @@ ocr_processor = SimpleOCRProcessor()
 # 初始化向量数据库服务
 vector_service = create_vector_service(config, db_manager)
 
-# 初始化多模态向量数据库服务
-multimodal_vector_service = create_multimodal_vector_service(config, db_manager)
-
 # 初始化RAG服务 - 从配置文件读取API配置
 rag_service = RAGService(
     db_manager=db_manager,
@@ -133,7 +129,6 @@ deps.init_dependencies(
     db_manager,
     ocr_processor,
     vector_service,
-    multimodal_vector_service,
     rag_service,
     config,
     logger,
@@ -153,21 +148,23 @@ app.include_router(vector.router)
 app.include_router(system.router)
 app.include_router(logs.router)
 app.include_router(behavior.router)
-app.include_router(plan.router)
 app.include_router(project.router)
 app.include_router(task.router)
 app.include_router(context.router)
 app.include_router(rag.router)
 app.include_router(scheduler.router)
+app.include_router(cost_tracking.router)
 app.include_router(time_allocation.router)
 
 
 if __name__ == "__main__":
     logger.info(f"启动服务器: http://{config.server_host}:{config.server_port}")
+    logger.info(f"调试模式: {'开启' if config.server_debug else '关闭'}")
     uvicorn.run(
-        app,
+        "lifetrace.server:app",
         host=config.server_host,
         port=config.server_port,
-        reload=False,
-        access_log=False,
+        reload=config.server_debug,
+        access_log=config.server_debug,
+        log_level="debug" if config.server_debug else "info",
     )
