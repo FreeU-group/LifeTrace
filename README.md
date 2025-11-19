@@ -71,6 +71,18 @@ cp lifetrace/config/default_config.yaml lifetrace/config/config.yaml
 
 > **Note**: On first run, the system will automatically create `config.yaml` from `default_config.yaml` if it doesn't exist. You can customize your settings by editing `lifetrace/config/config.yaml`.
 
+### Database Migration
+
+**Apply database migrations (first time skip this step):**
+
+```bash
+# Navigate to lifetrace directory
+cd lifetrace
+
+# Apply all migrations to the latest version
+alembic upgrade head
+```
+
 ### Start the Backend Service
 
 **Start the server:**
@@ -132,21 +144,27 @@ For more details, see: [frontend/README.md](frontend/README.md)
 │   └── ...                     # Other GitHub repository files
 ├── lifetrace/                  # Core backend modules
 │   ├── server.py               # Web API service
+│   ├── alembic/                # Database migration tool
+│   │   ├── env.py              # Alembic environment config
+│   │   ├── script.py.mako      # Migration script template
+│   │   └── README              # Alembic documentation
+│   ├── alembic.ini             # Alembic configuration
 │   ├── config/                 # Configuration files
 │   │   ├── config.yaml         # Main configuration (auto-generated)
 │   │   ├── default_config.yaml # Default configuration template
+│   │   ├── prompt.yaml         # AI prompt templates
 │   │   └── rapidocr_config.yaml# OCR configuration
 │   ├── routers/                # API route handlers
 │   │   ├── behavior.py         # User behavior endpoints
 │   │   ├── chat.py             # Chat interface endpoints
 │   │   ├── config.py           # Configuration endpoints
 │   │   ├── context.py          # Context management endpoints
+│   │   ├── cost_tracking.py    # Cost tracking endpoints
 │   │   ├── dependencies.py     # Router dependencies
 │   │   ├── event.py            # Event management endpoints
 │   │   ├── health.py           # Health check endpoints
 │   │   ├── logs.py             # Log management endpoints
 │   │   ├── ocr.py              # OCR service endpoints
-│   │   ├── plan.py             # Plan management endpoints
 │   │   ├── project.py          # Project management endpoints
 │   │   ├── rag.py              # RAG service endpoints
 │   │   ├── scheduler.py        # Scheduler endpoints
@@ -161,7 +179,6 @@ For more details, see: [frontend/README.md](frontend/README.md)
 │   │   ├── config.py           # Config models
 │   │   ├── context.py          # Context models
 │   │   ├── event.py            # Event models
-│   │   ├── plan.py             # Plan models
 │   │   ├── project.py          # Project models
 │   │   ├── screenshot.py       # Screenshot models
 │   │   ├── search.py           # Search models
@@ -170,8 +187,18 @@ For more details, see: [frontend/README.md](frontend/README.md)
 │   │   ├── task.py             # Task models
 │   │   └── vector.py           # Vector models
 │   ├── storage/                # Data storage layer
-│   │   ├── database.py         # Database operations
-│   │   └── models.py           # SQLAlchemy models
+│   │   ├── __init__.py         # Storage module init
+│   │   ├── database_base.py    # Base database operations
+│   │   ├── database.py         # Main database operations
+│   │   ├── models.py           # SQLAlchemy models
+│   │   ├── chat_manager.py     # Chat data management
+│   │   ├── context_manager.py  # Context data management
+│   │   ├── event_manager.py    # Event data management
+│   │   ├── ocr_manager.py      # OCR data management
+│   │   ├── project_manager.py  # Project data management
+│   │   ├── screenshot_manager.py # Screenshot data management
+│   │   ├── stats_manager.py    # Statistics data management
+│   │   └── task_manager.py     # Task data management
 │   ├── llm/                    # LLM and AI services
 │   │   ├── llm_client.py       # LLM client wrapper
 │   │   ├── event_summary_service.py # Event summarization
@@ -179,22 +206,22 @@ For more details, see: [frontend/README.md](frontend/README.md)
 │   │   ├── retrieval_service.py# Retrieval service
 │   │   ├── context_builder.py  # Context building
 │   │   ├── vector_service.py   # Vector operations
-│   │   ├── vector_db.py        # Vector database
-│   │   ├── multimodal_vector_service.py # Multimodal vectors
-│   │   └── multimodal_embedding.py # Multimodal embeddings
+│   │   └── vector_db.py        # Vector database
 │   ├── jobs/                   # Background jobs
 │   │   ├── job_manager.py      # Job management
 │   │   ├── ocr.py              # OCR processing job
 │   │   ├── recorder.py         # Screen recording job
 │   │   ├── scheduler.py        # Job scheduler
 │   │   ├── task_context_mapper.py # Task context mapping
-│   │   └── task_summary.py     # Task summarization
+│   │   ├── task_summary.py     # Task summarization
+│   │   └── clean_data.py       # Data cleaning job
 │   ├── util/                   # Utility functions
 │   │   ├── app_utils.py        # Application utilities
 │   │   ├── config.py           # Configuration utilities
 │   │   ├── config_watcher.py   # Configuration file watcher
 │   │   ├── llm_config_handler.py # LLM config handler
 │   │   ├── logging_config.py   # Logging configuration
+│   │   ├── prompt_loader.py    # Prompt loading utilities
 │   │   ├── query_parser.py     # Query parsing
 │   │   ├── token_usage_logger.py # Token usage tracking
 │   │   └── utils.py            # General utilities
@@ -220,30 +247,34 @@ For more details, see: [frontend/README.md](frontend/README.md)
 │   │   ├── page.tsx            # Home page
 │   │   ├── layout.tsx          # Root layout
 │   │   ├── globals.css         # Global styles
-│   │   ├── events/             # Events management page
 │   │   ├── app-usage/          # App usage page
+│   │   ├── cost-tracking/      # Cost tracking page
 │   │   ├── time-allocation/    # Time allocation page
 │   │   ├── project-management/ # Project & task management
 │   │   │   ├── page.tsx        # Projects list
 │   │   │   └── [id]/           # Project details
 │   │   │       ├── page.tsx    # Project overview
-│   │   │       └── tasks/      # Task management
-│   │   ├── scheduler/          # Scheduler page
-│   │   └── settings/           # Settings page
+│   │   │       └── tasks.tsx   # Task management
+│   │   └── scheduler/          # Scheduler page
 │   ├── components/             # React components
 │   │   ├── common/             # Common components
 │   │   │   ├── Button.tsx
 │   │   │   ├── Card.tsx
 │   │   │   ├── Input.tsx
 │   │   │   ├── Loading.tsx
+│   │   │   ├── MessageContent.tsx
 │   │   │   ├── Pagination.tsx
+│   │   │   ├── ScreenshotIdButton.tsx
 │   │   │   ├── SettingsModal.tsx
 │   │   │   └── ThemeToggle.tsx
 │   │   ├── context/            # Context components
+│   │   │   ├── ContextCard.tsx
+│   │   │   └── ContextList.tsx
 │   │   ├── layout/             # Layout components
 │   │   ├── project/            # Project components
 │   │   ├── screenshot/         # Screenshot components
 │   │   ├── search/             # Search components
+│   │   │   └── SearchBar.tsx
 │   │   ├── task/               # Task components
 │   │   └── ui/                 # UI components
 │   ├── lib/                    # Utilities and services
@@ -255,6 +286,7 @@ For more details, see: [frontend/README.md](frontend/README.md)
 │   │   └── store/              # State management
 │   ├── devlog/                 # Frontend development logs
 │   ├── public/                 # Static assets
+│   │   └── app-icons/          # Application icons
 │   ├── package.json            # Frontend dependencies
 │   ├── pnpm-lock.yaml          # pnpm lock file
 │   ├── next.config.ts          # Next.js configuration

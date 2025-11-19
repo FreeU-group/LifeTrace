@@ -3,8 +3,13 @@
 from datetime import datetime
 
 from fastapi import APIRouter
+from openai import OpenAI
 
 from lifetrace.routers import dependencies as deps
+from lifetrace.storage import db_base
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 router = APIRouter()
 
@@ -15,7 +20,7 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now(),
-        "database": "connected" if deps.db_manager.engine else "disconnected",
+        "database": "connected" if db_base.engine else "disconnected",
         "ocr": "available" if deps.ocr_processor.is_available() else "unavailable",
     }
 
@@ -43,9 +48,6 @@ async def llm_health_check():
                 "timestamp": datetime.now().isoformat(),
             }
 
-        # 测试LLM连接
-        from openai import OpenAI
-
         client = OpenAI(api_key=llm_key, base_url=base_url)
         model = deps.config.llm_model
 
@@ -65,7 +67,7 @@ async def llm_health_check():
         }
 
     except Exception as e:
-        deps.logger.error(f"LLM健康检查失败: {e}")
+        logger.error(f"LLM健康检查失败: {e}")
         return {
             "status": "error",
             "message": f"LLM服务异常: {str(e)}",

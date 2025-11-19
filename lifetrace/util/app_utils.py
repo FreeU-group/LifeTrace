@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 应用工具模块
 合并了应用名称映射和应用图标映射功能
@@ -133,13 +132,13 @@ def get_all_supported_apps():
 APP_MAPPING: dict[str, dict[str, list[str]]] = {
     # 即时通讯软件
     "微信": {
-        "Windows": ["WeChat.exe", "Weixin.exe"],
-        "Darwin": ["WeChat"],  # macOS
+        "Windows": ["WeChat.exe", "Weixin.exe", "微信.exe"],
+        "Darwin": ["WeChat", "微信"],  # macOS 可能返回中文或英文名
         "Linux": ["wechat", "electronic-wechat"],
     },
     "WeChat": {
-        "Windows": ["WeChat.exe", "Weixin.exe"],
-        "Darwin": ["WeChat"],  # macOS
+        "Windows": ["WeChat.exe", "Weixin.exe", "微信.exe"],
+        "Darwin": ["WeChat", "微信"],  # macOS 可能返回中文或英文名
         "Linux": ["wechat", "electronic-wechat"],
     },
     "QQ": {
@@ -148,18 +147,18 @@ APP_MAPPING: dict[str, dict[str, list[str]]] = {
         "Linux": ["qq", "linuxqq"],
     },
     "钉钉": {
-        "Windows": ["DingTalk.exe"],
-        "Darwin": ["DingTalk"],
+        "Windows": ["DingTalk.exe", "钉钉.exe"],
+        "Darwin": ["DingTalk", "钉钉"],  # macOS 可能返回中文或英文名
         "Linux": ["dingtalk"],
     },
     "企业微信": {
-        "Windows": ["WXWork.exe"],
-        "Darwin": ["企业微信"],
+        "Windows": ["WXWork.exe", "企业微信.exe"],
+        "Darwin": ["企业微信", "WeCom"],  # macOS 可能返回中文或英文名
         "Linux": ["wxwork"],
     },
     "飞书": {
-        "Windows": ["Feishu.exe", "Lark.exe"],
-        "Darwin": ["Feishu", "Lark"],
+        "Windows": ["Feishu.exe", "Lark.exe", "飞书.exe"],
+        "Darwin": ["Feishu", "Lark", "飞书"],  # macOS 可能返回中文或英文名
         "Linux": ["feishu", "lark"],
     },
     "Telegram": {

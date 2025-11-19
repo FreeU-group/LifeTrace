@@ -10,7 +10,13 @@ from datetime import datetime
 from typing import Any
 
 from lifetrace.llm.llm_client import LLMClient
-from lifetrace.storage.database import DatabaseManager
+from lifetrace.storage import (
+    context_mgr,
+    event_mgr,
+    ocr_mgr,
+    project_mgr,
+    task_mgr,
+)
 from lifetrace.util.config import config
 from lifetrace.util.logging_config import get_logger
 
@@ -25,7 +31,6 @@ class TaskContextMapper:
 
     def __init__(
         self,
-        db_manager: DatabaseManager,
         llm_client: LLMClient = None,
         project_confidence_threshold: float = 0.7,
         task_confidence_threshold: float = 0.7,
@@ -37,7 +42,6 @@ class TaskContextMapper:
         初始化任务上下文映射服务
 
         Args:
-            db_manager: 数据库管理器
             llm_client: LLM客户端，如果为None则自动创建
             project_confidence_threshold: 项目置信度阈值，只有超过此阈值的项目关联才会被应用
             task_confidence_threshold: 任务置信度阈值，只有超过此阈值的任务关联才会被应用
@@ -45,7 +49,6 @@ class TaskContextMapper:
             check_interval: 检查间隔（秒）
             enabled: 是否启用服务
         """
-        self.db_manager = db_manager
         self.llm_client = llm_client or LLMClient()
         self.project_confidence_threshold = project_confidence_threshold
         self.task_confidence_threshold = task_confidence_threshold
@@ -152,7 +155,7 @@ class TaskContextMapper:
                 # 注意：_process_single_context 内部的 finally 块通常会执行标记
                 # 但为了绝对确保标记操作，这里再次执行（幂等操作，多次调用安全）
                 try:
-                    self.db_manager.mark_context_mapping_attempted(context_id)
+                    context_mgr.mark_context_mapping_attempted(context_id)
                 except Exception as mark_error:
                     logger.error(f"❌ 紧急：无法标记上下文 {context_id} 为已尝试: {mark_error}")
 
@@ -173,7 +176,7 @@ class TaskContextMapper:
             # 使用 mapping_attempted=False 获取未尝试过自动关联的上下文
             # 注意：不是 associated=False（那是检查是否已关联到任务）
             # mapping_attempted=False 确保每个 event 只被 task_context_mapper job 处理一次
-            contexts = self.db_manager.list_contexts(mapping_attempted=False, limit=limit, offset=0)
+            contexts = context_mgr.list_contexts(mapping_attempted=False, limit=limit, offset=0)
             logger.debug(f"获取到 {len(contexts)} 个未尝试自动关联的上下文")
             return contexts
         except Exception as e:
@@ -230,7 +233,7 @@ class TaskContextMapper:
                 logger.info(f"项目 {project_id} 没有进行中的任务，上下文 {context_id} 跳过任务关联")
                 self.stats["total_skipped"] += 1
                 # 仍然保存项目关联
-                self.db_manager.create_or_update_event_association(
+                context_mgr.create_or_update_event_association(
                     event_id=context_id,
                     project_id=project_id,
                     project_confidence=project_confidence,
@@ -253,7 +256,7 @@ class TaskContextMapper:
                 logger.warning(f"上下文 {context_id} LLM任务关联失败，但保存项目关联")
                 self.stats["total_skipped"] += 1
                 # 保存项目关联
-                self.db_manager.create_or_update_event_association(
+                context_mgr.create_or_update_event_association(
                     event_id=context_id,
                     project_id=project_id,
                     project_confidence=project_confidence,
@@ -265,8 +268,8 @@ class TaskContextMapper:
             task_confidence = result.get("confidence_score", 0.0)
             reasoning = result.get("reasoning", "")
 
-            # e. 保存关联结果到 event_associations 表（无论置信度如何都保存）
-            success = self.db_manager.create_or_update_event_association(
+            # e. 保存关联结果到 event_task_relations 表（无论置信度如何都保存）
+            success = context_mgr.create_or_update_event_association(
                 event_id=context_id,
                 project_id=project_id,
                 task_id=task_id if task_confidence >= self.task_confidence_threshold else None,
@@ -310,7 +313,7 @@ class TaskContextMapper:
             # 这样可以确保每个 event 只尝试一次自动关联，避免重复处理浪费 token
             # 注意：此标记是永久的，该 event 将不再被 task_context_mapper job 处理
             try:
-                self.db_manager.mark_context_mapping_attempted(context_id)
+                context_mgr.mark_context_mapping_attempted(context_id)
                 logger.info(f"✓ 已标记上下文 {context_id} 为已尝试自动关联（永久标记）")
             except Exception as e:
                 logger.error(f"❌ 严重错误：无法标记上下文 {context_id} 为已尝试: {e}")
@@ -342,7 +345,7 @@ class TaskContextMapper:
                 logger.debug(f"上下文 {context_id} 没有关联的截图")
                 # 如果没有截图，我们尝试使用应用名和窗口标题来判断
                 # 这里可以简化：返回第一个活跃项目（低置信度）
-                projects = self.db_manager.list_projects(limit=1, offset=0)
+                projects = project_mgr.list_projects(limit=1, offset=0)
                 if projects:
                     return (projects[0]["id"], 0.5)  # 默认置信度0.5
                 return None
@@ -350,13 +353,13 @@ class TaskContextMapper:
             # 提取OCR文本
             ocr_texts = []
             for screenshot in screenshots[:5]:  # 最多取5个截图
-                ocr_results = self.db_manager.get_ocr_results_by_screenshot(screenshot["id"])
+                ocr_results = ocr_mgr.get_ocr_results_by_screenshot(screenshot["id"])
                 for ocr_result in ocr_results:
                     if ocr_result and ocr_result.get("text_content"):
                         ocr_texts.append(ocr_result["text_content"])
 
             # 获取所有项目
-            all_projects = self.db_manager.list_projects(limit=100, offset=0)
+            all_projects = project_mgr.list_projects(limit=100, offset=0)
 
             if not all_projects:
                 logger.warning("系统中没有任何项目")
@@ -386,7 +389,7 @@ class TaskContextMapper:
         """
         try:
             # 使用数据库管理器的方法获取事件的截图
-            screenshots = self.db_manager.get_event_screenshots(context_id)
+            screenshots = event_mgr.get_event_screenshots(context_id)
             return screenshots
         except Exception as e:
             logger.error(f"获取上下文 {context_id} 的截图失败: {e}")
@@ -515,7 +518,7 @@ class TaskContextMapper:
         """
         try:
             # 获取项目的所有任务
-            all_tasks = self.db_manager.list_tasks(project_id=project_id, limit=1000, offset=0)
+            all_tasks = task_mgr.list_tasks(project_id=project_id, limit=1000, offset=0)
 
             # 筛选出进行中的任务
             in_progress_tasks = [task for task in all_tasks if task["status"] == "in_progress"]
@@ -547,7 +550,7 @@ class TaskContextMapper:
             包含system和user消息的字典
         """
         # 获取项目信息
-        project = self.db_manager.get_project(project_id)
+        project = project_mgr.get_project(project_id)
         project_name = project.get("name", "未知项目") if project else "未知项目"
         project_goal = project.get("goal", "无") if project else "无"
 
@@ -565,7 +568,7 @@ class TaskContextMapper:
         screenshots = self._get_screenshots_for_context(context["id"])
         ocr_texts = []
         for screenshot in screenshots[:5]:  # 最多取5个截图
-            ocr_results = self.db_manager.get_ocr_results_by_screenshot(screenshot["id"])
+            ocr_results = ocr_mgr.get_ocr_results_by_screenshot(screenshot["id"])
             for ocr_result in ocr_results:
                 if ocr_result and ocr_result.get("text_content"):
                     ocr_texts.append(ocr_result["text_content"])
@@ -724,8 +727,6 @@ def get_mapper_instance() -> TaskContextMapper:
     """
     global _global_mapper_instance
     if _global_mapper_instance is None:
-        from lifetrace.storage import db_manager
-
         mapper_config = config.get("jobs.task_context_mapper", {})
         project_confidence_threshold = mapper_config.get("project_confidence_threshold", 0.7)
         task_confidence_threshold = mapper_config.get("task_confidence_threshold", 0.7)
@@ -734,7 +735,6 @@ def get_mapper_instance() -> TaskContextMapper:
         enabled = mapper_config.get("enabled", False)
 
         _global_mapper_instance = TaskContextMapper(
-            db_manager=db_manager,
             project_confidence_threshold=project_confidence_threshold,
             task_confidence_threshold=task_confidence_threshold,
             batch_size=batch_size,
@@ -750,17 +750,20 @@ def execute_mapper_task():
     这是一个模块级别的函数，可以被 APScheduler 序列化到数据库中
     """
     try:
+        logger.info("🔄 开始执行任务上下文映射任务")
         mapper = get_mapper_instance()
 
         if not mapper.enabled:
-            logger.debug("任务上下文映射服务未启用，跳过执行")
+            logger.info("任务上下文映射服务未启用，跳过执行")
             return 0
 
         # 执行一批处理
         mapper._process_batch()
 
         # 返回处理统计
-        return mapper.stats.get("total_processed", 0)
+        processed = mapper.stats.get("total_processed", 0)
+        logger.info(f"✅ 任务上下文映射任务完成，已处理: {processed}")
+        return processed
     except Exception as e:
         logger.error(f"执行任务上下文映射任务失败: {e}", exc_info=True)
         return 0

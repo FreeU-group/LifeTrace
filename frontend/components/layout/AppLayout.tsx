@@ -20,8 +20,8 @@ type MenuType = 'events' | 'project-management' | 'scheduler' | 'time-allocation
 
 // 所有菜单项配置（包含路由路径）
 const allMenuItems: (SidebarNavItem & { path: string })[] = [
-  { id: 'events', label: '事件管理', icon: Calendar, path: '/' },
   { id: 'project-management', label: '项目管理', icon: FolderKanban, path: '/project-management' },
+  { id: 'events', label: '事件管理', icon: Calendar, path: '/' },
   { id: 'time-allocation', label: '时间分配', icon: BarChart3, path: '/time-allocation' },
   { id: 'scheduler', label: '定时任务', icon: Clock, path: '/scheduler' },
   { id: 'cost-tracking', label: '费用统计', icon: DollarSign, path: '/cost-tracking' },
@@ -37,6 +37,7 @@ function AppLayoutInner({ children }: AppLayoutInnerProps) {
   const [activeMenu, setActiveMenu] = useState<MenuType>('events');
   const [showScheduler, setShowScheduler] = useState(false);
   const [showCostTracking, setShowCostTracking] = useState(false);
+  const [showProjectManagement, setShowProjectManagement] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -68,10 +69,13 @@ function AppLayoutInner({ children }: AppLayoutInnerProps) {
     if (item.id === 'cost-tracking') {
       return showCostTracking;
     }
+    if (item.id === 'project-management') {
+      return showProjectManagement;
+    }
     return true;
   });
 
-  // 从 localStorage 读取定时任务和费用统计显示设置
+  // 从 localStorage 读取定时任务、费用统计和项目管理显示设置
   useEffect(() => {
     const savedScheduler = localStorage.getItem('showScheduler');
     if (savedScheduler !== null) {
@@ -81,6 +85,11 @@ function AppLayoutInner({ children }: AppLayoutInnerProps) {
     const savedCostTracking = localStorage.getItem('showCostTracking');
     if (savedCostTracking !== null) {
       setShowCostTracking(savedCostTracking === 'true');
+    }
+
+    const savedProjectManagement = localStorage.getItem('showProjectManagement');
+    if (savedProjectManagement !== null) {
+      setShowProjectManagement(savedProjectManagement === 'true');
     }
 
     // 监听定时任务设置变化
@@ -105,11 +114,24 @@ function AppLayoutInner({ children }: AppLayoutInnerProps) {
       }
     };
 
+    // 监听项目管理设置变化
+    const handleProjectManagementVisibilityChange = (event: CustomEvent) => {
+      const { visible, currentPath } = event.detail;
+      setShowProjectManagement(visible);
+
+      // 如果关闭了项目管理开关，且当前在项目管理页面，则跳转到事件管理页面
+      if (!visible && currentPath?.startsWith('/project-management')) {
+        router.push('/');
+      }
+    };
+
     window.addEventListener('schedulerVisibilityChange', handleSchedulerVisibilityChange as EventListener);
     window.addEventListener('costTrackingVisibilityChange', handleCostTrackingVisibilityChange as EventListener);
+    window.addEventListener('projectManagementVisibilityChange', handleProjectManagementVisibilityChange as EventListener);
     return () => {
       window.removeEventListener('schedulerVisibilityChange', handleSchedulerVisibilityChange as EventListener);
       window.removeEventListener('costTrackingVisibilityChange', handleCostTrackingVisibilityChange as EventListener);
+      window.removeEventListener('projectManagementVisibilityChange', handleProjectManagementVisibilityChange as EventListener);
     };
   }, [router]);
 

@@ -1,6 +1,5 @@
 """搜索相关路由"""
 
-import logging
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
@@ -10,6 +9,10 @@ from lifetrace.routers import dependencies as deps
 from lifetrace.schemas.event import EventResponse
 from lifetrace.schemas.screenshot import ScreenshotResponse
 from lifetrace.schemas.search import SearchRequest
+from lifetrace.storage import event_mgr, screenshot_mgr
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 router = APIRouter(prefix="/api", tags=["search"])
 
@@ -24,7 +27,7 @@ async def search_screenshots(search_request: SearchRequest, request: Request):
         user_agent = request.headers.get("user-agent", "")
         client_ip = request.client.host if request.client else "unknown"
 
-        results = deps.db_manager.search_screenshots(
+        results = screenshot_mgr.search_screenshots(
             query=search_request.query,
             start_date=search_request.start_date,
             end_date=search_request.end_date,
@@ -54,7 +57,7 @@ async def search_screenshots(search_request: SearchRequest, request: Request):
         return [ScreenshotResponse(**result) for result in results]
 
     except Exception as e:
-        logging.error(f"搜索截图失败: {e}")
+        logger.error(f"搜索截图失败: {e}")
 
         # 记录失败的用户行为（如果behavior_tracker可用）
         response_time = (datetime.now() - start_time).total_seconds() * 1000
@@ -79,7 +82,7 @@ async def search_screenshots(search_request: SearchRequest, request: Request):
 async def search_events(search_request: SearchRequest):
     """事件级简单文本搜索：按OCR分组后返回事件摘要"""
     try:
-        results = deps.db_manager.search_events_simple(
+        results = event_mgr.search_events_simple(
             query=search_request.query,
             start_date=search_request.start_date,
             end_date=search_request.end_date,
@@ -88,5 +91,5 @@ async def search_events(search_request: SearchRequest):
         )
         return [EventResponse(**r) for r in results]
     except Exception as e:
-        logging.error(f"搜索事件失败: {e}")
+        logger.error(f"搜索事件失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

@@ -1,13 +1,16 @@
 """事件相关路由"""
 
-import logging
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
 
-from lifetrace.routers import dependencies as deps
+from lifetrace.llm.event_summary_service import event_summary_service
 from lifetrace.schemas.event import EventDetailResponse, EventListResponse, EventResponse
 from lifetrace.schemas.screenshot import ScreenshotResponse
+from lifetrace.storage import event_mgr, ocr_mgr
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 router = APIRouter(prefix="/api/events", tags=["event"])
 
@@ -25,25 +28,25 @@ async def list_events(
         start_dt = datetime.fromisoformat(start_date) if start_date else None
         end_dt = datetime.fromisoformat(end_date) if end_date else None
 
-        logging.info(
+        logger.info(
             f"获取事件列表 - 参数: limit={limit}, offset={offset}, start_date={start_dt}, end_date={end_dt}, app_name={app_name}"
         )
 
         # 并行获取事件列表和总数
-        events = deps.db_manager.list_events(
+        events = event_mgr.list_events(
             limit=limit,
             offset=offset,
             start_date=start_dt,
             end_date=end_dt,
             app_name=app_name,
         )
-        total_count = deps.db_manager.count_events(
+        total_count = event_mgr.count_events(
             start_date=start_dt,
             end_date=end_dt,
             app_name=app_name,
         )
 
-        logging.info(f"获取事件列表 - 结果: events_count={len(events)}, total_count={total_count}")
+        logger.info(f"获取事件列表 - 结果: events_count={len(events)}, total_count={total_count}")
 
         event_responses = [EventResponse(**e) for e in events]
         result = EventListResponse(
@@ -51,11 +54,11 @@ async def list_events(
             total_count=total_count,
         )
 
-        logging.info(f"返回数据: events数量={len(result.events)}, total_count={result.total_count}")
+        logger.info(f"返回数据: events数量={len(result.events)}, total_count={result.total_count}")
 
         return result
     except Exception as e:
-        logging.error(f"获取事件列表失败: {e}")
+        logger.error(f"获取事件列表失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -69,14 +72,14 @@ async def count_events(
     try:
         start_dt = datetime.fromisoformat(start_date) if start_date else None
         end_dt = datetime.fromisoformat(end_date) if end_date else None
-        count = deps.db_manager.count_events(
+        count = event_mgr.count_events(
             start_date=start_dt,
             end_date=end_dt,
             app_name=app_name,
         )
         return {"count": count}
     except Exception as e:
-        logging.error(f"获取事件总数失败: {e}")
+        logger.error(f"获取事件总数失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -85,12 +88,12 @@ async def get_event_detail(event_id: int):
     """获取事件详情（包含该事件下的截图列表）"""
     try:
         # 读取事件摘要
-        event_summary = deps.db_manager.get_event_summary(event_id)
+        event_summary = event_mgr.get_event_summary(event_id)
         if not event_summary:
             raise HTTPException(status_code=404, detail="事件不存在")
 
         # 读取截图
-        screenshots = deps.db_manager.get_event_screenshots(event_id)
+        screenshots = event_mgr.get_event_screenshots(event_id)
         screenshots_resp = [
             ScreenshotResponse(
                 id=s["id"],
@@ -118,7 +121,7 @@ async def get_event_detail(event_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        logging.error(f"获取事件详情失败: {e}")
+        logger.error(f"获取事件详情失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -127,17 +130,17 @@ async def get_event_context(event_id: int):
     """获取事件的OCR文本上下文"""
     try:
         # 获取事件信息
-        event_summary = deps.db_manager.get_event_summary(event_id)
+        event_summary = event_mgr.get_event_summary(event_id)
         if not event_summary:
             raise HTTPException(status_code=404, detail="事件不存在")
 
         # 获取事件下所有截图
-        screenshots = deps.db_manager.get_event_screenshots(event_id)
+        screenshots = event_mgr.get_event_screenshots(event_id)
 
         # 聚合OCR文本
         ocr_texts = []
         for screenshot in screenshots:
-            ocr_results = deps.db_manager.get_ocr_results_by_screenshot(screenshot["id"])
+            ocr_results = ocr_mgr.get_ocr_results_by_screenshot(screenshot["id"])
             if ocr_results:
                 # 取第一个OCR结果的文本内容（通常一个截图只有一个OCR结果）
                 for ocr in ocr_results:
@@ -157,7 +160,7 @@ async def get_event_context(event_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        logging.error(f"获取事件上下文失败: {e}")
+        logger.error(f"获取事件上下文失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -165,10 +168,8 @@ async def get_event_context(event_id: int):
 async def generate_event_summary(event_id: int):
     """手动触发单个事件的摘要生成"""
     try:
-        from lifetrace.llm.event_summary_service import event_summary_service
-
         # 检查事件是否存在
-        event_info = deps.db_manager.get_event_summary(event_id)
+        event_info = event_mgr.get_event_summary(event_id)
         if not event_info:
             raise HTTPException(status_code=404, detail="事件不存在")
 
@@ -177,7 +178,7 @@ async def generate_event_summary(event_id: int):
 
         if success:
             # 获取更新后的事件信息
-            updated_event = deps.db_manager.get_event_summary(event_id)
+            updated_event = event_mgr.get_event_summary(event_id)
             return {
                 "success": True,
                 "event_id": event_id,
@@ -190,5 +191,5 @@ async def generate_event_summary(event_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        logging.error(f"生成事件摘要失败: {e}")
+        logger.error(f"生成事件摘要失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

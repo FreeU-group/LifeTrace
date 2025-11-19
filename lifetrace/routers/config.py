@@ -3,10 +3,15 @@
 import os
 from typing import Any
 
+import yaml
 from fastapi import APIRouter, HTTPException
+from openai import OpenAI
 
 from lifetrace.routers import dependencies as deps
 from lifetrace.schemas.config import ConfigResponse
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 router = APIRouter(prefix="/api", tags=["config"])
 
@@ -41,8 +46,6 @@ async def get_config():
 async def test_llm_config(config_data: dict[str, str]):
     """测试LLM配置是否可用（仅验证认证）"""
     try:
-        from openai import OpenAI
-
         llm_key = config_data.get("llmKey", "")
         base_url = config_data.get("baseUrl", "")
         model = config_data.get("model", "qwen3-max")
@@ -63,7 +66,7 @@ async def test_llm_config(config_data: dict[str, str]):
                     "error": f"阿里云 API Key 长度异常（当前: {len(llm_key)} 字符），请检查是否完整",
                 }
 
-        deps.logger.info(f"开始测试 LLM 配置 - 模型: {model}, Key前缀: {llm_key[:10]}...")
+        logger.info(f"开始测试 LLM 配置 - 模型: {model}, Key前缀: {llm_key[:10]}...")
 
         # 创建临时客户端进行测试
         client = OpenAI(api_key=llm_key, base_url=base_url)
@@ -73,12 +76,12 @@ async def test_llm_config(config_data: dict[str, str]):
             model=model, messages=[{"role": "user", "content": "test"}], max_tokens=5
         )
 
-        deps.logger.info(f"LLM配置测试成功 - 模型: {model}")
+        logger.info(f"LLM配置测试成功 - 模型: {model}")
         return {"success": True, "message": "配置验证成功"}
 
     except Exception as e:
         error_msg = str(e)
-        deps.logger.error(f"LLM配置测试失败: {error_msg}")
+        logger.error(f"LLM配置测试失败: {error_msg}")
 
         # 提供更友好的错误提示
         if "401" in error_msg or "invalid_api_key" in error_msg:
@@ -113,6 +116,7 @@ async def get_config_detailed():
                 "blacklistEnabled": deps.config.get("jobs.recorder.blacklist.enabled", False),
                 "blacklistApps": deps.config.get("jobs.recorder.blacklist.apps", []),
                 "recordingEnabled": deps.config.get("jobs.recorder.enabled", True),
+                "recordEnabled": deps.config.get("jobs.recorder.enabled", True),  # 别名，保持兼容性
                 "recordInterval": deps.config.get("jobs.recorder.interval", 1),
                 "screenSelection": deps.config.get("jobs.recorder.screens", "all"),
                 # 存储配置
@@ -131,10 +135,13 @@ async def get_config_detailed():
                 # Clean data 配置
                 "maxDays": deps.config.get("jobs.clean_data.max_days", 30),
                 "maxScreenshots": deps.config.get("jobs.clean_data.max_screenshots", 10000),
+                # 聊天配置
+                "chatContextEnabled": deps.config.get("chat.enable_history", True),
+                "chatContextRounds": deps.config.get("chat.history_limit", 10),
             },
         }
     except Exception as e:
-        deps.logger.error(f"获取配置失败: {e}")
+        logger.error(f"获取配置失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取配置失败: {str(e)}") from e
 
 
@@ -185,23 +192,23 @@ async def save_and_init_llm(config_data: dict[str, str]):
         # LLM配置处理器会自动检测变化并重新初始化LLM客户端
         reload_success = deps.config.reload()
         if not reload_success:
-            deps.logger.error("配置重新加载失败")
+            logger.error("配置重新加载失败")
             return {"success": False, "error": "配置重新加载失败"}
 
-        deps.logger.info(f"配置已重新加载 - LLM Key: {deps.config.llm_api_key[:10]}...")
-        deps.logger.info(f"配置已重新加载 - Base URL: {deps.config.llm_base_url}")
-        deps.logger.info(f"配置已重新加载 - Model: {deps.config.llm_model}")
-        deps.logger.info("LLM配置处理器将自动检测变化并重新初始化客户端")
+        logger.info(f"配置已重新加载 - LLM Key: {deps.config.llm_api_key[:10]}...")
+        logger.info(f"配置已重新加载 - Base URL: {deps.config.llm_base_url}")
+        logger.info(f"配置已重新加载 - Model: {deps.config.llm_model}")
+        logger.info("LLM配置处理器将自动检测变化并重新初始化客户端")
 
         # 4. 更新配置状态
         deps.is_llm_configured = True
-        deps.logger.info("LLM配置状态已更新为：已配置")
+        logger.info("LLM配置状态已更新为：已配置")
 
         return {"success": True, "message": "配置保存成功，正在跳转..."}
 
     except Exception as e:
         error_msg = str(e)
-        deps.logger.error(f"保存并初始化LLM失败: {error_msg}")
+        logger.error(f"保存并初始化LLM失败: {error_msg}")
         return {"success": False, "error": error_msg}
 
 
@@ -209,8 +216,6 @@ async def save_and_init_llm(config_data: dict[str, str]):
 async def save_config(settings: dict[str, Any]):
     """保存配置到config.yaml文件"""
     try:
-        import yaml
-
         # 读取当前配置文件
         config_path = deps.config.config_path
 
@@ -231,6 +236,7 @@ async def save_config(settings: dict[str, Any]):
             "blacklistEnabled": "jobs.recorder.blacklist.enabled",
             "blacklistApps": "jobs.recorder.blacklist.apps",
             "recordingEnabled": "jobs.recorder.enabled",
+            "recordEnabled": "jobs.recorder.enabled",  # 别名，与 recordingEnabled 相同
             "recordInterval": "jobs.recorder.interval",
             "screenSelection": "jobs.recorder.screens",
             "deduplicate": "jobs.recorder.deduplicate",
@@ -250,6 +256,9 @@ async def save_config(settings: dict[str, Any]):
             "serverHost": "server.host",
             "serverPort": "server.port",
             "autoExcludeSelf": "jobs.recorder.auto_exclude_self",
+            # 聊天配置
+            "chatContextEnabled": "chat.enable_history",
+            "chatContextRounds": "chat.history_limit",
         }
 
         # 更新配置
@@ -266,32 +275,32 @@ async def save_config(settings: dict[str, Any]):
 
                 # 记录敏感配置的保存（仅显示前几位）
                 if frontend_key == "llmKey":
-                    deps.logger.info(f"保存 LLM Key: {settings[frontend_key][:10]}...")
+                    logger.info(f"保存 LLM Key: {settings[frontend_key][:10]}...")
                 elif frontend_key in ["baseUrl", "llmModel"]:
-                    deps.logger.info(f"保存 {frontend_key}: {settings[frontend_key]}")
+                    logger.info(f"保存 {frontend_key}: {settings[frontend_key]}")
 
         # 保存配置文件
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(current_config, f, allow_unicode=True, sort_keys=False)
 
-        deps.logger.info(f"配置已保存到: {config_path}")
+        logger.info(f"配置已保存到: {config_path}")
 
         # 验证保存后的配置
         with open(config_path, encoding="utf-8") as f:
             saved_config = yaml.safe_load(f)
             if "llm" in saved_config and "api_key" in saved_config["llm"]:
-                deps.logger.info(f"验证保存: LLM Key = {saved_config['llm']['api_key'][:10]}...")
+                logger.info(f"验证保存: LLM Key = {saved_config['llm']['api_key'][:10]}...")
 
         # 重新加载配置
         # 配置重新加载后，LLM配置处理器会自动检测变化并重新初始化LLM客户端
         reload_success = deps.config.reload()
         if reload_success:
-            deps.logger.info("配置已重新加载到内存（LLM配置变化将自动触发重新初始化）")
+            logger.info("配置已重新加载到内存（LLM配置变化将自动触发重新初始化）")
         else:
-            deps.logger.warning("配置重新加载失败，但文件已保存")
+            logger.warning("配置重新加载失败，但文件已保存")
 
         return {"success": True, "message": "配置保存成功"}
 
     except Exception as e:
-        deps.logger.error(f"保存配置失败: {e}")
+        logger.error(f"保存配置失败: {e}")
         raise HTTPException(status_code=500, detail=f"保存配置失败: {str(e)}") from e

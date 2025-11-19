@@ -21,8 +21,10 @@ interface ConfigSettings {
   maxTokens: number;
   recordEnabled: boolean;
   recordInterval: number;
-  maxDays: number;
+  blacklistEnabled: boolean;
   blacklistApps: string[];
+  chatContextEnabled: boolean;
+  chatContextRounds: number;
 }
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
@@ -34,8 +36,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     maxTokens: 2048,
     recordEnabled: true,
     recordInterval: 5,
-    maxDays: 30,
+    blacklistEnabled: false,
     blacklistApps: [],
+    chatContextEnabled: true,
+    chatContextRounds: 3,
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -45,6 +49,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [initialShowScheduler, setInitialShowScheduler] = useState(false); // 记录初始值
   const [showCostTracking, setShowCostTracking] = useState(false);
   const [initialShowCostTracking, setInitialShowCostTracking] = useState(false); // 记录初始值
+  const [showProjectManagement, setShowProjectManagement] = useState(false);
+  const [initialShowProjectManagement, setInitialShowProjectManagement] = useState(false); // 记录初始值
   const [blacklistInput, setBlacklistInput] = useState(''); // 黑名单输入框的值
   const [initialLlmConfig, setInitialLlmConfig] = useState<{ llmKey: string; baseUrl: string; model: string }>({
     llmKey: '',
@@ -67,6 +73,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       const savedCostTrackingValue = savedCostTracking === 'true';
       setShowCostTracking(savedCostTrackingValue);
       setInitialShowCostTracking(savedCostTrackingValue); // 记录初始值
+
+      // 从 localStorage 读取项目管理显示设置
+      const savedProjectManagement = localStorage.getItem('showProjectManagement');
+      const savedProjectManagementValue = savedProjectManagement === 'true';
+      setShowProjectManagement(savedProjectManagementValue);
+      setInitialShowProjectManagement(savedProjectManagementValue); // 记录初始值
     }
   }, [isOpen]);
 
@@ -86,10 +98,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           model: config.model || 'qwen3-max',
           temperature: config.temperature || 0.7,
           maxTokens: config.maxTokens || 2048,
-          recordEnabled: config.recordEnabled ?? config.record?.enabled ?? true,
+          recordEnabled: config.recordingEnabled ?? config.recordEnabled ?? config.record?.enabled ?? true,
           recordInterval: config.recordInterval || 5,
-          maxDays: config.maxDays || 30,
+          blacklistEnabled: config.blacklistEnabled ?? false,
           blacklistApps: blacklistAppsArray,
+          chatContextEnabled: config.chatContextEnabled ?? true,
+          chatContextRounds: config.chatContextRounds || 3,
         };
 
         setSettings(newSettings);
@@ -172,8 +186,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           maxTokens: settings.maxTokens,
           recordEnabled: settings.recordEnabled,
           recordInterval: settings.recordInterval,
-          maxDays: settings.maxDays,
+          blacklistEnabled: settings.blacklistEnabled,
           blacklistApps: settings.blacklistApps,
+          chatContextEnabled: settings.chatContextEnabled,
+          chatContextRounds: settings.chatContextRounds,
         });
       } else {
         // 如果没有 LLM 配置，使用普通的保存接口
@@ -208,6 +224,22 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           window.dispatchEvent(new CustomEvent('costTrackingVisibilityChange', {
             detail: {
               visible: showCostTracking,
+              currentPath: currentPath
+            }
+          }));
+        }
+
+        // 保存项目管理显示设置
+        const projectManagementChanged = showProjectManagement !== initialShowProjectManagement;
+        if (projectManagementChanged) {
+          localStorage.setItem('showProjectManagement', String(showProjectManagement));
+          setInitialShowProjectManagement(showProjectManagement); // 更新初始值
+
+          // 触发自定义事件通知其他组件
+          const currentPath = window.location.pathname;
+          window.dispatchEvent(new CustomEvent('projectManagementVisibilityChange', {
+            detail: {
+              visible: showProjectManagement,
               currentPath: currentPath
             }
           }));
@@ -284,12 +316,19 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setShowCostTracking(checked);
   };
 
+  // 处理项目管理显示开关（仅更新状态，不立即保存）
+  const handleProjectManagementToggle = (checked: boolean) => {
+    setShowProjectManagement(checked);
+  };
+
   // 处理取消操作
   const handleCancel = () => {
     // 恢复定时任务开关到初始状态
     setShowScheduler(initialShowScheduler);
     // 恢复费用统计开关到初始状态
     setShowCostTracking(initialShowCostTracking);
+    // 恢复项目管理开关到初始状态
+    setShowProjectManagement(initialShowProjectManagement);
     onClose();
   };
 
@@ -355,6 +394,17 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         value={settings.llmKey}
                         onChange={(e) => handleChange('llmKey', e.target.value)}
                       />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        如何获取 API Key？请访问{' '}
+                        <a
+                          href="https://bailian.console.aliyun.com/?tab=api#/api"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          阿里云百炼控制台
+                        </a>
+                      </p>
                     </div>
                     <div>
                       <label className="mb-1 block text-sm font-medium text-foreground">
@@ -452,64 +502,126 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
                     {settings.recordEnabled && (
                       <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="mb-1 block text-sm font-medium text-foreground">
-                              截图间隔（秒）
-                            </label>
-                            <Input
-                              type="number"
-                              className="px-3 py-2 h-9"
-                              value={settings.recordInterval}
-                              onChange={(e) => handleChange('recordInterval', parseInt(e.target.value))}
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1 block text-sm font-medium text-foreground">
-                              自动清理（天）
-                            </label>
-                            <Input
-                              type="number"
-                              className="px-3 py-2 h-9"
-                              value={settings.maxDays}
-                              onChange={(e) => handleChange('maxDays', parseInt(e.target.value))}
-                            />
-                          </div>
-                        </div>
                         <div>
                           <label className="mb-1 block text-sm font-medium text-foreground">
-                            应用黑名单
+                            截图间隔（秒）
                           </label>
-                          <div className="border border-input rounded-md px-2 py-1.5 min-h-[38px] flex flex-wrap gap-1.5 items-center bg-background focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
-                            {settings.blacklistApps.map((app) => (
-                              <span
-                                key={app}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 text-sm bg-primary/10 text-primary rounded-md border border-primary/20"
-                              >
-                                {app}
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveBlacklistApp(app)}
-                                  className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
-                                  aria-label={`删除 ${app}`}
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </span>
-                            ))}
-                            <input
-                              type="text"
-                              className="flex-1 min-w-[120px] outline-none bg-transparent text-sm placeholder:text-muted-foreground px-1"
-                              placeholder={settings.blacklistApps.length === 0 ? "输入应用名称后按回车添加" : "继续添加..."}
-                              value={blacklistInput}
-                              onChange={(e) => setBlacklistInput(e.target.value)}
-                              onKeyDown={handleBlacklistKeyDown}
-                            />
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            这些应用的窗口将不会被截图记录，输入应用名称后按回车添加（例如：微信、QQ、钉钉）
-                          </p>
+                          <Input
+                            type="number"
+                            className="px-3 py-2 h-9"
+                            value={settings.recordInterval}
+                            onChange={(e) => handleChange('recordInterval', parseInt(e.target.value))}
+                          />
                         </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">
+                              启用黑名单
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              开启后可以设置不需要截图的应用
+                            </p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="sr-only peer"
+                              checked={settings.blacklistEnabled}
+                              onChange={(e) => handleChange('blacklistEnabled', e.target.checked)}
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                          </label>
+                        </div>
+                        {settings.blacklistEnabled && (
+                          <div>
+                            <label className="mb-1 block text-sm font-medium text-foreground">
+                              应用黑名单
+                            </label>
+                            <div className="border border-input rounded-md px-2 py-1.5 min-h-[38px] flex flex-wrap gap-1.5 items-center bg-background focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
+                              {settings.blacklistApps.map((app) => (
+                                <span
+                                  key={app}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 text-sm bg-primary/10 text-primary rounded-md border border-primary/20"
+                                >
+                                  {app}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveBlacklistApp(app)}
+                                    className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                                    aria-label={`删除 ${app}`}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              ))}
+                              <input
+                                type="text"
+                                className="flex-1 min-w-[120px] outline-none bg-transparent text-sm placeholder:text-muted-foreground px-1"
+                                placeholder={settings.blacklistApps.length === 0 ? "输入应用名称后按回车添加" : "继续添加..."}
+                                value={blacklistInput}
+                                onChange={(e) => setBlacklistInput(e.target.value)}
+                                onKeyDown={handleBlacklistKeyDown}
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              这些应用的窗口将不会被截图记录，输入应用名称后按回车添加（例如：微信、QQ、钉钉）
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 对话设置 */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">对话设置</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          启用上下文
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          开启后发送消息时附带历史上下文
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={settings.chatContextEnabled}
+                          onChange={(e) => handleChange('chatContextEnabled', e.target.checked)}
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                      </label>
+                    </div>
+
+                    {settings.chatContextEnabled && (
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-foreground">
+                          上下文轮次
+                        </label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="20"
+                          className="px-3 py-2 h-9"
+                          value={settings.chatContextRounds}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value);
+                            if (value >= 1 && value <= 20) {
+                              handleChange('chatContextRounds', value);
+                            }
+                          }}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          附带最近 {settings.chatContextRounds} 轮历史对话作为上下文（最多 20 轮）
+                        </p>
                       </div>
                     )}
                   </div>
@@ -557,6 +669,26 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         className="sr-only peer"
                         checked={showCostTracking}
                         onChange={(e) => handleCostTrackingToggle(e.target.checked)}
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground">
+                        显示项目管理
+                      </label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        开启后在侧边栏显示项目管理菜单
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={showProjectManagement}
+                        onChange={(e) => handleProjectManagementToggle(e.target.checked)}
                       />
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                     </label>

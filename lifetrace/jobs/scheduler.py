@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 APScheduler 调度器管理模块
 用于管理 LifeTrace 的定时任务，包括 recorder 和 ocr

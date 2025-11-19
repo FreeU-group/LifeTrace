@@ -1,6 +1,5 @@
 """系统资源相关路由"""
 
-import logging
 from datetime import datetime
 from pathlib import Path
 
@@ -10,6 +9,10 @@ from fastapi import APIRouter, HTTPException, Query
 from lifetrace.routers import dependencies as deps
 from lifetrace.schemas.stats import StatisticsResponse
 from lifetrace.schemas.system import ProcessInfo, SystemResourcesResponse
+from lifetrace.storage import stats_mgr
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 router = APIRouter(prefix="/api", tags=["system"])
 
@@ -17,7 +20,7 @@ router = APIRouter(prefix="/api", tags=["system"])
 @router.get("/statistics", response_model=StatisticsResponse)
 async def get_statistics():
     """获取系统统计信息"""
-    stats = deps.db_manager.get_statistics()
+    stats = stats_mgr.get_statistics()
     return StatisticsResponse(**stats)
 
 
@@ -25,35 +28,10 @@ async def get_statistics():
 async def cleanup_old_data(days: int = Query(30, ge=1)):
     """清理旧数据"""
     try:
-        deps.db_manager.cleanup_old_data(days)
+        stats_mgr.cleanup_old_data(days)
         return {"success": True, "message": f"清理了 {days} 天前的数据"}
     except Exception as e:
-        logging.error(f"清理数据失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-@router.get("/queue/status")
-async def get_queue_status():
-    """获取处理队列状态"""
-    try:
-        with deps.db_manager.get_session() as session:
-            from lifetrace.storage.models import ProcessingQueue
-
-            pending_count = session.query(ProcessingQueue).filter_by(status="pending").count()
-            processing_count = session.query(ProcessingQueue).filter_by(status="processing").count()
-            completed_count = session.query(ProcessingQueue).filter_by(status="completed").count()
-            failed_count = session.query(ProcessingQueue).filter_by(status="failed").count()
-
-            return {
-                "pending": pending_count,
-                "processing": processing_count,
-                "completed": completed_count,
-                "failed": failed_count,
-                "total": pending_count + processing_count + completed_count + failed_count,
-            }
-
-    except Exception as e:
-        logging.error(f"获取队列状态失败: {e}")
+        logger.error(f"清理数据失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -171,5 +149,5 @@ async def get_system_resources():
         )
 
     except Exception as e:
-        logging.error(f"获取系统资源信息失败: {e}")
+        logger.error(f"获取系统资源信息失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

@@ -1,7 +1,5 @@
 """向量数据库相关路由"""
 
-import logging
-
 from fastapi import APIRouter, HTTPException, Query
 
 from lifetrace.routers import dependencies as deps
@@ -11,6 +9,10 @@ from lifetrace.schemas.vector import (
     SemanticSearchResult,
     VectorStatsResponse,
 )
+from lifetrace.storage import event_mgr
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 router = APIRouter(prefix="/api", tags=["vector"])
 
@@ -45,7 +47,7 @@ async def semantic_search(request: SemanticSearchRequest):
         return search_results
 
     except Exception as e:
-        logging.error(f"语义搜索失败: {e}")
+        logger.error(f"语义搜索失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -72,7 +74,7 @@ async def event_semantic_search(request: SemanticSearchRequest):
                 event_id = metadata.get("event_id")
                 if not event_id:
                     continue
-                matched = deps.db_manager.get_event_summary(int(event_id))
+                matched = event_mgr.get_event_summary(int(event_id))
                 if matched:
                     events_resp.append(EventResponse(**matched))
 
@@ -80,7 +82,7 @@ async def event_semantic_search(request: SemanticSearchRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logging.error(f"事件语义搜索失败: {e}")
+        logger.error(f"事件语义搜索失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -92,7 +94,7 @@ async def get_vector_stats():
         return VectorStatsResponse(**stats)
 
     except Exception as e:
-        logging.error(f"获取向量数据库统计信息失败: {e}")
+        logger.error(f"获取向量数据库统计信息失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -111,7 +113,7 @@ async def sync_vector_database(
         return {"message": "同步完成", "synced_count": synced_count}
 
     except Exception as e:
-        logging.error(f"向量数据库同步失败: {e}")
+        logger.error(f"向量数据库同步失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -130,5 +132,5 @@ async def reset_vector_database():
             raise HTTPException(status_code=500, detail="向量数据库重置失败")
 
     except Exception as e:
-        logging.error(f"向量数据库重置失败: {e}")
+        logger.error(f"向量数据库重置失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

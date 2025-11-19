@@ -8,6 +8,9 @@ from fastapi.responses import FileResponse
 
 from lifetrace.routers import dependencies as deps
 from lifetrace.util.app_utils import get_icon_filename
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 router = APIRouter(prefix="/api", tags=["rag"])
 
@@ -18,7 +21,7 @@ async def rag_health_check():
     try:
         return deps.rag_service.health_check()
     except Exception as e:
-        deps.logger.error(f"RAG健康检查失败: {e}")
+        logger.error(f"RAG健康检查失败: {e}")
         return {
             "rag_service": "error",
             "error": str(e),
@@ -52,7 +55,7 @@ async def get_app_icon(app_name: str):
         icon_path = project_root / ".github" / "assets" / "icons" / "apps" / icon_filename
 
         if not icon_path.exists():
-            deps.logger.warning(f"图标文件不存在: {icon_path}")
+            logger.warning(f"图标文件不存在: {icon_path}")
             raise HTTPException(status_code=404, detail="图标文件不存在")
 
         # 返回图标文件
@@ -65,5 +68,5 @@ async def get_app_icon(app_name: str):
     except HTTPException:
         raise
     except Exception as e:
-        deps.logger.error(f"获取应用图标失败 {app_name}: {e}")
+        logger.error(f"获取应用图标失败 {app_name}: {e}")
         raise HTTPException(status_code=500, detail=f"获取图标失败: {str(e)}") from e

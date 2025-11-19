@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, Path, Query
 
-from lifetrace.routers import dependencies as deps
+from lifetrace.llm.llm_client import LLMClient
 from lifetrace.schemas.task import (
     TaskCreate,
     TaskListResponse,
@@ -11,6 +11,10 @@ from lifetrace.schemas.task import (
     TaskResponse,
     TaskUpdate,
 )
+from lifetrace.storage import context_mgr, project_mgr, task_mgr
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 router = APIRouter(tags=["tasks"])
 
@@ -36,34 +40,33 @@ async def create_task(
     """
     try:
         # 验证项目是否存在
-        project = deps.db_manager.get_project(project_id)
+        project = project_mgr.get_project(project_id)
         if not project:
             raise HTTPException(status_code=404, detail="项目不存在")
 
         # 创建任务
-        task_id = deps.db_manager.create_task(
+        task_id = task_mgr.create_task(
             project_id=project_id,
             name=task.name,
             description=task.description,
             status=task.status.value if task.status else "pending",
-            parent_task_id=task.parent_task_id,
         )
 
         if not task_id:
             raise HTTPException(status_code=500, detail="创建任务失败")
 
         # 获取创建的任务信息
-        task_data = deps.db_manager.get_task(task_id)
+        task_data = task_mgr.get_task(task_id)
         if not task_data:
             raise HTTPException(status_code=500, detail="获取创建的任务信息失败")
 
-        deps.logger.info(f"成功创建任务: {task_id} - {task.name} (项目: {project_id})")
+        logger.info(f"成功创建任务: {task_id} - {task.name} (项目: {project_id})")
         return TaskResponse(**task_data)
 
     except HTTPException:
         raise
     except Exception as e:
-        deps.logger.error(f"创建任务失败: {e}", exc_info=True)
+        logger.error(f"创建任务失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"创建任务失败: {str(e)}") from e
 
 
@@ -72,8 +75,6 @@ async def get_project_tasks(
     project_id: int = Path(..., description="项目ID"),
     limit: int = Query(100, ge=1, le=1000, description="返回数量限制"),
     offset: int = Query(0, ge=0, description="偏移量"),
-    parent_task_id: int | None = Query(None, description="父任务ID（获取子任务）"),
-    include_subtasks: bool = Query(True, description="是否包含所有子任务"),
 ):
     """
     获取项目的任务列表
@@ -82,31 +83,27 @@ async def get_project_tasks(
         project_id: 项目ID
         limit: 返回数量限制
         offset: 偏移量
-        parent_task_id: 父任务ID，用于获取特定任务的子任务
-        include_subtasks: 是否包含所有子任务（如果parent_task_id为None）
 
     Returns:
         任务列表
     """
     try:
         # 验证项目是否存在
-        project = deps.db_manager.get_project(project_id)
+        project = project_mgr.get_project(project_id)
         if not project:
             raise HTTPException(status_code=404, detail="项目不存在")
 
         # 获取任务列表
-        tasks = deps.db_manager.list_tasks(
+        tasks = task_mgr.list_tasks(
             project_id=project_id,
             limit=limit,
             offset=offset,
-            parent_task_id=parent_task_id,
-            include_subtasks=include_subtasks,
         )
 
         # 统计总数
-        total = deps.db_manager.count_tasks(project_id=project_id, parent_task_id=parent_task_id)
+        total = task_mgr.count_tasks(project_id=project_id)
 
-        deps.logger.info(f"获取项目 {project_id} 的任务列表，返回 {len(tasks)} 个任务")
+        logger.info(f"获取项目 {project_id} 的任务列表，返回 {len(tasks)} 个任务")
 
         return TaskListResponse(
             total=total,
@@ -116,7 +113,7 @@ async def get_project_tasks(
     except HTTPException:
         raise
     except Exception as e:
-        deps.logger.error(f"获取任务列表失败: {e}", exc_info=True)
+        logger.error(f"获取任务列表失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取任务列表失败: {str(e)}") from e
 
 
@@ -139,7 +136,7 @@ async def get_task(
         任务详情
     """
     try:
-        task = deps.db_manager.get_task(task_id)
+        task = task_mgr.get_task(task_id)
 
         if not task:
             raise HTTPException(status_code=404, detail="任务不存在")
@@ -153,7 +150,7 @@ async def get_task(
     except HTTPException:
         raise
     except Exception as e:
-        deps.logger.error(f"获取任务详情失败: {e}", exc_info=True)
+        logger.error(f"获取任务详情失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取任务详情失败: {str(e)}") from e
 
 
@@ -179,7 +176,7 @@ async def update_task(
     """
     try:
         # 检查任务是否存在
-        existing = deps.db_manager.get_task(task_id)
+        existing = task_mgr.get_task(task_id)
         if not existing:
             raise HTTPException(status_code=404, detail="任务不存在")
 
@@ -188,29 +185,28 @@ async def update_task(
             raise HTTPException(status_code=404, detail="任务不属于该项目")
 
         # 更新任务
-        success = deps.db_manager.update_task(
+        success = task_mgr.update_task(
             task_id=task_id,
             name=task.name,
             description=task.description,
             status=task.status.value if task.status else None,
-            parent_task_id=task.parent_task_id,
         )
 
         if not success:
             raise HTTPException(status_code=500, detail="更新任务失败")
 
         # 获取更新后的任务信息
-        updated_task = deps.db_manager.get_task(task_id)
+        updated_task = task_mgr.get_task(task_id)
         if not updated_task:
             raise HTTPException(status_code=500, detail="获取更新后的任务信息失败")
 
-        deps.logger.info(f"成功更新任务: {task_id}")
+        logger.info(f"成功更新任务: {task_id}")
         return TaskResponse(**updated_task)
 
     except HTTPException:
         raise
     except Exception as e:
-        deps.logger.error(f"更新任务失败: {e}", exc_info=True)
+        logger.error(f"更新任务失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"更新任务失败: {str(e)}") from e
 
 
@@ -223,7 +219,7 @@ async def delete_task(
     task_id: int = Path(..., description="任务ID"),
 ):
     """
-    删除任务（包括其所有子任务）
+    删除任务
 
     Args:
         project_id: 项目ID
@@ -234,7 +230,7 @@ async def delete_task(
     """
     try:
         # 检查任务是否存在
-        existing = deps.db_manager.get_task(task_id)
+        existing = task_mgr.get_task(task_id)
         if not existing:
             raise HTTPException(status_code=404, detail="任务不存在")
 
@@ -243,64 +239,19 @@ async def delete_task(
             raise HTTPException(status_code=404, detail="任务不属于该项目")
 
         # 删除任务
-        success = deps.db_manager.delete_task(task_id)
+        success = task_mgr.delete_task(task_id)
 
         if not success:
             raise HTTPException(status_code=500, detail="删除任务失败")
 
-        deps.logger.info(f"成功删除任务及其子任务: {task_id}")
+        logger.info(f"成功删除任务: {task_id}")
         return None
 
     except HTTPException:
         raise
     except Exception as e:
-        deps.logger.error(f"删除任务失败: {e}", exc_info=True)
+        logger.error(f"删除任务失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"删除任务失败: {str(e)}") from e
-
-
-@router.get(
-    "/api/projects/{project_id}/tasks/{task_id}/children",
-    response_model=TaskListResponse,
-)
-async def get_task_children(
-    project_id: int = Path(..., description="项目ID"),
-    task_id: int = Path(..., description="任务ID"),
-):
-    """
-    获取任务的所有直接子任务
-
-    Args:
-        project_id: 项目ID
-        task_id: 任务ID
-
-    Returns:
-        子任务列表
-    """
-    try:
-        # 检查任务是否存在
-        task = deps.db_manager.get_task(task_id)
-        if not task:
-            raise HTTPException(status_code=404, detail="任务不存在")
-
-        # 验证任务是否属于指定项目
-        if task["project_id"] != project_id:
-            raise HTTPException(status_code=404, detail="任务不属于该项目")
-
-        # 获取子任务
-        children = deps.db_manager.get_task_children(task_id)
-
-        deps.logger.info(f"获取任务 {task_id} 的子任务，共 {len(children)} 个")
-
-        return TaskListResponse(
-            total=len(children),
-            tasks=[TaskResponse(**t) for t in children],
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        deps.logger.error(f"获取子任务失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"获取子任务失败: {str(e)}") from e
 
 
 @router.get(
@@ -327,7 +278,7 @@ async def get_task_progress(
     """
     try:
         # 检查任务是否存在
-        task = deps.db_manager.get_task(task_id)
+        task = task_mgr.get_task(task_id)
         if not task:
             raise HTTPException(status_code=404, detail="任务不存在")
 
@@ -336,16 +287,16 @@ async def get_task_progress(
             raise HTTPException(status_code=404, detail="任务不属于该项目")
 
         # 获取进展记录列表
-        progress_list = deps.db_manager.get_task_progress_list(
+        progress_list = task_mgr.get_task_progress_list(
             task_id=task_id,
             limit=limit,
             offset=offset,
         )
 
         # 统计总数
-        total = deps.db_manager.count_task_progress(task_id=task_id)
+        total = task_mgr.count_task_progress(task_id=task_id)
 
-        deps.logger.info(f"获取任务 {task_id} 的进展记录，返回 {len(progress_list)} 条")
+        logger.info(f"获取任务 {task_id} 的进展记录，返回 {len(progress_list)} 条")
 
         return TaskProgressListResponse(
             total=total,
@@ -355,7 +306,7 @@ async def get_task_progress(
     except HTTPException:
         raise
     except Exception as e:
-        deps.logger.error(f"获取任务进展记录失败: {e}", exc_info=True)
+        logger.error(f"获取任务进展记录失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取任务进展记录失败: {str(e)}") from e
 
 
@@ -379,7 +330,7 @@ async def get_task_progress_latest(
     """
     try:
         # 检查任务是否存在
-        task = deps.db_manager.get_task(task_id)
+        task = task_mgr.get_task(task_id)
         if not task:
             raise HTTPException(status_code=404, detail="任务不存在")
 
@@ -388,19 +339,19 @@ async def get_task_progress_latest(
             raise HTTPException(status_code=404, detail="任务不属于该项目")
 
         # 获取最新进展记录
-        progress = deps.db_manager.get_task_progress_latest(task_id=task_id)
+        progress = task_mgr.get_task_progress_latest(task_id=task_id)
 
         if progress:
-            deps.logger.info(f"获取任务 {task_id} 的最新进展记录")
+            logger.info(f"获取任务 {task_id} 的最新进展记录")
             return TaskProgressResponse(**progress)
         else:
-            deps.logger.info(f"任务 {task_id} 暂无进展记录")
+            logger.info(f"任务 {task_id} 暂无进展记录")
             return None
 
     except HTTPException:
         raise
     except Exception as e:
-        deps.logger.error(f"获取任务最新进展记录失败: {e}", exc_info=True)
+        logger.error(f"获取任务最新进展记录失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取任务最新进展记录失败: {str(e)}") from e
 
 
@@ -424,7 +375,7 @@ async def generate_task_summary(
     """
     try:
         # 检查任务是否存在
-        task = deps.db_manager.get_task(task_id)
+        task = task_mgr.get_task(task_id)
         if not task:
             raise HTTPException(status_code=404, detail="任务不存在")
 
@@ -433,7 +384,7 @@ async def generate_task_summary(
             raise HTTPException(status_code=404, detail="任务不属于该项目")
 
         # 获取任务关联的未使用上下文
-        contexts = deps.db_manager.list_contexts(
+        contexts = context_mgr.list_contexts(
             task_id=task_id,
             used_in_summary=False,
             limit=1000,
@@ -441,7 +392,7 @@ async def generate_task_summary(
 
         # 如果没有未使用的上下文，获取所有上下文（允许重新生成）
         if not contexts:
-            contexts = deps.db_manager.list_contexts(
+            contexts = context_mgr.list_contexts(
                 task_id=task_id,
                 limit=1000,
             )
@@ -475,8 +426,6 @@ async def generate_task_summary(
 """
 
         # 调用 LLM 生成摘要
-        from lifetrace.llm.llm_client import LLMClient
-
         llm_client = LLMClient()
 
         if not llm_client.is_available():
@@ -512,10 +461,10 @@ async def generate_task_summary(
                     user_query=f"生成任务进展摘要 - 任务ID: {task_id}",
                 )
         except Exception as e:
-            deps.logger.warning(f"记录token使用量失败: {e}")
+            logger.warning(f"记录token使用量失败: {e}")
 
         # 保存进展记录
-        progress_id = deps.db_manager.create_task_progress(
+        progress_id = task_mgr.create_task_progress(
             task_id=task_id,
             summary=summary,
             context_count=len(contexts),
@@ -527,18 +476,18 @@ async def generate_task_summary(
         # 标记上下文为已使用
         for ctx in contexts:
             if "id" in ctx:
-                deps.db_manager.mark_context_as_used_in_summary(ctx["id"])
+                context_mgr.mark_context_as_used_in_summary(ctx["id"])
 
         # 获取保存的进展记录
-        progress = deps.db_manager.get_task_progress_latest(task_id=task_id)
+        progress = task_mgr.get_task_progress_latest(task_id=task_id)
         if not progress:
             raise HTTPException(status_code=500, detail="获取保存的进展记录失败")
 
-        deps.logger.info(f"成功生成任务 {task_id} 的进展摘要，基于 {len(contexts)} 个上下文")
+        logger.info(f"成功生成任务 {task_id} 的进展摘要，基于 {len(contexts)} 个上下文")
         return TaskProgressResponse(**progress)
 
     except HTTPException:
         raise
     except Exception as e:
-        deps.logger.error(f"生成任务进展摘要失败: {e}", exc_info=True)
+        logger.error(f"生成任务进展摘要失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"生成任务进展摘要失败: {str(e)}") from e

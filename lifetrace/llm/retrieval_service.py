@@ -1,34 +1,24 @@
-import logging
-import sys
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any
-
-# 添加项目根目录到Python路径，以便直接运行此文件
-if __name__ == "__main__":
-    project_root = Path(__file__).parent.parent
-    sys.path.insert(0, str(project_root))
 
 from sqlalchemy import func, or_
 
-from lifetrace.storage import DatabaseManager
-from lifetrace.storage.models import Event, EventAssociation, OCRResult, Screenshot, Task
+from lifetrace.storage import get_session
+from lifetrace.storage.models import Event, EventTaskRelation, OCRResult, Screenshot, Task
+from lifetrace.util.logging_config import get_logger
 from lifetrace.util.query_parser import QueryConditions, QueryParser
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 class RetrievalService:
     """检索服务，用于从数据库中检索相关的截图和OCR数据"""
 
-    def __init__(self, db_manager: DatabaseManager):
+    def __init__(self):
         """
         初始化检索服务
-
-        Args:
-            db_manager: 数据库管理器实例
         """
-        self.db_manager = db_manager
+        pass
         self.query_parser = QueryParser()
         logger.info("检索服务初始化完成")
 
@@ -48,18 +38,18 @@ class RetrievalService:
         try:
             logger.info(f"执行数据库查询 - 条件: {conditions}, 限制: {limit}")
 
-            with self.db_manager.get_session() as session:
+            with get_session() as session:
                 # 构建基础查询
                 query = session.query(Screenshot).join(
                     OCRResult, Screenshot.id == OCRResult.screenshot_id
                 )
 
-                # 添加项目过滤（通过 Screenshot -> Event -> EventAssociation -> Task -> Project 的关联）
+                # 添加项目过滤（通过 Screenshot -> Event -> EventTaskRelation -> Task -> Project 的关联）
                 if conditions.project_id:
                     query = (
                         query.join(Event, Screenshot.event_id == Event.id)
-                        .join(EventAssociation, Event.id == EventAssociation.event_id)
-                        .join(Task, EventAssociation.task_id == Task.id)
+                        .join(EventTaskRelation, Event.id == EventTaskRelation.event_id)
+                        .join(Task, EventTaskRelation.task_id == Task.id)
                         .filter(Task.project_id == conditions.project_id)
                     )
 
@@ -268,7 +258,7 @@ class RetrievalService:
             logger.info(f"统计查询条件: {conditions}")
             logger.info(f"执行统计查询 - 条件: {conditions}")
 
-            with self.db_manager.get_session() as session:
+            with get_session() as session:
                 # 基础查询
                 query = session.query(Screenshot)
 
@@ -278,8 +268,8 @@ class RetrievalService:
                     if conditions.project_id:
                         query = (
                             query.join(Event, Screenshot.event_id == Event.id)
-                            .join(EventAssociation, Event.id == EventAssociation.event_id)
-                            .join(Task, EventAssociation.task_id == Task.id)
+                            .join(EventTaskRelation, Event.id == EventTaskRelation.event_id)
+                            .join(Task, EventTaskRelation.task_id == Task.id)
                             .filter(Task.project_id == conditions.project_id)
                         )
                     if conditions.start_date:
@@ -306,8 +296,8 @@ class RetrievalService:
                     if conditions.project_id:
                         app_stats = (
                             app_stats.join(Event, Screenshot.event_id == Event.id)
-                            .join(EventAssociation, Event.id == EventAssociation.event_id)
-                            .join(Task, EventAssociation.task_id == Task.id)
+                            .join(EventTaskRelation, Event.id == EventTaskRelation.event_id)
+                            .join(Task, EventTaskRelation.task_id == Task.id)
                             .filter(Task.project_id == conditions.project_id)
                         )
                     if conditions.start_date:

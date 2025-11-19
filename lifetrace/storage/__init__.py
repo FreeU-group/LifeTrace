@@ -1,31 +1,34 @@
 """
-存储模块
-包含数据库管理和数据模型
+Storage 模块
+提供数据库管理和模型定义
 """
 
-from .database import DatabaseManager, db_manager
-from .models import (
-    AppUsageLog,
-    Base,
-    DailyStats,
-    Event,
-    OCRResult,
-    ProcessingQueue,
-    Screenshot,
-    SearchIndex,
-    UserBehaviorStats,
+from lifetrace.storage.database import (
+    chat_mgr,
+    context_mgr,
+    db_base,
+    event_mgr,
+    get_db,
+    get_session,
+    ocr_mgr,
+    project_mgr,
+    screenshot_mgr,
+    stats_mgr,
+    task_mgr,
 )
 
 __all__ = [
-    "DatabaseManager",
-    "db_manager",
-    "Base",
-    "Event",
-    "Screenshot",
-    "OCRResult",
-    "SearchIndex",
-    "ProcessingQueue",
-    "UserBehaviorStats",
-    "AppUsageLog",
-    "DailyStats",
+    # 各个功能管理器
+    "screenshot_mgr",
+    "event_mgr",
+    "ocr_mgr",
+    "project_mgr",
+    "task_mgr",
+    "context_mgr",
+    "chat_mgr",
+    "stats_mgr",
+    # 数据库基础
+    "db_base",
+    "get_session",
+    "get_db",
 ]

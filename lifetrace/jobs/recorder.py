@@ -1,3 +1,7 @@
+"""
+屏幕录制器 - 负责截图和相关处理
+"""
+
 import argparse
 import hashlib
 import os
@@ -12,13 +16,14 @@ import imagehash
 import mss
 from PIL import Image
 
-from lifetrace.storage import db_manager
+from lifetrace.storage import event_mgr, get_session, screenshot_mgr
 from lifetrace.util.app_utils import expand_blacklist_apps
 from lifetrace.util.config import config
 from lifetrace.util.logging_config import get_logger
 from lifetrace.util.utils import (
     ensure_dir,
     get_active_window_info,
+    get_active_window_screen,
     get_screenshot_filename,
 )
 
@@ -92,7 +97,7 @@ class ScreenRecorder:
     def __init__(self):
         self.config = config
         self.screenshots_dir = self.config.screenshots_dir
-        self.interval = self.config.get(CONFIG_KEY_RECORD_INTERVAL, 1)
+        self.interval = self.config.get(CONFIG_KEY_RECORD_INTERVAL, 10)
         self.screens = self._get_screen_list()
         self.deduplicate = self.config.get(CONFIG_KEY_RECORDER_DEDUPLICATE, True)
         self.hash_threshold = self.config.get(CONFIG_KEY_RECORDER_HASH_THRESHOLD, 5)
@@ -116,6 +121,9 @@ class ScreenRecorder:
 
         logger.info(f"屏幕录制器初始化完成，监控屏幕: {self.screens}")
 
+        # 打印黑名单配置信息
+        self._log_blacklist_config()
+
         # 注册配置变更回调
         self.config.register_callback(self._on_config_change)
 
@@ -135,10 +143,9 @@ class ScreenRecorder:
 
     def _update_interval_config(self, old_config: dict, new_config: dict):
         """更新截图间隔配置"""
-        record_config = new_config.get("record", {})
-        new_interval = record_config.get("interval", 1)
-        if new_interval != self.interval:
-            old_interval = self.interval
+        old_interval = old_config.get("record", {}).get("interval", 10)
+        new_interval = new_config.get("record", {}).get("interval", 10)
+        if old_interval != new_interval:
             self.interval = new_interval
             logger.info(f"截图间隔已更新: {old_interval}s -> {new_interval}s")
 
@@ -172,9 +179,34 @@ class ScreenRecorder:
         new_blacklist = new_config.get("record", {}).get("blacklist", {})
         if old_blacklist != new_blacklist:
             logger.info("黑名单配置已更新")
-            if new_blacklist.get("enabled") != old_blacklist.get("enabled"):
-                enabled = new_blacklist.get("enabled", False)
-                logger.info(f"黑名单功能已{'启用' if enabled else '禁用'}")
+            # 打印新的黑名单配置详情
+            self._log_blacklist_config()
+
+    def _log_blacklist_config(self):
+        """打印当前黑名单配置"""
+        blacklist_enabled = self.config.get(CONFIG_KEY_RECORD_BLACKLIST_ENABLED, False)
+        blacklist_apps = self.config.get(CONFIG_KEY_RECORD_BLACKLIST_APPS, [])
+        blacklist_windows = self.config.get(CONFIG_KEY_RECORD_BLACKLIST_WINDOWS, [])
+
+        logger.info("=" * 60)
+        logger.info(f"📋 黑名单配置状态: {'✅ 已启用' if blacklist_enabled else '❌ 已禁用'}")
+
+        if blacklist_enabled:
+            if blacklist_apps:
+                expanded_apps = expand_blacklist_apps(blacklist_apps)
+                logger.info(f"🚫 黑名单应用: {blacklist_apps}")
+                logger.info(f"   扩展后的进程名: {expanded_apps}")
+            else:
+                logger.info("🚫 黑名单应用: 无")
+
+            if blacklist_windows:
+                logger.info(f"🚫 黑名单窗口: {blacklist_windows}")
+            else:
+                logger.info("🚫 黑名单窗口: 无")
+        else:
+            logger.info("   (黑名单功能未启用，所有应用都会被截图)")
+
+        logger.info("=" * 60)
 
     def _update_timeout_config(self, new_config: dict):
         """更新超时配置"""
@@ -238,20 +270,13 @@ class ScreenRecorder:
         screen_id: int,
         app_name: str,
         window_title: str,
-        timestamp: datetime,
     ) -> int | None:
         """保存截图信息到数据库"""
 
         @with_timeout(timeout_seconds=self.db_timeout, operation_name="数据库操作")
         def _do_save_to_db():
-            # 获取或创建事件（基于当前前台应用）
-            event_id = db_manager.get_or_create_event(
-                app_name or UNKNOWN_APP,
-                window_title or UNKNOWN_WINDOW,
-                timestamp,
-            )
-
-            screenshot_id = db_manager.add_screenshot(
+            # 不再自动关联事件，由事件处理器处理
+            screenshot_id = screenshot_mgr.add_screenshot(
                 file_path=file_path,
                 file_hash=file_hash,
                 width=width,
@@ -259,7 +284,7 @@ class ScreenRecorder:
                 screen_id=screen_id,
                 app_name=app_name or UNKNOWN_APP,
                 window_title=window_title or UNKNOWN_WINDOW,
-                event_id=event_id,
+                event_id=None,  # 不自动关联事件
             )
             return screenshot_id
 
@@ -269,6 +294,83 @@ class ScreenRecorder:
         except Exception as e:
             logger.error(f"保存截图记录到数据库失败: {e}")
             return None
+
+    def _process_screenshot_event(
+        self,
+        screenshot_id: int,
+        app_name: str,
+        window_title: str,
+        timestamp: datetime,
+    ):
+        """处理截图事件：将截图关联到事件
+
+        Args:
+            screenshot_id: 截图ID
+            app_name: 应用名称
+            window_title: 窗口标题
+            timestamp: 截图时间
+        """
+        try:
+            # 检查是否有该应用的活跃事件
+            active_event_id = event_mgr.get_active_event_by_app(app_name)
+
+            if active_event_id:
+                # 有活跃事件，添加截图到该事件
+                success = event_mgr.add_screenshot_to_event(screenshot_id, active_event_id)
+                if success:
+                    logger.info(
+                        f"📎 截图 {screenshot_id} 已添加到事件 {active_event_id} [{app_name}]"
+                    )
+                else:
+                    logger.warning(f"⚠️  截图 {screenshot_id} 添加到事件失败")
+            else:
+                # 没有活跃事件，需要完成其他应用的事件并创建新事件
+                self._complete_other_active_events(app_name, timestamp)
+
+                # 创建新事件
+                event_id = event_mgr.create_event_for_screenshot(
+                    screenshot_id=screenshot_id,
+                    app_name=app_name,
+                    window_title=window_title,
+                    timestamp=timestamp,
+                )
+
+                if event_id:
+                    logger.info(f"✨ 为截图 {screenshot_id} 创建新事件 {event_id} [{app_name}]")
+                else:
+                    logger.warning(f"⚠️  创建事件失败，截图ID: {screenshot_id}")
+
+        except Exception as e:
+            logger.error(f"处理截图事件失败: {e}", exc_info=True)
+
+    def _complete_other_active_events(self, current_app: str, end_time: datetime):
+        """完成其他应用的活跃事件
+
+        Args:
+            current_app: 当前应用名称
+            end_time: 结束时间
+        """
+        try:
+            from lifetrace.storage.models import Event
+
+            with get_session() as session:
+                # 获取所有未完成的事件（new 或 processing 状态）
+                active_events = (
+                    session.query(Event)
+                    .filter(Event.status.in_(["new", "processing"]), Event.app_name != current_app)
+                    .all()
+                )
+
+                for event in active_events:
+                    logger.info(
+                        f"🔚 应用切换，完成其他事件 {event.id}: "
+                        f"[{event.app_name}] → [{current_app}]"
+                    )
+                    # 使用 event_mgr 的方法来完成事件，这样会触发摘要生成
+                    event_mgr.complete_event(event.id, end_time)
+
+        except Exception as e:
+            logger.error(f"完成其他活跃事件失败: {e}", exc_info=True)
 
     def _get_window_info(self) -> tuple[str, str]:
         """获取当前活动窗口信息"""
@@ -280,7 +382,11 @@ class ScreenRecorder:
         try:
             result = _do_get_window_info()
             if result is not None:
-                return result
+                app_name, window_title = result
+                # 如果任何一个为 None，使用默认值
+                app_name = app_name or UNKNOWN_APP
+                window_title = window_title or UNKNOWN_WINDOW
+                return (app_name, window_title)
             return (UNKNOWN_APP, UNKNOWN_WINDOW)
         except Exception as e:
             logger.error(f"获取窗口信息失败: {e}")
@@ -312,64 +418,94 @@ class ScreenRecorder:
         """检查是否为浏览器或Python应用"""
         return any(browser in app_name_lower for browser in BROWSER_APPS + PYTHON_APPS)
 
-    def _is_app_blacklisted(self, app_name: str, window_title: str) -> bool:
-        """检查应用是否在黑名单中"""
+    def _get_blacklist_reason(self, app_name: str, window_title: str) -> str:
+        """获取应用被列入黑名单的原因
+
+        Returns:
+            如果在黑名单中，返回跳过原因；否则返回空字符串
+        """
         # 首先检查是否启用自动排除LifeTrace自身窗口
         auto_exclude_self = self.config.get(CONFIG_KEY_RECORD_AUTO_EXCLUDE_SELF, True)
         if auto_exclude_self and self._is_lifetrace_window(app_name, window_title):
-            logger.info(
-                f"检测到LifeTrace自身窗口 - 应用: '{app_name}', 窗口: '{window_title}', 跳过截图"
-            )
-            return True
+            return f"🏠 [自动排除] 检测到 LifeTrace 自身窗口 - 应用: '{app_name}', 窗口: '{window_title}'"
 
         # 检查黑名单功能是否启用
         blacklist_enabled = self.config.get(CONFIG_KEY_RECORD_BLACKLIST_ENABLED, False)
         if not blacklist_enabled:
-            return False
+            return ""
 
-        # 检查应用名和窗口标题是否在黑名单中
-        if self._is_app_in_blacklist(app_name):
-            logger.info(f"应用 '{app_name}' 在黑名单中，跳过截图")
-            return True
+        # 检查应用名是否在黑名单中
+        app_reason = self._get_app_blacklist_reason(app_name)
+        if app_reason:
+            return app_reason
 
-        if self._is_window_in_blacklist(window_title):
-            logger.info(f"窗口 '{window_title}' 在黑名单中，跳过截图")
-            return True
+        # 检查窗口标题是否在黑名单中
+        window_reason = self._get_window_blacklist_reason(window_title)
+        if window_reason:
+            return window_reason
 
-        return False
+        return ""
 
-    def _is_app_in_blacklist(self, app_name: str) -> bool:
-        """检查应用名是否在黑名单中"""
+    def _is_app_blacklisted(self, app_name: str, window_title: str) -> bool:
+        """检查应用是否在黑名单中（保留向后兼容性）"""
+        return bool(self._get_blacklist_reason(app_name, window_title))
+
+    def _get_app_blacklist_reason(self, app_name: str) -> str:
+        """获取应用名在黑名单中的原因
+
+        Returns:
+            如果在黑名单中，返回跳过原因；否则返回空字符串
+        """
         if not app_name:
-            return False
+            return ""
 
         blacklist_apps = self.config.get(CONFIG_KEY_RECORD_BLACKLIST_APPS, [])
         expanded_blacklist_apps = expand_blacklist_apps(blacklist_apps)
 
         if not expanded_blacklist_apps:
-            return False
+            return ""
 
         app_name_lower = app_name.lower()
-        return any(
-            blacklist_app.lower() == app_name_lower or blacklist_app.lower() in app_name_lower
-            for blacklist_app in expanded_blacklist_apps
-        )
+        # 查找匹配的黑名单项
+        for blacklist_app in expanded_blacklist_apps:
+            if blacklist_app.lower() == app_name_lower or blacklist_app.lower() in app_name_lower:
+                # 找到匹配项，返回原因
+                return f"🚫 [黑名单过滤] 应用 '{app_name}' 匹配黑名单项 '{blacklist_app}'"
 
-    def _is_window_in_blacklist(self, window_title: str) -> bool:
-        """检查窗口标题是否在黑名单中"""
+        return ""
+
+    def _get_window_blacklist_reason(self, window_title: str) -> str:
+        """获取窗口标题在黑名单中的原因
+
+        Returns:
+            如果在黑名单中，返回跳过原因；否则返回空字符串
+        """
         if not window_title:
-            return False
+            return ""
 
         blacklist_windows = self.config.get(CONFIG_KEY_RECORD_BLACKLIST_WINDOWS, [])
         if not blacklist_windows:
-            return False
+            return ""
 
         window_title_lower = window_title.lower()
-        return any(
-            blacklist_window.lower() == window_title_lower
-            or blacklist_window.lower() in window_title_lower
-            for blacklist_window in blacklist_windows
-        )
+        # 查找匹配的黑名单项
+        for blacklist_window in blacklist_windows:
+            if (
+                blacklist_window.lower() == window_title_lower
+                or blacklist_window.lower() in window_title_lower
+            ):
+                # 找到匹配项，返回原因
+                return f"🚫 [黑名单过滤] 窗口 '{window_title}' 匹配黑名单项 '{blacklist_window}'"
+
+        return ""
+
+    def _is_app_in_blacklist(self, app_name: str) -> bool:
+        """检查应用名是否在黑名单中（保留向后兼容性）"""
+        return bool(self._get_app_blacklist_reason(app_name))
+
+    def _is_window_in_blacklist(self, window_title: str) -> bool:
+        """检查窗口标题是否在黑名单中（保留向后兼容性）"""
+        return bool(self._get_window_blacklist_reason(window_title))
 
     def _get_screen_list(self) -> list[int]:
         """获取要截图的屏幕列表"""
@@ -513,12 +649,7 @@ class ScreenRecorder:
         return app_name, window_title
 
     def _save_screenshot_metadata(
-        self,
-        file_path: str,
-        screen_id: int,
-        app_name: str,
-        window_title: str,
-        timestamp: datetime,
+        self, file_path: str, screen_id: int, app_name: str, window_title: str, timestamp: datetime
     ):
         """保存截图的元数据到数据库"""
         filename = os.path.basename(file_path)
@@ -534,18 +665,14 @@ class ScreenRecorder:
 
         # 保存到数据库
         screenshot_id = self._save_to_database(
-            file_path,
-            file_hash,
-            width,
-            height,
-            screen_id,
-            app_name,
-            window_title,
-            timestamp,
+            file_path, file_hash, width, height, screen_id, app_name, window_title
         )
 
         if screenshot_id:
             logger.debug(f"[窗口 {screen_id}] 截图记录已保存到数据库: {screenshot_id}")
+
+            # 立即处理事件：将截图关联到事件
+            self._process_screenshot_event(screenshot_id, app_name, window_title, timestamp)
         else:
             logger.warning(f"[窗口 {screen_id}] 数据库保存失败，但文件已保存: {filename}")
 
@@ -554,50 +681,52 @@ class ScreenRecorder:
         logger.info(f"[窗口 {screen_id}] 截图保存: {filename} ({file_size_kb:.2f} KB) - {app_name}")
 
     def capture_all_screens(self) -> list[str]:
-        """截取所有屏幕"""
+        """只截取活跃窗口所在的屏幕"""
         captured_files = []
 
-        # 获取当前活动窗口信息，用于黑名单检查
+        # 获取当前活动窗口信息（用于事件关联和应用使用记录）
         app_name, window_title = self._get_window_info()
-        logger.info(f"当前活动窗口信息: {app_name} - {window_title}")
 
-        # 统计信息
-        total_screens = len(self.screens)
-        success_count = 0
-        skipped_count = 0
-        failed_count = 0
+        # 获取活跃窗口所在的屏幕ID
+        active_screen_id = get_active_window_screen()
 
-        # 检查是否在黑名单中
-        if self._is_app_blacklisted(app_name, window_title):
-            logger.info(
-                f"当前应用 '{app_name}' 或窗口 '{window_title}' 在黑名单中，跳过所有屏幕截图"
-            )
-            logger.info(
-                f"截图统计 - 总屏幕: {total_screens}, 成功: 0, 跳过: {total_screens}, 失败: 0"
-            )
+        if active_screen_id is None:
+            logger.warning("无法获取活跃窗口所在的屏幕，跳过截图")
+            return captured_files
+
+        # 检查活跃屏幕是否在配置的屏幕列表中
+        if active_screen_id not in self.screens:
+            logger.info(f"⏭️  活跃窗口在屏幕 {active_screen_id}，但该屏幕未在配置中启用，跳过截图")
+            return captured_files
+
+        # 检查活动窗口是否在黑名单中
+        blacklist_reason = self._get_blacklist_reason(app_name, window_title)
+        is_blacklisted = bool(blacklist_reason)
+
+        if is_blacklisted:
+            # 活动窗口在黑名单中，跳过截图
+            logger.info(f"⏭️  {blacklist_reason}（跳过截图）")
+            # 关闭活跃事件，避免黑名单窗口被关联到事件
             self._close_active_event_on_blacklist()
             return captured_files
 
-        # 记录应用使用信息到新表（在截图前记录，避免跳过和去重的影响）
-        self._log_app_usage(app_name, window_title)
-
-        for screen_id in self.screens:
-            file_path, status = self._capture_screen(screen_id, app_name, window_title)
-            if file_path:
-                captured_files.append(file_path)
-
-            # 统计各种状态
-            if status == "success":
-                success_count += 1
-            elif status == "skipped":
-                skipped_count += 1
-            elif status == "failed":
-                failed_count += 1
-
+        # 活动窗口不在黑名单，显示窗口信息
         logger.info(
-            f"截图统计 - 总屏幕: {total_screens}, 成功: {success_count}, "
-            f"跳过: {skipped_count}, 失败: {failed_count}"
+            f"📸 准备截图 - 屏幕: {active_screen_id}, 应用: {app_name}, 窗口: {window_title}"
         )
+
+        # 只截取活跃窗口所在的屏幕
+        file_path, status = self._capture_screen(active_screen_id, app_name, window_title)
+        if file_path:
+            captured_files.append(file_path)
+
+        # 输出统计信息
+        if status == "success":
+            logger.info(f"截图成功 - 屏幕: {active_screen_id}")
+        elif status == "skipped":
+            logger.info(f"截图跳过 - 屏幕: {active_screen_id}")
+        elif status == "failed":
+            logger.warning(f"截图失败 - 屏幕: {active_screen_id}")
 
         return captured_files
 
@@ -607,35 +736,10 @@ class ScreenRecorder:
         # 这样可以确保从白名单应用切换到黑名单应用时，
         # 白名单应用的事件能正确结束
         try:
-            db_manager.close_active_event()
-            logger.debug("已关闭上一个活跃事件")
+            event_mgr.close_active_event()
+            logger.info("已关闭上一个活跃事件")
         except Exception as e:
             logger.error(f"关闭活跃事件失败: {e}")
-
-    def _log_app_usage(self, app_name: str, window_title: str | None = None):
-        """记录应用使用信息到新表"""
-        try:
-            # 计算持续时间（使用截图间隔作为估算）
-            duration_seconds = self.interval
-
-            # 记录到数据库
-            log_id = db_manager.add_app_usage_log(
-                app_name=app_name,
-                window_title=window_title,
-                duration_seconds=duration_seconds,
-                screen_id=DEFAULT_SCREEN_ID,  # 默认屏幕ID，用于应用使用记录
-                timestamp=datetime.now(),
-            )
-
-            if log_id:
-                logger.debug(
-                    f"应用使用记录已保存: {app_name} - {window_title} ({duration_seconds}s)"
-                )
-            else:
-                logger.warning(f"应用使用记录保存失败: {app_name}")
-
-        except Exception as e:
-            logger.error(f"记录应用使用信息失败: {e}")
 
     def execute_capture(self):
         """执行一次截图任务（用于调度器调用）
@@ -646,7 +750,9 @@ class ScreenRecorder:
         try:
             captured_files = self.capture_all_screens()
             if captured_files:
-                logger.debug(f"本次截取了 {len(captured_files)} 张截图")
+                logger.info(f"✅ 本次截取了 {len(captured_files)} 张截图")
+            else:
+                logger.info("⏭️  本次未截取截图（窗口被跳过或重复）")
             return captured_files
         except Exception as e:
             logger.error(f"执行截图任务失败: {e}")
@@ -708,7 +814,7 @@ class ScreenRecorder:
         unprocessed_files = []
         for file_path in screenshot_files:
             # 如果数据库中没有相同路径的记录，则认为未处理
-            screenshot = db_manager.get_screenshot_by_path(file_path)
+            screenshot = screenshot_mgr.get_screenshot_by_path(file_path)
             if not screenshot:
                 unprocessed_files.append(file_path)
 
@@ -753,7 +859,7 @@ class ScreenRecorder:
                 app_name, window_title = self._get_window_info()
 
                 # 添加到数据库
-                screenshot_id = db_manager.add_screenshot(
+                screenshot_id = screenshot_mgr.add_screenshot(
                     file_path=file_path,
                     file_hash=file_hash,
                     width=width,
@@ -843,9 +949,9 @@ def execute_capture_task():
     这是一个模块级别的函数，可以被 APScheduler 序列化到数据库中
     """
     try:
+        logger.info("🔄 开始执行录制器任务")
         recorder = get_recorder_instance()
         captured_files = recorder.execute_capture()
-        logger.debug(f"录制器任务执行完成，截取了 {len(captured_files)} 张截图")
         return len(captured_files)
     except Exception as e:
         logger.error(f"执行录制器任务失败: {e}", exc_info=True)

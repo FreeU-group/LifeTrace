@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 后台任务管理器
 负责管理所有后台任务的启动、停止和配置更新
@@ -34,7 +33,7 @@ class JobManager:
         # 启动调度器
         self._start_scheduler()
 
-        # 启动录制器任务
+        # 启动录制器任务（事件处理已集成到录制器中，截图后立即处理）
         self._start_recorder_job()
 
         # 启动OCR任务

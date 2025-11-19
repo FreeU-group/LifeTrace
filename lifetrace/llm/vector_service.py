@@ -4,13 +4,15 @@
 与现有的 SQLite 数据库并行工作。
 """
 
-import logging
 from datetime import datetime
 from typing import Any
 
 from lifetrace.llm.vector_db import create_vector_db
-from lifetrace.storage import DatabaseManager
+from lifetrace.storage import event_mgr, get_session
 from lifetrace.storage.models import OCRResult, Screenshot
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 
 class VectorService:
@@ -19,16 +21,14 @@ class VectorService:
     负责将 OCR 结果存储到向量数据库，并提供语义搜索功能。
     """
 
-    def __init__(self, config, db_manager: DatabaseManager):
+    def __init__(self, config):
         """初始化向量服务
 
         Args:
             config: 配置对象
-            db_manager: 数据库管理器
         """
         self.config = config
-        self.db_manager = db_manager
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
         # 初始化向量数据库
         self.vector_db = create_vector_db(config)
@@ -256,7 +256,7 @@ class VectorService:
 
                     if ocr_result_id:
                         # 获取OCR结果详细信息
-                        with self.db_manager.get_session() as session:
+                        with get_session() as session:
                             from lifetrace.storage.models import OCRResult, Screenshot
 
                             ocr_result = (
@@ -318,11 +318,7 @@ class VectorService:
             return False
         try:
             # 聚合事件文本
-            event_text = (
-                self.db_manager.get_event_text(event_id)
-                if hasattr(self.db_manager, "get_event_text")
-                else ""
-            )
+            event_text = event_mgr.get_event_text(event_id) or ""
             if not event_text or not event_text.strip():
                 self.logger.debug(f"事件{event_id}无文本，跳过索引")
                 return False
@@ -375,7 +371,7 @@ class VectorService:
             event_results = []
             for event_id, score_info in event_scores.items():
                 try:
-                    with self.db_manager.get_session() as session:
+                    with get_session() as session:
                         from lifetrace.storage.models import Event, Screenshot
 
                         event = session.query(Event).filter(Event.id == event_id).first()
@@ -440,7 +436,7 @@ class VectorService:
             return 0
 
         try:
-            with self.db_manager.get_session() as session:
+            with get_session() as session:
                 # 检查SQLite数据库中的OCR结果数量
                 total_ocr_count = session.query(OCRResult).count()
                 self.logger.info(f"SQLite database has {total_ocr_count} OCR results")
@@ -540,14 +536,13 @@ class VectorService:
             return False
 
 
-def create_vector_service(config, db_manager: DatabaseManager) -> VectorService:
+def create_vector_service(config) -> VectorService:
     """创建向量服务实例
 
     Args:
         config: 配置对象
-        db_manager: 数据库管理器
 
     Returns:
         向量服务实例
     """
-    return VectorService(config, db_manager)
+    return VectorService(config)

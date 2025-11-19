@@ -52,6 +52,8 @@ async def get_cost_stats(days: int = Query(30, description="统计天数")):
                 "output_tokens": model_stats.get("output_tokens", 0),
                 "total_tokens": model_stats.get("total_tokens", 0),
                 "requests": model_stats.get("requests", 0),
+                "input_cost": round(model_stats.get("input_cost", 0), 4),
+                "output_cost": round(model_stats.get("output_cost", 0), 4),
                 "total_cost": round(model_stats.get("total_cost", 0), 4),
             }
 

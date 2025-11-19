@@ -39,11 +39,13 @@ LifeTrace 采用**前后端分离**架构：
 ### 环境要求
 
 **后端**:
+
 - Python 3.13+
 - 支持的操作系统：Windows、macOS
 - 可选：CUDA 支持（用于 GPU 加速）
 
 **前端**:
+
 - Node.js 18+
 - pnpm 包管理器
 
@@ -52,6 +54,7 @@ LifeTrace 采用**前后端分离**架构：
 本项目使用 [uv](https://github.com/astral-sh/uv) 进行快速可靠的依赖管理。
 
 **安装 uv:**
+
 ```bash
 # macOS/Linux
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -61,6 +64,7 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
 **安装依赖并同步环境:**
+
 ```bash
 # 从 pyproject.toml 和 uv.lock 同步依赖
 uv sync
@@ -86,6 +90,18 @@ cp lifetrace/config/default_config.yaml lifetrace/config/config.yaml
 ```
 
 > **注意**：首次运行时，如果 `config.yaml` 不存在，系统会自动从 `default_config.yaml` 创建。您可以通过编辑 `lifetrace/config/config.yaml` 来自定义设置。
+
+### 数据库迁移
+
+**应用数据库迁移（首次运行跳过此步骤）：**
+
+```bash
+# 进入 lifetrace 目录
+cd lifetrace
+
+# 升级到最新版本
+alembic upgrade head
+```
 
 ### 启动后端服务
 
@@ -118,24 +134,6 @@ pnpm dev
 
 详细说明请参考：[frontend/README.md](frontend/README.md)
 
-<!--
-#### 仅启动 Web 服务
-```bash
-python -m lifetrace_backend.server --port 8000
-```
-
-#### 启动单个服务
-```bash
-# 启动录制器
-python -m lifetrace_backend.recorder
-
-# 启动处理器
-python -m lifetrace_backend.processor
-
-# 启动 OCR 服务
-python -m lifetrace_backend.simple_ocr
-``` -->
-
 ## 📋 待办事项与路线图
 
 ### 🚀 高优先级
@@ -152,6 +150,7 @@ python -m lifetrace_backend.simple_ocr
   - ☐ 创建 Web 版本
 
 ### ✅ 最近完成
+
 - ☑ **核心基础设施** - 基础截图记录和 OCR 功能
 
 ---
@@ -168,21 +167,27 @@ python -m lifetrace_backend.simple_ocr
 │   └── ...                     # 其他 GitHub 仓库文件
 ├── lifetrace/                  # 核心后端模块
 │   ├── server.py               # Web API 服务
+│   ├── alembic/                # 数据库迁移工具
+│   │   ├── env.py              # Alembic 环境配置
+│   │   ├── script.py.mako      # 迁移脚本模板
+│   │   └── README              # Alembic 文档
+│   ├── alembic.ini             # Alembic 配置文件
 │   ├── config/                 # 配置文件
 │   │   ├── config.yaml         # 主配置文件（自动生成）
 │   │   ├── default_config.yaml # 默认配置模板
+│   │   ├── prompt.yaml         # AI 提示词模板
 │   │   └── rapidocr_config.yaml# OCR 配置
 │   ├── routers/                # API 路由处理器
 │   │   ├── behavior.py         # 用户行为端点
 │   │   ├── chat.py             # 聊天接口端点
 │   │   ├── config.py           # 配置端点
 │   │   ├── context.py          # 上下文管理端点
+│   │   ├── cost_tracking.py    # 成本追踪端点
 │   │   ├── dependencies.py     # 路由依赖项
 │   │   ├── event.py            # 事件管理端点
 │   │   ├── health.py           # 健康检查端点
 │   │   ├── logs.py             # 日志管理端点
 │   │   ├── ocr.py              # OCR 服务端点
-│   │   ├── plan.py             # 计划管理端点
 │   │   ├── project.py          # 项目管理端点
 │   │   ├── rag.py              # RAG 服务端点
 │   │   ├── scheduler.py        # 调度器端点
@@ -197,7 +202,6 @@ python -m lifetrace_backend.simple_ocr
 │   │   ├── config.py           # 配置模型
 │   │   ├── context.py          # 上下文模型
 │   │   ├── event.py            # 事件模型
-│   │   ├── plan.py             # 计划模型
 │   │   ├── project.py          # 项目模型
 │   │   ├── screenshot.py       # 截图模型
 │   │   ├── search.py           # 搜索模型
@@ -206,8 +210,18 @@ python -m lifetrace_backend.simple_ocr
 │   │   ├── task.py             # 任务模型
 │   │   └── vector.py           # 向量模型
 │   ├── storage/                # 数据存储层
-│   │   ├── database.py         # 数据库操作
-│   │   └── models.py           # SQLAlchemy 模型
+│   │   ├── __init__.py         # 存储模块初始化
+│   │   ├── database_base.py    # 基础数据库操作
+│   │   ├── database.py         # 主数据库操作
+│   │   ├── models.py           # SQLAlchemy 模型
+│   │   ├── chat_manager.py     # 聊天数据管理
+│   │   ├── context_manager.py  # 上下文数据管理
+│   │   ├── event_manager.py    # 事件数据管理
+│   │   ├── ocr_manager.py      # OCR 数据管理
+│   │   ├── project_manager.py  # 项目数据管理
+│   │   ├── screenshot_manager.py # 截图数据管理
+│   │   ├── stats_manager.py    # 统计数据管理
+│   │   └── task_manager.py     # 任务数据管理
 │   ├── llm/                    # LLM 和 AI 服务
 │   │   ├── llm_client.py       # LLM 客户端封装
 │   │   ├── event_summary_service.py # 事件摘要
@@ -215,22 +229,22 @@ python -m lifetrace_backend.simple_ocr
 │   │   ├── retrieval_service.py# 检索服务
 │   │   ├── context_builder.py  # 上下文构建
 │   │   ├── vector_service.py   # 向量操作
-│   │   ├── vector_db.py        # 向量数据库
-│   │   ├── multimodal_vector_service.py # 多模态向量
-│   │   └── multimodal_embedding.py # 多模态嵌入
+│   │   └── vector_db.py        # 向量数据库
 │   ├── jobs/                   # 后台任务
 │   │   ├── job_manager.py      # 任务管理
 │   │   ├── ocr.py              # OCR 处理任务
 │   │   ├── recorder.py         # 屏幕录制任务
 │   │   ├── scheduler.py        # 任务调度器
 │   │   ├── task_context_mapper.py # 任务上下文映射
-│   │   └── task_summary.py     # 任务摘要
+│   │   ├── task_summary.py     # 任务摘要
+│   │   └── clean_data.py       # 数据清理任务
 │   ├── util/                   # 工具函数
 │   │   ├── app_utils.py        # 应用工具
 │   │   ├── config.py           # 配置工具
 │   │   ├── config_watcher.py   # 配置文件监听器
 │   │   ├── llm_config_handler.py # LLM 配置处理器
 │   │   ├── logging_config.py   # 日志配置
+│   │   ├── prompt_loader.py    # 提示词加载工具
 │   │   ├── query_parser.py     # 查询解析
 │   │   ├── token_usage_logger.py # Token 使用跟踪
 │   │   └── utils.py            # 通用工具
@@ -256,30 +270,34 @@ python -m lifetrace_backend.simple_ocr
 │   │   ├── page.tsx            # 主页
 │   │   ├── layout.tsx          # 根布局
 │   │   ├── globals.css         # 全局样式
-│   │   ├── events/             # 事件管理页面
 │   │   ├── app-usage/          # 应用使用页面
+│   │   ├── cost-tracking/      # 成本追踪页面
 │   │   ├── time-allocation/    # 时间分配页面
 │   │   ├── project-management/ # 项目和任务管理
 │   │   │   ├── page.tsx        # 项目列表
 │   │   │   └── [id]/           # 项目详情
 │   │   │       ├── page.tsx    # 项目概览
-│   │   │       └── tasks/      # 任务管理
-│   │   ├── scheduler/          # 调度器页面
-│   │   └── settings/           # 设置页面
+│   │   │       └── tasks.tsx   # 任务管理
+│   │   └── scheduler/          # 调度器页面
 │   ├── components/             # React 组件
 │   │   ├── common/             # 通用组件
 │   │   │   ├── Button.tsx
 │   │   │   ├── Card.tsx
 │   │   │   ├── Input.tsx
 │   │   │   ├── Loading.tsx
+│   │   │   ├── MessageContent.tsx
 │   │   │   ├── Pagination.tsx
+│   │   │   ├── ScreenshotIdButton.tsx
 │   │   │   ├── SettingsModal.tsx
 │   │   │   └── ThemeToggle.tsx
 │   │   ├── context/            # 上下文组件
+│   │   │   ├── ContextCard.tsx
+│   │   │   └── ContextList.tsx
 │   │   ├── layout/             # 布局组件
 │   │   ├── project/            # 项目组件
 │   │   ├── screenshot/         # 截图组件
 │   │   ├── search/             # 搜索组件
+│   │   │   └── SearchBar.tsx
 │   │   ├── task/               # 任务组件
 │   │   └── ui/                 # UI 组件
 │   ├── lib/                    # 工具和服务
@@ -291,6 +309,7 @@ python -m lifetrace_backend.simple_ocr
 │   │   └── store/              # 状态管理
 │   ├── devlog/                 # 前端开发日志
 │   ├── public/                 # 静态资源
+│   │   └── app-icons/          # 应用图标
 │   ├── package.json            # 前端依赖
 │   ├── pnpm-lock.yaml          # pnpm 锁定文件
 │   ├── next.config.ts          # Next.js 配置

@@ -2,13 +2,16 @@
 
 from fastapi import APIRouter, HTTPException, Query
 
-from lifetrace.routers import dependencies as deps
 from lifetrace.schemas.project import (
     ProjectCreate,
     ProjectListResponse,
     ProjectResponse,
     ProjectUpdate,
 )
+from lifetrace.storage import project_mgr
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -26,23 +29,23 @@ async def create_project(project: ProjectCreate):
     """
     try:
         # 创建项目
-        project_id = deps.db_manager.create_project(name=project.name, goal=project.goal)
+        project_id = project_mgr.create_project(name=project.name, goal=project.goal)
 
         if not project_id:
             raise HTTPException(status_code=500, detail="创建项目失败")
 
         # 获取创建的项目信息
-        project_data = deps.db_manager.get_project(project_id)
+        project_data = project_mgr.get_project(project_id)
         if not project_data:
             raise HTTPException(status_code=500, detail="获取创建的项目信息失败")
 
-        deps.logger.info(f"成功创建项目: {project_id} - {project.name}")
+        logger.info(f"成功创建项目: {project_id} - {project.name}")
         return ProjectResponse(**project_data)
 
     except HTTPException:
         raise
     except Exception as e:
-        deps.logger.error(f"创建项目失败: {e}", exc_info=True)
+        logger.error(f"创建项目失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"创建项目失败: {str(e)}") from e
 
 
@@ -63,12 +66,12 @@ async def get_projects(
     """
     try:
         # 获取项目列表
-        projects = deps.db_manager.list_projects(limit=limit, offset=offset)
+        projects = project_mgr.list_projects(limit=limit, offset=offset)
 
         # 统计总数（这里简化处理，实际应该有单独的count方法）
         total = len(projects)
 
-        deps.logger.info(f"获取项目列表，返回 {len(projects)} 个项目")
+        logger.info(f"获取项目列表，返回 {len(projects)} 个项目")
 
         return ProjectListResponse(
             total=total,
@@ -76,7 +79,7 @@ async def get_projects(
         )
 
     except Exception as e:
-        deps.logger.error(f"获取项目列表失败: {e}", exc_info=True)
+        logger.error(f"获取项目列表失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取项目列表失败: {str(e)}") from e
 
 
@@ -92,7 +95,7 @@ async def get_project(project_id: int):
         项目详情
     """
     try:
-        project = deps.db_manager.get_project(project_id)
+        project = project_mgr.get_project(project_id)
 
         if not project:
             raise HTTPException(status_code=404, detail="项目不存在")
@@ -102,7 +105,7 @@ async def get_project(project_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        deps.logger.error(f"获取项目详情失败: {e}", exc_info=True)
+        logger.error(f"获取项目详情失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"获取项目详情失败: {str(e)}") from e
 
 
@@ -120,12 +123,12 @@ async def update_project(project_id: int, project: ProjectUpdate):
     """
     try:
         # 检查项目是否存在
-        existing = deps.db_manager.get_project(project_id)
+        existing = project_mgr.get_project(project_id)
         if not existing:
             raise HTTPException(status_code=404, detail="项目不存在")
 
         # 更新项目
-        success = deps.db_manager.update_project(
+        success = project_mgr.update_project(
             project_id=project_id, name=project.name, goal=project.goal
         )
 
@@ -133,17 +136,17 @@ async def update_project(project_id: int, project: ProjectUpdate):
             raise HTTPException(status_code=500, detail="更新项目失败")
 
         # 获取更新后的项目信息
-        updated_project = deps.db_manager.get_project(project_id)
+        updated_project = project_mgr.get_project(project_id)
         if not updated_project:
             raise HTTPException(status_code=500, detail="获取更新后的项目信息失败")
 
-        deps.logger.info(f"成功更新项目: {project_id}")
+        logger.info(f"成功更新项目: {project_id}")
         return ProjectResponse(**updated_project)
 
     except HTTPException:
         raise
     except Exception as e:
-        deps.logger.error(f"更新项目失败: {e}", exc_info=True)
+        logger.error(f"更新项目失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"更新项目失败: {str(e)}") from e
 
 
@@ -160,21 +163,21 @@ async def delete_project(project_id: int):
     """
     try:
         # 检查项目是否存在
-        existing = deps.db_manager.get_project(project_id)
+        existing = project_mgr.get_project(project_id)
         if not existing:
             raise HTTPException(status_code=404, detail="项目不存在")
 
         # 删除项目
-        success = deps.db_manager.delete_project(project_id)
+        success = project_mgr.delete_project(project_id)
 
         if not success:
             raise HTTPException(status_code=500, detail="删除项目失败")
 
-        deps.logger.info(f"成功删除项目: {project_id}")
+        logger.info(f"成功删除项目: {project_id}")
         return None
 
     except HTTPException:
         raise
     except Exception as e:
-        deps.logger.error(f"删除项目失败: {e}", exc_info=True)
+        logger.error(f"删除项目失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"删除项目失败: {str(e)}") from e

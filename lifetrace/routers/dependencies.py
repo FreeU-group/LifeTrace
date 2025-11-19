@@ -5,14 +5,16 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Any
 
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
+
 # 全局依赖对象 - 在 server.py 中初始化
-db_manager = None
 ocr_processor = None
 vector_service = None
 rag_service = None
 behavior_tracker = None
 config = None
-logger = None
 
 # 会话管理
 chat_sessions = defaultdict(dict)
@@ -37,8 +39,7 @@ def create_new_session(session_id: str = None) -> str:
         "last_active": datetime.now(),
     }
 
-    if logger:
-        logger.info(f"创建新会话: {session_id}")
+    logger.info(f"创建新会话: {session_id}")
     return session_id
 
 
@@ -47,8 +48,7 @@ def clear_session_context(session_id: str) -> bool:
     if session_id in chat_sessions:
         chat_sessions[session_id]["context"] = []
         chat_sessions[session_id]["last_active"] = datetime.now()
-        if logger:
-            logger.info(f"清除会话上下文: {session_id}")
+        logger.info(f"清除会话上下文: {session_id}")
         return True
     return False
 
@@ -80,22 +80,18 @@ def add_to_session_context(session_id: str, role: str, content: str):
 
 
 def init_dependencies(
-    db_mgr,
     ocr_proc,
     vec_service,
     rag_svc,
     cfg,
-    log,
     is_llm_config,
 ):
     """初始化全局依赖"""
-    global db_manager, ocr_processor, vector_service
-    global rag_service, config, logger, is_llm_configured
+    global ocr_processor, vector_service
+    global rag_service, config, is_llm_configured
 
-    db_manager = db_mgr
     ocr_processor = ocr_proc
     vector_service = vec_service
     rag_service = rag_svc
     config = cfg
-    logger = log
     is_llm_configured = is_llm_config

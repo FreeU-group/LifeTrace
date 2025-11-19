@@ -10,6 +10,10 @@ from lifetrace.schemas.stats import (
     BehaviorStatsResponse,
     DashboardStatsResponse,
 )
+from lifetrace.storage import event_mgr
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 router = APIRouter(prefix="/api", tags=["behavior"])
 
@@ -46,7 +50,7 @@ async def get_behavior_stats(
             total_records=len(behavior_records),
         )
     except Exception as e:
-        deps.logger.error(f"获取行为统计失败: {e}")
+        logger.error(f"获取行为统计失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取行为统计失败: {str(e)}") from e
 
 
@@ -111,7 +115,7 @@ async def get_dashboard_stats():
             performance_metrics=performance_metrics,
         )
     except Exception as e:
-        deps.logger.error(f"获取仪表板统计失败: {e}")
+        logger.error(f"获取仪表板统计失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取仪表板统计失败: {str(e)}") from e
 
 
@@ -119,10 +123,10 @@ async def get_dashboard_stats():
 async def get_app_usage_stats(
     days: int = Query(7, description="统计天数", ge=1, le=365),
 ):
-    """获取应用使用统计数据"""
+    """获取应用使用统计数据（基于 Event 表）"""
     try:
-        # 使用新的AppUsageLog表获取统计数据
-        stats_data = deps.db_manager.get_app_usage_stats(days=days)
+        # 使用 Event 表获取统计数据（更准确的时间计算）
+        stats_data = event_mgr.get_app_usage_stats(days=days)
 
         # 转换数据格式以匹配前端期望
         app_usage_list = []
@@ -183,5 +187,5 @@ async def get_app_usage_stats(
         )
 
     except Exception as e:
-        deps.logger.error(f"获取应用使用统计失败: {e}")
+        logger.error(f"获取应用使用统计失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取应用使用统计失败: {str(e)}") from e

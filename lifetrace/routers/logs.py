@@ -6,6 +6,9 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
 from lifetrace.routers import dependencies as deps
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 router = APIRouter(prefix="/api/logs", tags=["logs"])
 
@@ -41,7 +44,7 @@ async def get_log_files():
 
         return sorted(log_files, key=lambda x: x["name"])
     except Exception as e:
-        deps.logger.error(f"获取日志文件列表失败: {e}")
+        logger.error(f"获取日志文件列表失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -71,5 +74,5 @@ async def get_log_content(file: str = Query(..., description="日志文件相对
     except HTTPException:
         raise
     except Exception as e:
-        deps.logger.error(f"读取日志文件失败: {e}")
+        logger.error(f"读取日志文件失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

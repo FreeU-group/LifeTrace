@@ -5,16 +5,13 @@
 """
 
 import hashlib
-import logging
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-# 添加项目根目录到Python路径，以便直接运行此文件
-if __name__ == "__main__":
-    project_root = Path(__file__).parent.parent
-    sys.path.insert(0, str(project_root))
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 try:
     import chromadb
@@ -22,8 +19,8 @@ try:
     from chromadb.config import Settings
     from sentence_transformers import CrossEncoder, SentenceTransformer
 except ImportError as e:
-    logging.warning(f"Vector database dependencies not installed: {e}")
-    logging.warning("Please install with: pip install -r requirements_vector.txt")
+    logger.warning(f"Vector database dependencies not installed: {e}")
+    logger.warning("Please install with: pip install -r requirements_vector.txt")
     SentenceTransformer = None
     CrossEncoder = None
     chromadb = None
@@ -44,7 +41,7 @@ class VectorDatabase:
             config: 配置对象
         """
         self.config = config
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
         # 检查依赖
         if not self._check_dependencies():
@@ -168,6 +165,9 @@ class VectorDatabase:
             if metadata:
                 doc_metadata.update(metadata)
 
+            # 过滤掉 None 值（ChromaDB 不接受 None）
+            doc_metadata = {k: v for k, v in doc_metadata.items() if v is not None}
+
             # 添加到集合
             self.collection.add(
                 documents=[text],
@@ -218,6 +218,9 @@ class VectorDatabase:
             }
             if metadata:
                 doc_metadata.update(metadata)
+
+            # 过滤掉 None 值（ChromaDB 不接受 None）
+            doc_metadata = {k: v for k, v in doc_metadata.items() if v is not None}
 
             # 添加到集合
             self.collection.add(
@@ -480,19 +483,19 @@ def create_vector_db(config) -> VectorDatabase | None:
     """
     # 检查依赖
     if not all([SentenceTransformer, CrossEncoder, chromadb, np]):
-        logging.warning("Vector database dependencies not available")
+        logger.warning("Vector database dependencies not available")
         return None
 
     # 检查是否启用向量数据库
     if not config.vector_db_enabled:
-        logging.info("Vector database is disabled in configuration")
+        logger.info("Vector database is disabled in configuration")
         return None
 
     try:
         return VectorDatabase(config)
     except ImportError:
-        logging.warning("Vector database not available, skipping initialization")
+        logger.warning("Vector database not available, skipping initialization")
         return None
     except Exception as e:
-        logging.error(f"Failed to create vector database: {e}")
+        logger.error(f"Failed to create vector database: {e}")
         return None

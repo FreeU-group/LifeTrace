@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
 """
 LifeTrace 简化OCR处理器
 参考 pad_ocr.py 设计，提供简单高效的OCR功能
 """
 
+import hashlib
 import os
 import sys
 import time
@@ -12,7 +12,7 @@ from pathlib import Path
 import yaml
 
 from lifetrace.llm.vector_service import create_vector_service
-from lifetrace.storage import db_manager
+from lifetrace.storage import get_session, ocr_mgr, screenshot_mgr
 from lifetrace.storage.models import OCRResult, Screenshot
 from lifetrace.util.config import config
 from lifetrace.util.logging_config import get_logger
@@ -238,7 +238,7 @@ class SimpleOCRProcessor:
     def get_statistics(self):
         """获取OCR处理统计信息"""
         try:
-            with db_manager.get_session() as session:
+            with get_session() as session:
                 total_screenshots = session.query(Screenshot).count()
                 ocr_results = session.query(OCRResult).count()
                 unprocessed = total_screenshots - ocr_results
@@ -306,7 +306,7 @@ def save_to_database(image_path: str, ocr_result: dict, vector_service=None):
     """保存OCR结果到数据库"""
     try:
         # 查找对应的截图记录
-        screenshot = db_manager.get_screenshot_by_path(image_path)
+        screenshot = screenshot_mgr.get_screenshot_by_path(image_path)
         if not screenshot:
             # 如果没有找到截图记录，为外部文件创建一个记录
             logger.info(f"为外部截图文件创建数据库记录: {image_path}")
@@ -318,7 +318,7 @@ def save_to_database(image_path: str, ocr_result: dict, vector_service=None):
             screenshot_id = screenshot["id"]
 
         # 添加OCR结果到SQLite数据库
-        ocr_result_id = db_manager.add_ocr_result(
+        ocr_result_id = ocr_mgr.add_ocr_result(
             screenshot_id=screenshot_id,
             text_content=ocr_result["text_content"],
             confidence=ocr_result["confidence"],
@@ -327,13 +327,13 @@ def save_to_database(image_path: str, ocr_result: dict, vector_service=None):
         )
 
         # 更新截图状态
-        db_manager.update_screenshot_processed(screenshot_id)
+        screenshot_mgr.update_screenshot_processed(screenshot_id)
 
         # 添加到向量数据库
         if vector_service and vector_service.is_enabled() and ocr_result_id:
             try:
                 # 获取完整的OCR结果对象
-                with db_manager.get_session() as session:
+                with get_session() as session:
                     ocr_obj = session.query(OCRResult).filter(OCRResult.id == ocr_result_id).first()
                     screenshot_obj = (
                         session.query(Screenshot).filter(Screenshot.id == screenshot_id).first()
@@ -361,8 +361,6 @@ def save_to_database(image_path: str, ocr_result: dict, vector_service=None):
 def create_screenshot_record(image_path: str):
     """为外部截图文件创建数据库记录"""
     try:
-        import hashlib
-
         # 检查文件是否存在
         if not os.path.exists(image_path):
             return None
@@ -389,7 +387,7 @@ def create_screenshot_record(image_path: str):
             window_title = f"Snipaste截图 - {filename}"
 
         # 添加截图记录
-        screenshot_id = db_manager.add_screenshot(
+        screenshot_id = screenshot_mgr.add_screenshot(
             file_path=image_path,
             file_hash=file_hash,
             width=width,
@@ -420,9 +418,7 @@ def get_unprocessed_screenshots(logger_instance=None, limit=50):
     log = logger_instance if logger_instance is not None else logger
 
     try:
-        from lifetrace.storage.models import OCRResult, Screenshot
-
-        with db_manager.get_session() as session:
+        with get_session() as session:
             # 优化查询：使用NOT EXISTS子查询替代LEFT JOIN
             # 这种方式在大数据量时性能更好
             # 按创建时间降序排列，优先处理最新的截图
@@ -522,7 +518,7 @@ def _ensure_ocr_initialized():
 
     if _vector_service is None:
         logger.info("正在初始化向量数据库服务...")
-        _vector_service = create_vector_service(config, db_manager)
+        _vector_service = create_vector_service(config)
         if _vector_service.is_enabled():
             logger.info("向量数据库服务已启用")
         else:
@@ -623,7 +619,7 @@ def ocr_service():
 
     # 初始化向量数据库服务
     logger.info("正在初始化向量数据库服务...")
-    vector_service = create_vector_service(config, db_manager)
+    vector_service = create_vector_service(config)
     if vector_service.is_enabled():
         logger.info("向量数据库服务已启用")
     else:

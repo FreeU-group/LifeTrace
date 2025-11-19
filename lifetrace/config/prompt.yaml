@@ -68,13 +68,13 @@ llm_client:
     4. 查询类型：总结、搜索、统计等
 
     请以JSON格式返回结果，包含以下字段：
-    {
+    {{
       "start_date": "YYYY-MM-DD HH:MM:SS" 或 null,
       "end_date": "YYYY-MM-DD HH:MM:SS" 或 null,
       "app_names": ["应用名称1", "应用名称2"] 或 null,
       "keywords": ["关键词1", "关键词2"] 或 null,
       "query_type": "summary|search|statistics|other"
-    }
+    }}
 
     注意：
     - 如果没有明确的时间信息，start_date和end_date设为null
@@ -125,10 +125,10 @@ event_summary:
     4. 如果OCR文本内容较杂乱，提取最重要的主题
 
     请以JSON格式返回：
-    {
+    {{
       "title": "标题内容",
       "summary": "摘要内容，**重点部分**"
-    }
+    }}
 
   # 活动摘要助手（系统提示词）
   activity_assistant: |

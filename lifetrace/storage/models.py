@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, Text
 from sqlalchemy.ext.declarative import declarative_base
 
 
@@ -12,66 +12,29 @@ def get_local_time():
 Base = declarative_base()
 
 
-class Event(Base):
-    """事件模型（按前台应用连续使用区间聚合截图）"""
-
-    __tablename__ = "events"
-
-    id = Column(Integer, primary_key=True)
-    app_name = Column(String(200))
-    window_title = Column(String(500))  # 首个或最近的窗口标题
-    start_time = Column(DateTime, default=get_local_time)
-    end_time = Column(DateTime)  # 事件结束时间（应用切换时填充）
-    created_at = Column(DateTime, default=get_local_time)
-    ai_title = Column(String(50))  # LLM生成的事件标题（≤10字）
-    ai_summary = Column(Text)  # LLM生成的事件摘要（≤30字，支持markdown）
-    task_id = Column(Integer, ForeignKey("tasks.id"))  # 关联的任务ID（可为空）
-    auto_association_attempted = Column(Boolean, default=False)  # 是否已尝试过自动关联
-
-    def __repr__(self):
-        return f"<Event(id={self.id}, app={self.app_name})>"
-
-
-class EventAssociation(Base):
-    """事件关联模型（事件与项目/任务的关联关系）"""
-
-    __tablename__ = "event_associations"
-
-    id = Column(Integer, primary_key=True)
-    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)  # 关联的事件ID
-    project_id = Column(Integer, ForeignKey("projects.id"))  # 关联的项目ID
-    task_id = Column(Integer, ForeignKey("tasks.id"))  # 关联的任务ID
-    project_confidence = Column(Float)  # 项目关联置信度
-    task_confidence = Column(Float)  # 任务关联置信度
-    reasoning = Column(Text)  # 关联推理过程
-    association_method = Column(String(50))  # 关联方法：auto, manual等
-    used_in_summary = Column(Boolean, default=False)  # 是否已用于任务摘要
-    created_at = Column(DateTime, default=get_local_time, nullable=False)
-    updated_at = Column(DateTime, default=get_local_time, onupdate=get_local_time, nullable=False)
-
-    def __repr__(self):
-        return f"<EventAssociation(id={self.id}, event_id={self.event_id}, task_id={self.task_id})>"
-
-
 class Screenshot(Base):
     """截图记录模型"""
 
     __tablename__ = "screenshots"
 
     id = Column(Integer, primary_key=True)
-    file_path = Column(String(500), nullable=False, unique=True)
-    file_hash = Column(String(64), nullable=False)  # imagehash值
-    file_size = Column(Integer, nullable=False)
-    width = Column(Integer, nullable=False)
-    height = Column(Integer, nullable=False)
-    screen_id = Column(Integer, nullable=False, default=0)
+    file_path = Column(String(500), nullable=False, unique=True)  # 文件路径
+    file_hash = Column(String(64), nullable=False)  # 文件hash值
+    file_size = Column(Integer, nullable=False)  # 文件大小
+    file_deleted = Column(Boolean, default=False)  # 文件是否已被清理（标记后前端显示占位图）
+    width = Column(Integer, nullable=False)  # 截图宽度
+    height = Column(Integer, nullable=False)  # 截图高度
+    screen_id = Column(Integer, nullable=False, default=0)  # 屏幕ID
     app_name = Column(String(200))  # 前台应用名称
     window_title = Column(String(500))  # 窗口标题
-    # 事件ID（可为空，老数据迁移后逐步填充）
-    event_id = Column(Integer)
-    created_at = Column(DateTime, default=get_local_time)
-    processed_at = Column(DateTime)  # OCR处理时间
-    is_processed = Column(Boolean, default=False)
+    event_id = Column(Integer)  # 关联事件ID
+    is_processed = Column(Boolean, default=False)  # 是否在进行OCR处理
+    processed_at = Column(DateTime)  # OCR处理完成时间
+    created_at = Column(DateTime, default=get_local_time, nullable=False)  # 创建时间
+    updated_at = Column(
+        DateTime, default=get_local_time, onupdate=get_local_time, nullable=False
+    )  # 更新时间
+    deleted_at = Column(DateTime)  # 软删除时间戳
 
     def __repr__(self):
         return f"<Screenshot(id={self.id}, file={self.file_path})>"
@@ -83,107 +46,64 @@ class OCRResult(Base):
     __tablename__ = "ocr_results"
 
     id = Column(Integer, primary_key=True)
-    screenshot_id = Column(Integer, nullable=False)
+    screenshot_id = Column(Integer, nullable=False)  # 关联截图ID
     text_content = Column(Text)  # 提取的文本内容
-    confidence = Column(Float)  # 置信度
-    language = Column(String(10))  # 识别语言
-    processing_time = Column(Float)  # 处理耗时（秒）
-    created_at = Column(DateTime, default=get_local_time)
+    confidence = Column(Float)  # 置信度[0, 1]
+    language = Column(String(10))  # 识别语言（zh, en, ja, etc.）
+    processing_time = Column(Float)  # OCR处理耗时（秒）
+    created_at = Column(DateTime, default=get_local_time, nullable=False)
+    updated_at = Column(DateTime, default=get_local_time, onupdate=get_local_time, nullable=False)
+    deleted_at = Column(DateTime)  # 软删除时间戳
 
     def __repr__(self):
         return f"<OCRResult(id={self.id}, screenshot_id={self.screenshot_id})>"
 
 
-class SearchIndex(Base):
-    """搜索索引模型"""
+class Event(Base):
+    """事件模型（按前台应用连续使用区间聚合截图）"""
 
-    __tablename__ = "search_index"
-
-    id = Column(Integer, primary_key=True)
-    screenshot_id = Column(Integer, nullable=False)
-    content = Column(Text, nullable=False)  # 用于搜索的内容
-    keywords = Column(Text)  # 关键词（JSON格式）
-    created_at = Column(DateTime, default=get_local_time)
-
-    def __repr__(self):
-        return f"<SearchIndex(id={self.id}, screenshot_id={self.screenshot_id})>"
-
-
-class ProcessingQueue(Base):
-    """处理队列模型"""
-
-    __tablename__ = "processing_queue"
+    __tablename__ = "events"
 
     id = Column(Integer, primary_key=True)
-    screenshot_id = Column(Integer, nullable=False)
-    task_type = Column(String(50), nullable=False)  # 任务类型：ocr
-    status = Column(String(20), default="pending")  # pending, processing, completed, failed
-    retry_count = Column(Integer, default=0)
-    error_message = Column(Text)
-    created_at = Column(DateTime, default=get_local_time)
-    updated_at = Column(DateTime, default=get_local_time, onupdate=get_local_time)
+    app_name = Column(String(200))  # 前台应用名称
+    window_title = Column(String(500))  # 首个或最近的窗口标题
+    start_time = Column(DateTime, default=get_local_time)  # 事件开始时间
+    end_time = Column(DateTime)  # 事件结束时间（应用切换时填充）
+    status = Column(String(20), default="new")  # 事件状态：new, processing, done
+    ai_title = Column(String(50))  # LLM生成的事件标题（≤10字）
+    ai_summary = Column(Text)  # LLM生成的事件摘要（≤30字，支持markdown）
+    task_id = Column(Integer)  # 关联的任务ID（可为空）
+    auto_association_attempted = Column(Boolean, default=False)  # 是否已尝试过自动关联
+    created_at = Column(DateTime, default=get_local_time, nullable=False)
+    updated_at = Column(DateTime, default=get_local_time, onupdate=get_local_time, nullable=False)
+    deleted_at = Column(DateTime)  # 软删除时间戳
 
     def __repr__(self):
-        return f"<ProcessingQueue(id={self.id}, task={self.task_type}, status={self.status})>"
+        return f"<Event(id={self.id}, app={self.app_name}, status={self.status})>"
 
 
-class UserBehaviorStats(Base):
-    """用户行为统计模型"""
+class EventTaskRelation(Base):
+    """事件与任务的关联关系表"""
 
-    __tablename__ = "user_behavior_stats"
+    __tablename__ = "event_task_relations"
 
     id = Column(Integer, primary_key=True)
-    action_type = Column(String(50), nullable=False)  # search, chat, view_screenshot, etc.
-    action_details = Column(Text)  # JSON格式的详细信息
-    session_id = Column(String(100))  # 会话ID
-    user_agent = Column(String(500))  # 用户代理
-    ip_address = Column(String(50))  # IP地址
-    response_time = Column(Float)  # 响应时间（毫秒）
-    success = Column(Boolean, default=True)  # 操作是否成功
-    created_at = Column(DateTime, default=get_local_time)
+    event_id = Column(Integer, nullable=False)  # 关联的事件ID
+    project_id = Column(Integer)  # 关联的项目ID
+    task_id = Column(Integer)  # 关联的任务ID
+    project_confidence = Column(Float)  # 项目关联置信度
+    task_confidence = Column(Float)  # 任务关联置信度
+    reasoning = Column(Text)  # 关联推理过程
+    association_method = Column(String(50))  # 关联方法：auto, manual等
+    used_in_summary = Column(Boolean, default=False)  # 是否已用于任务摘要
+    created_at = Column(DateTime, default=get_local_time, nullable=False)
+    updated_at = Column(DateTime, default=get_local_time, onupdate=get_local_time, nullable=False)
+    deleted_at = Column(DateTime)  # 软删除时间戳
 
     def __repr__(self):
-        return f"<UserBehaviorStats(id={self.id}, action={self.action_type})>"
-
-
-class AppUsageLog(Base):
-    """应用使用记录模型 - 用于精确的app使用统计"""
-
-    __tablename__ = "app_usage_logs"
-
-    id = Column(Integer, primary_key=True)
-    app_name = Column(String(200), nullable=False)  # 应用名称
-    window_title = Column(String(500))  # 窗口标题
-    timestamp = Column(DateTime, default=get_local_time, nullable=False)  # 记录时间戳
-    duration_seconds = Column(Integer, default=0)  # 持续时间（秒），用于记录从上次记录到现在的时长
-    is_active = Column(Boolean, default=True)  # 是否为活跃状态
-    screen_id = Column(Integer, default=0)  # 屏幕ID
-    created_at = Column(DateTime, default=get_local_time)
-
-    def __repr__(self):
-        return f"<AppUsageLog(id={self.id}, app={self.app_name}, timestamp={self.timestamp})>"
-
-
-class DailyStats(Base):
-    """每日统计模型"""
-
-    __tablename__ = "daily_stats"
-
-    id = Column(Integer, primary_key=True)
-    date = Column(String(10), nullable=False, unique=True)  # YYYY-MM-DD格式
-    total_searches = Column(Integer, default=0)
-    total_chats = Column(Integer, default=0)
-    total_screenshots_viewed = Column(Integer, default=0)
-    total_actions = Column(Integer, default=0)  # 添加缺失的字段
-    total_sessions = Column(Integer, default=0)
-    avg_response_time = Column(Float, default=0.0)
-    most_active_hour = Column(Integer)  # 最活跃的小时
-    top_search_keywords = Column(Text)  # JSON格式的热门搜索关键词
-    created_at = Column(DateTime, default=get_local_time)
-    updated_at = Column(DateTime, default=get_local_time, onupdate=get_local_time)
-
-    def __repr__(self):
-        return f"<DailyStats(date={self.date}, searches={self.total_searches})>"
+        return (
+            f"<EventTaskRelation(id={self.id}, event_id={self.event_id}, task_id={self.task_id})>"
+        )
 
 
 class Project(Base):
@@ -193,9 +113,11 @@ class Project(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(200), nullable=False)  # 项目名称
+    description = Column(Text)  # 项目描述
     goal = Column(Text)  # 项目目标
     created_at = Column(DateTime, default=get_local_time, nullable=False)
     updated_at = Column(DateTime, default=get_local_time, onupdate=get_local_time, nullable=False)
+    deleted_at = Column(DateTime)
 
     def __repr__(self):
         return f"<Project(id={self.id}, name={self.name})>"
@@ -206,16 +128,16 @@ class Task(Base):
 
     __tablename__ = "tasks"
 
-    id = Column(Integer, primary_key=True)  # task_id
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)  # 外键关联到项目
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, nullable=False)  # 关联到项目ID
     name = Column(String(200), nullable=False)  # 任务名称
     description = Column(Text)  # 任务描述
     status = Column(
         String(20), default="pending", nullable=False
     )  # 任务状态：pending, in_progress, completed, cancelled
-    parent_task_id = Column(Integer, ForeignKey("tasks.id"))  # 父任务ID（自关联，用于子任务）
     created_at = Column(DateTime, default=get_local_time, nullable=False)
     updated_at = Column(DateTime, default=get_local_time, onupdate=get_local_time, nullable=False)
+    deleted_at = Column(DateTime)
 
     def __repr__(self):
         return f"<Task(id={self.id}, name={self.name}, project_id={self.project_id})>"
@@ -227,11 +149,13 @@ class TaskProgress(Base):
     __tablename__ = "task_progress"
 
     id = Column(Integer, primary_key=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)  # 关联的任务ID
+    task_id = Column(Integer, nullable=False)  # 关联的任务ID
     summary = Column(Text, nullable=False)  # 进展摘要内容
     context_count = Column(Integer, default=0)  # 基于多少个上下文生成
     generated_at = Column(DateTime, default=get_local_time, nullable=False)  # 生成时间
     created_at = Column(DateTime, default=get_local_time, nullable=False)
+    updated_at = Column(DateTime, default=get_local_time, onupdate=get_local_time, nullable=False)
+    deleted_at = Column(DateTime)
 
     def __repr__(self):
         return f"<TaskProgress(id={self.id}, task_id={self.task_id}, generated_at={self.generated_at})>"
@@ -248,9 +172,10 @@ class Chat(Base):
     title = Column(String(200))  # 会话标题
     context_id = Column(Integer)  # 关联的上下文ID（可选）
     extra_data = Column(Text)  # 额外数据（JSON格式）
+    last_message_at = Column(DateTime)  # 最后一条消息的时间
     created_at = Column(DateTime, default=get_local_time, nullable=False)
     updated_at = Column(DateTime, default=get_local_time, onupdate=get_local_time, nullable=False)
-    last_message_at = Column(DateTime)  # 最后一条消息的时间
+    deleted_at = Column(DateTime)
 
     def __repr__(self):
         return f"<Chat(id={self.id}, session_id={self.session_id}, type={self.chat_type})>"
@@ -262,13 +187,15 @@ class Message(Base):
     __tablename__ = "messages"
 
     id = Column(Integer, primary_key=True)
-    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False)  # 关联的聊天会话ID
+    chat_id = Column(Integer, nullable=False)  # 关联的聊天会话ID
     role = Column(String(20), nullable=False)  # 消息角色：user, assistant, system
     content = Column(Text, nullable=False)  # 消息内容
     token_count = Column(Integer)  # token数量
     model = Column(String(100))  # 使用的模型名称
     extra_data = Column(Text)  # 额外数据（JSON格式）
     created_at = Column(DateTime, default=get_local_time, nullable=False)
+    updated_at = Column(DateTime, default=get_local_time, onupdate=get_local_time, nullable=False)
+    deleted_at = Column(DateTime)
 
     def __repr__(self):
         return f"<Message(id={self.id}, chat_id={self.chat_id}, role={self.role})>"
@@ -293,6 +220,8 @@ class TokenUsage(Base):
     output_cost = Column(Float)  # 输出成本（元）
     total_cost = Column(Float)  # 总成本（元）
     created_at = Column(DateTime, default=get_local_time, nullable=False)
+    updated_at = Column(DateTime, default=get_local_time, onupdate=get_local_time, nullable=False)
+    deleted_at = Column(DateTime)  # 软删除时间戳
 
     def __repr__(self):
         return f"<TokenUsage(id={self.id}, model={self.model}, total_tokens={self.total_tokens}, cost={self.total_cost})>"

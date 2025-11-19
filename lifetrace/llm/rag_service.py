@@ -1,42 +1,29 @@
 import asyncio
-import logging
-import sys
 from collections.abc import Generator
 from datetime import datetime
-from pathlib import Path
 from typing import Any
-
-# 添加项目根目录到Python路径，以便直接运行此文件
-if __name__ == "__main__":
-    project_root = Path(__file__).parent.parent
-    sys.path.insert(0, str(project_root))
 
 from lifetrace.llm.context_builder import ContextBuilder
 from lifetrace.llm.llm_client import LLMClient
 from lifetrace.llm.retrieval_service import RetrievalService
-from lifetrace.storage import DatabaseManager
+from lifetrace.storage import chat_mgr, project_mgr, task_mgr
+from lifetrace.util.config import config
+from lifetrace.util.logging_config import get_logger
 from lifetrace.util.prompt_loader import get_prompt
 from lifetrace.util.query_parser import QueryConditions, QueryParser
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 class RAGService:
     """RAG (检索增强生成) 服务，整合查询解析、数据检索、上下文构建和LLM生成"""
 
-    def __init__(
-        self,
-        db_manager: DatabaseManager,
-    ):
+    def __init__(self):
         """
         初始化RAG服务
-
-        Args:
-            db_manager: 数据库管理器
         """
-        self.db_manager = db_manager
         self.llm_client = LLMClient()
-        self.retrieval_service = RetrievalService(db_manager)
+        self.retrieval_service = RetrievalService()
         self.context_builder = ContextBuilder()
         self.query_parser = QueryParser(self.llm_client)
 
@@ -520,7 +507,7 @@ class RAGService:
         return {
             "rag_service": "healthy",
             "llm_client": ("available" if self.llm_client.is_available() else "unavailable"),
-            "database": "connected" if self.db_manager else "disconnected",
+            "database": "connected",
             "components": {
                 "retrieval_service": "ready",
                 "context_builder": "ready",
@@ -632,7 +619,11 @@ LifeTrace是一个生活轨迹记录和分析系统，主要功能包括：
             return "我理解您的问题，但可能需要更多信息才能提供准确的回答。您可以尝试更具体的查询，比如搜索特定内容或统计使用情况。"
 
     async def process_query_stream(
-        self, user_query: str, project_id: int | None = None, task_ids: list[int] | None = None
+        self,
+        user_query: str,
+        project_id: int | None = None,
+        task_ids: list[int] | None = None,
+        session_id: str | None = None,
     ) -> dict[str, Any]:
         """
         为流式接口处理查询，返回构建好的messages和temperature
@@ -642,11 +633,12 @@ LifeTrace是一个生活轨迹记录和分析系统，主要功能包括：
             user_query: 用户查询
             project_id: 可选的项目ID，用于过滤上下文
             task_ids: 可选的任务ID列表，表示选中的任务
+            session_id: 可选的会话ID，用于获取历史对话
         """
         try:
             # 1. 意图识别
             logger.info(
-                f"[stream] 开始处理查询: {user_query}, project_id: {project_id}, task_ids: {task_ids}"
+                f"[stream] 开始处理查询: {user_query}, project_id: {project_id}, task_ids: {task_ids}, session_id: {session_id}"
             )
             intent_result = self.llm_client.classify_intent(user_query)
             needs_db = intent_result.get("needs_database", True)
@@ -654,17 +646,25 @@ LifeTrace是一个生活轨迹记录和分析系统，主要功能包括：
             messages = []
             temperature = 0.7
 
+            # 获取历史对话配置
+            chat_config = config.get("chat", {})
+            enable_history = chat_config.get("enable_history", True)
+            history_limit = chat_config.get("history_limit", 10)
+            logger.info(
+                f"[stream] 历史对话配置: enable_history={enable_history}, history_limit={history_limit}"
+            )
+
             # 获取项目信息（如果提供了 project_id）
             project_info = None
             tasks_info_str = "暂无任务"
             selected_tasks_info_str = None
 
             if project_id:
-                project_info = self.db_manager.get_project(project_id)
+                project_info = project_mgr.get_project(project_id)
                 logger.info(f"[stream] 获取到项目信息: {project_info}")
 
                 # 获取项目的任务列表
-                tasks = self.db_manager.list_tasks(project_id, limit=100)
+                tasks = task_mgr.list_tasks(project_id, limit=100)
                 if tasks:
                     # 格式化任务信息
                     tasks_list = []
@@ -694,7 +694,7 @@ LifeTrace是一个生活轨迹记录和分析系统，主要功能包括：
                 if task_ids and len(task_ids) > 0:
                     selected_tasks_list = []
                     for task_id in task_ids:
-                        task = self.db_manager.get_task(task_id)
+                        task = task_mgr.get_task(task_id)
                         if task:
                             status_emoji = {
                                 "pending": "⏳",
@@ -742,10 +742,26 @@ LifeTrace是一个生活轨迹记录和分析系统，主要功能包括：
                 else:
                     system_prompt = get_prompt("rag", "general_chat")
 
-                messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_query},
-                ]
+                messages = [{"role": "system", "content": system_prompt}]
+
+                # 添加历史对话（如果启用）
+                if enable_history and session_id and history_limit > 0:
+                    try:
+                        # 获取历史消息，限制数量为 history_limit * 2（因为1轮=用户+助手）
+                        history_messages = chat_mgr.get_messages(
+                            session_id, limit=history_limit * 2
+                        )
+                        # 按时间顺序添加历史消息（排除system消息）
+                        for msg in history_messages:
+                            if msg["role"] in ["user", "assistant"]:
+                                messages.append({"role": msg["role"], "content": msg["content"]})
+                        if history_messages:
+                            logger.info(f"[stream] 添加了 {len(history_messages)} 条历史消息")
+                    except Exception as e:
+                        logger.warning(f"[stream] 获取历史消息失败: {e}")
+
+                # 添加当前用户消息
+                messages.append({"role": "user", "content": user_query})
             else:
                 # 需要数据库查询的情况（会检索历史数据）
                 parsed_query = self.query_parser.parse_query(user_query)
@@ -795,10 +811,26 @@ LifeTrace是一个生活轨迹记录和分析系统，主要功能包括：
                     # 非项目对话，使用事件助手的提示词
                     system_content = context_text
 
-                messages = [
-                    {"role": "system", "content": system_content},
-                    {"role": "user", "content": user_query},
-                ]
+                messages = [{"role": "system", "content": system_content}]
+
+                # 添加历史对话（如果启用）
+                if enable_history and session_id and history_limit > 0:
+                    try:
+                        # 获取历史消息，限制数量为 history_limit * 2（因为1轮=用户+助手）
+                        history_messages = chat_mgr.get_messages(
+                            session_id, limit=history_limit * 2
+                        )
+                        # 按时间顺序添加历史消息（排除system消息）
+                        for msg in history_messages:
+                            if msg["role"] in ["user", "assistant"]:
+                                messages.append({"role": msg["role"], "content": msg["content"]})
+                        if history_messages:
+                            logger.info(f"[stream] 添加了 {len(history_messages)} 条历史消息")
+                    except Exception as e:
+                        logger.warning(f"[stream] 获取历史消息失败: {e}")
+
+                # 添加当前用户消息
+                messages.append({"role": "user", "content": user_query})
                 temperature = 0.3
 
             return {

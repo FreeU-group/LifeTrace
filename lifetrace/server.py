@@ -29,7 +29,6 @@ from lifetrace.routers import (
 )
 from lifetrace.routers import config as config_router
 from lifetrace.routers import dependencies as deps
-from lifetrace.storage import db_manager
 from lifetrace.util.config import config
 from lifetrace.util.config_watcher import ConfigChangeType, get_config_watcher
 from lifetrace.util.llm_config_handler import get_llm_config_handler
@@ -111,12 +110,10 @@ app.add_middleware(
 ocr_processor = SimpleOCRProcessor()
 
 # 初始化向量数据库服务
-vector_service = create_vector_service(config, db_manager)
+vector_service = create_vector_service(config)
 
 # 初始化RAG服务 - 从配置文件读取API配置
-rag_service = RAGService(
-    db_manager=db_manager,
-)
+rag_service = RAGService()
 logger.info(f"RAG服务初始化完成 - 模型: {config.llm_model}, Base URL: {config.llm_base_url}")
 
 # 全局配置状态标志
@@ -126,12 +123,10 @@ logger.info(f"LLM配置状态: {config_status}")
 
 # 初始化路由依赖
 deps.init_dependencies(
-    db_manager,
     ocr_processor,
     vector_service,
     rag_service,
     config,
-    logger,
     is_llm_configured,
 )
 

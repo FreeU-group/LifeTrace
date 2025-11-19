@@ -1,5 +1,4 @@
 import copy
-import logging
 import os
 import shutil
 import sys
@@ -9,6 +8,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 import yaml
+
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 # 尝试导入watchdog，如果不可用则优雅降级
 try:
@@ -73,7 +76,7 @@ class LifeTraceConfig:
         """
         # 如果config.yaml已存在，无需初始化
         if os.path.exists(self.config_path):
-            logging.debug(f"配置文件已存在: {self.config_path}")
+            logger.debug(f"配置文件已存在: {self.config_path}")
             return
 
         # 获取default_config.yaml路径
@@ -91,7 +94,7 @@ class LifeTraceConfig:
             # 复制default_config.yaml到config.yaml
 
             shutil.copy2(default_config_path, self.config_path)
-            logging.info(f"已从默认配置创建配置文件: {self.config_path}")
+            logger.info(f"已从默认配置创建配置文件: {self.config_path}")
         except Exception as e:
             raise RuntimeError(f"初始化配置文件失败: {e}") from e
 
@@ -392,25 +395,25 @@ class LifeTraceConfig:
 
                 # 检查配置是否有变化
                 if new_config == old_config:
-                    logging.debug("配置文件未发生变化，跳过重载")
+                    logger.debug("配置文件未发生变化，跳过重载")
                     return True
 
                 # 更新配置
                 self._config = new_config
 
-                logging.info("配置文件已重新加载")
+                logger.info("配置文件已重新加载")
 
                 # 触发回调
                 for callback in self._callbacks:
                     try:
                         callback(old_config, new_config)
                     except Exception as e:
-                        logging.error(f"配置变更回调执行失败: {e}")
+                        logger.error(f"配置变更回调执行失败: {e}")
 
                 return True
 
         except Exception as e:
-            logging.error(f"配置重载失败: {e}")
+            logger.error(f"配置重载失败: {e}")
             return False
 
     def register_callback(self, callback: Callable[[dict, dict], None]):
@@ -421,7 +424,7 @@ class LifeTraceConfig:
         """
         if callback not in self._callbacks:
             self._callbacks.append(callback)
-            logging.debug(f"已注册配置变更回调: {callback.__name__}")
+            logger.debug(f"已注册配置变更回调: {callback.__name__}")
 
     def unregister_callback(self, callback: Callable[[dict, dict], None]):
         """取消注册配置变更回调
@@ -431,16 +434,16 @@ class LifeTraceConfig:
         """
         if callback in self._callbacks:
             self._callbacks.remove(callback)
-            logging.debug(f"已取消配置变更回调: {callback.__name__}")
+            logger.debug(f"已取消配置变更回调: {callback.__name__}")
 
     def start_watching(self):
         """启动配置文件监听"""
         if not WATCHDOG_AVAILABLE:
-            logging.warning("watchdog库不可用，无法启动配置文件监听")
+            logger.warning("watchdog库不可用，无法启动配置文件监听")
             return False
 
         if self._watching:
-            logging.debug("配置文件监听已在运行")
+            logger.debug("配置文件监听已在运行")
             return True
 
         try:
@@ -459,11 +462,11 @@ class LifeTraceConfig:
             self._observer.start()
 
             self._watching = True
-            logging.info(f"已启动配置文件监听: {self.config_path}")
+            logger.info(f"已启动配置文件监听: {self.config_path}")
             return True
 
         except Exception as e:
-            logging.error(f"启动配置文件监听失败: {e}")
+            logger.error(f"启动配置文件监听失败: {e}")
             return False
 
     def stop_watching(self):
@@ -478,10 +481,10 @@ class LifeTraceConfig:
                 self._observer = None
 
             self._watching = False
-            logging.info("已停止配置文件监听")
+            logger.info("已停止配置文件监听")
 
         except Exception as e:
-            logging.error(f"停止配置文件监听失败: {e}")
+            logger.error(f"停止配置文件监听失败: {e}")
 
     def _should_reload(self) -> bool:
         """检查是否应该重载配置（防抖）"""
@@ -507,7 +510,7 @@ class ConfigFileEventHandler(FileSystemEventHandler):
         # 只处理配置文件的修改
         if os.path.abspath(event.src_path) == os.path.abspath(self.config.config_path):
             if self.config._should_reload():
-                logging.info(f"检测到配置文件变更: {event.src_path}")
+                logger.info(f"检测到配置文件变更: {event.src_path}")
                 # 延迟一小段时间，确保文件写入完成
                 threading.Timer(0.1, self.config.reload).start()
 

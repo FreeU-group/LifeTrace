@@ -13,7 +13,7 @@ class LoggerManager:
         log_path = config.get("log_path", "lifetrace/data/logs/")
 
         console_format = (
-            "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+            "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
             "<level>{level}</level> | "
             "<cyan>{file}:{line}</cyan> | <cyan>{message}</cyan>"
         )
@@ -30,7 +30,7 @@ class LoggerManager:
                 raise ValueError("log_path must be a directory")
 
             # 添加文件名和行号信息到日志格式
-            file_format = "{time:YYYY-MM-DD HH:mm:ss} | {level} | {file}:{line} | {message}"
+            file_format = "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level} | {file}:{line} | {message}"
 
             logger.add(
                 dated_log_path,

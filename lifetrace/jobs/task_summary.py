@@ -9,7 +9,14 @@ from datetime import datetime
 from typing import Any
 
 from lifetrace.llm.llm_client import LLMClient
-from lifetrace.storage.database import DatabaseManager
+from lifetrace.storage import (
+    context_mgr,
+    event_mgr,
+    get_session,
+    ocr_mgr,
+    project_mgr,
+    task_mgr,
+)
 from lifetrace.util.config import config
 from lifetrace.util.logging_config import get_logger
 
@@ -24,7 +31,6 @@ class TaskSummaryService:
 
     def __init__(
         self,
-        db_manager: DatabaseManager,
         llm_client: LLMClient = None,
         min_new_contexts: int = 5,
         check_interval: int = 3600,  # 默认1小时
@@ -34,13 +40,11 @@ class TaskSummaryService:
         初始化任务摘要服务
 
         Args:
-            db_manager: 数据库管理器
             llm_client: LLM客户端，如果为None则自动创建
             min_new_contexts: 触发摘要的最小新上下文数量
             check_interval: 检查间隔（秒），默认3600秒（1小时）
             enabled: 是否启用服务
         """
-        self.db_manager = db_manager
         self.llm_client = llm_client or LLMClient()
         self.min_new_contexts = min_new_contexts
         self.check_interval = check_interval
@@ -129,7 +133,7 @@ class TaskSummaryService:
         """
         try:
             # 获取所有项目
-            projects = self.db_manager.list_projects(limit=1000, offset=0)
+            projects = project_mgr.list_projects(limit=1000, offset=0)
 
             if not projects:
                 logger.debug("系统中没有项目")
@@ -140,13 +144,13 @@ class TaskSummaryService:
             # 遍历所有项目的所有任务
             for project in projects:
                 project_id = project["id"]
-                tasks = self.db_manager.list_tasks(project_id=project_id, limit=1000, offset=0)
+                tasks = task_mgr.list_tasks(project_id=project_id, limit=1000, offset=0)
 
                 for task in tasks:
                     task_id = task["id"]
 
                     # 获取该任务关联的所有上下文，只获取未被用于摘要的
-                    new_contexts = self.db_manager.list_contexts(
+                    new_contexts = context_mgr.list_contexts(
                         task_id=task_id, used_in_summary=False, limit=1000, offset=0
                     )
 
@@ -218,7 +222,7 @@ class TaskSummaryService:
 
             ocr_texts = []
             for screenshot in screenshots[:3]:  # 每个上下文最多取3个截图
-                ocr_results = self.db_manager.get_ocr_results_by_screenshot(screenshot["id"])
+                ocr_results = ocr_mgr.get_ocr_results_by_screenshot(screenshot["id"])
                 for ocr_result in ocr_results:
                     if ocr_result and ocr_result.get("text_content"):
                         ocr_texts.append(ocr_result["text_content"])
@@ -253,10 +257,7 @@ class TaskSummaryService:
         if success:
             # 标记这些上下文已被摘要（在数据库中标记）
             event_ids = [ctx["id"] for ctx in new_contexts]
-            self.db_manager.mark_contexts_used_in_summary(task_id, event_ids)
-
-            # 同时调用旧的方法以保持兼容性
-            self._mark_contexts_as_summarized(task_id, new_contexts)
+            context_mgr.mark_contexts_used_in_summary(task_id, event_ids)
 
             self.stats["total_summaries_generated"] += 1
             self.stats["total_contexts_summarized"] += len(new_contexts)
@@ -279,7 +280,7 @@ class TaskSummaryService:
             截图列表
         """
         try:
-            screenshots = self.db_manager.get_event_screenshots(context_id)
+            screenshots = event_mgr.get_event_screenshots(context_id)
             return screenshots
         except Exception as e:
             logger.error(f"获取上下文 {context_id} 的截图失败: {e}")
@@ -437,7 +438,7 @@ class TaskSummaryService:
                 new_description = formatted_summary.strip()
 
             # 更新任务描述
-            success = self.db_manager.update_task(task_id=task_id, description=new_description)
+            success = task_mgr.update_task(task_id=task_id, description=new_description)
 
             if success:
                 logger.info(f"成功将摘要追加到任务 {task_id} 的描述中")
@@ -463,17 +464,17 @@ class TaskSummaryService:
         """
         try:
             # 获取任务信息
-            task = self.db_manager.get_task(task_id)
+            task = task_mgr.get_task(task_id)
             if not task:
                 return {"success": False, "message": f"任务 {task_id} 不存在"}
 
             # 获取项目信息
-            project = self.db_manager.get_project(task["project_id"])
+            project = project_mgr.get_project(task["project_id"])
             if not project:
                 return {"success": False, "message": f"项目 {task['project_id']} 不存在"}
 
             # 获取该任务关联的所有上下文，只获取未被用于摘要的
-            new_contexts = self.db_manager.list_contexts(
+            new_contexts = context_mgr.list_contexts(
                 task_id=task_id, used_in_summary=False, limit=1000, offset=0
             )
 
@@ -506,20 +507,20 @@ class TaskSummaryService:
         try:
             from sqlalchemy import update
 
-            from lifetrace.storage.models import EventAssociation
+            from lifetrace.storage.models import EventTaskRelation
 
-            with self.db_manager.get_session() as session:
+            with get_session() as session:
                 if task_id is None:
                     # 重置所有记录
-                    stmt = update(EventAssociation).values(used_in_summary=False)
+                    stmt = update(EventTaskRelation).values(used_in_summary=False)
                     result = session.execute(stmt)
                     session.commit()
                     logger.info(f"已清除所有任务的摘要历史记录（重置了 {result.rowcount} 条记录）")
                 else:
                     # 只重置指定任务的记录
                     stmt = (
-                        update(EventAssociation)
-                        .where(EventAssociation.task_id == task_id)
+                        update(EventTaskRelation)
+                        .where(EventTaskRelation.task_id == task_id)
                         .values(used_in_summary=False)
                     )
                     result = session.execute(stmt)
@@ -540,15 +541,12 @@ def get_summary_instance() -> TaskSummaryService:
     """
     global _global_summary_instance
     if _global_summary_instance is None:
-        from lifetrace.storage import db_manager
-
         summary_config = config.get("jobs.task_summary", {})
         min_new_contexts = summary_config.get("min_new_contexts", 5)
         check_interval = summary_config.get("interval", 3600)
         enabled = summary_config.get("enabled", False)
 
         _global_summary_instance = TaskSummaryService(
-            db_manager=db_manager,
             min_new_contexts=min_new_contexts,
             check_interval=check_interval,
             enabled=enabled,
@@ -562,17 +560,20 @@ def execute_summary_task():
     这是一个模块级别的函数，可以被 APScheduler 序列化到数据库中
     """
     try:
+        logger.info("🔄 开始执行任务摘要任务")
         summary_service = get_summary_instance()
 
         if not summary_service.enabled:
-            logger.debug("任务摘要服务未启用，跳过执行")
+            logger.info("任务摘要服务未启用，跳过执行")
             return 0
 
         # 执行摘要处理
         summary_service._process_all_tasks()
 
         # 返回处理统计
-        return summary_service.stats.get("total_summaries_generated", 0)
+        generated = summary_service.stats.get("total_summaries_generated", 0)
+        logger.info(f"✅ 任务摘要任务完成，生成摘要数: {generated}")
+        return generated
     except Exception as e:
         logger.error(f"执行任务摘要任务失败: {e}", exc_info=True)
         return 0

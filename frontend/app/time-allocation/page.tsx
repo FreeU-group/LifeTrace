@@ -55,7 +55,10 @@ const formatTotalTime = (seconds: number): string => {
 };
 
 function formatDate(date: Date) {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export default function TimeAllocationPage() {
@@ -124,12 +127,12 @@ export default function TimeAllocationPage() {
   // 获取每个小时每个类别的使用时间（分钟）
   const getHourlyCategoryUsage = (hour: number): { [category: string]: number } => {
     if (!data) return {};
-    
+
     const hourData = data.daily_distribution.find((h) => h.hour === hour);
     if (!hourData) return {};
 
     const categoryUsage: { [category: string]: number } = {};
-    
+
     // 创建应用名到类别的映射
     const appCategoryMap: { [appName: string]: string } = {};
     data.app_details.forEach((app) => {
@@ -210,7 +213,6 @@ export default function TimeAllocationPage() {
                 type="date"
                 value={endDate}
                 min={startDate}
-                max={formatDate(today)}
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
@@ -251,11 +253,11 @@ export default function TimeAllocationPage() {
                     const hourUsage = getHourlyTotal(i);
                     const categoryUsage = getHourlyCategoryUsage(i);
                     const height = maxUsage > 0 ? (hourUsage / maxUsage) * 100 : 0;
-                    
+
                     // 按固定顺序排列类别，确保堆叠顺序一致（从下到上）
                     const categoryOrder = ['社交', '浏览器', '开发工具', '文件管理', '办公软件', '其他'];
                     const sortedCategories = categoryOrder.filter(cat => categoryUsage[cat] && categoryUsage[cat] > 0);
-                    
+
                     return (
                       <div key={i} className="flex flex-col items-center justify-end gap-1" style={{ height: '100%' }}>
                         <div className="w-full relative" style={{ height: '200px' }}>
@@ -265,7 +267,7 @@ export default function TimeAllocationPage() {
                                 const categoryMinutes = categoryUsage[category];
                                 const categoryHeightPercent = hourUsage > 0 ? (categoryMinutes / hourUsage) * 100 : 0;
                                 const isTop = idx === sortedCategories.length - 1;
-                                
+
                                 return (
                                   <div
                                     key={category}
@@ -373,4 +375,3 @@ export default function TimeAllocationPage() {
     </div>
   );
 }
-

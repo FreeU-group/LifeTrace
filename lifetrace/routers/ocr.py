@@ -1,10 +1,12 @@
 """OCR相关路由"""
 
-import logging
-
 from fastapi import APIRouter, HTTPException
 
 from lifetrace.routers import dependencies as deps
+from lifetrace.storage import ocr_mgr, screenshot_mgr
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 router = APIRouter(prefix="/api/ocr", tags=["ocr"])
 
@@ -15,7 +17,7 @@ async def process_ocr(screenshot_id: int):
     if not deps.ocr_processor.is_available():
         raise HTTPException(status_code=503, detail="OCR服务不可用")
 
-    screenshot = deps.db_manager.get_screenshot_by_id(screenshot_id)
+    screenshot = screenshot_mgr.get_screenshot_by_id(screenshot_id)
     if not screenshot:
         raise HTTPException(status_code=404, detail="截图不存在")
 
@@ -28,7 +30,7 @@ async def process_ocr(screenshot_id: int):
 
         if ocr_result["success"]:
             # 保存OCR结果
-            deps.db_manager.add_ocr_result(
+            ocr_mgr.add_ocr_result(
                 screenshot_id=screenshot["id"],
                 text_content=ocr_result["text_content"],
                 confidence=ocr_result["confidence"],
@@ -46,7 +48,7 @@ async def process_ocr(screenshot_id: int):
             raise HTTPException(status_code=500, detail=ocr_result["error"])
 
     except Exception as e:
-        logging.error(f"OCR处理失败: {e}")
+        logger.error(f"OCR处理失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

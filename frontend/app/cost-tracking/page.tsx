@@ -50,6 +50,7 @@ interface CostStats {
 
 const FEATURE_NAME_MAP: Record<string, string> = {
   event_assistant: '事件助手',
+  event_summary: '事件摘要',
   project_assistant: '项目助手',
   job_task_context_mapper: '任务上下文映射',
   job_task_summary: '任务摘要生成',
@@ -205,6 +206,9 @@ export default function CostTrackingPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       功能
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      ID
+                    </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       输入 Token
                     </th>
@@ -230,6 +234,11 @@ export default function CostTrackingPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm font-medium">
                             {FEATURE_NAME_MAP[feature] || feature}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
+                            {feature}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm">

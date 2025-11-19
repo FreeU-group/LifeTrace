@@ -1,11 +1,11 @@
 import json
-import logging
 from datetime import datetime
 from typing import Any
 
+from lifetrace.util.logging_config import get_logger
 from lifetrace.util.prompt_loader import get_prompt
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 class ContextBuilder:

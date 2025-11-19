@@ -14,3 +14,4 @@ class ScreenshotResponse(BaseModel):
     text_content: str | None
     width: int
     height: int
+    file_deleted: bool = False  # 文件是否已被清理

@@ -75,6 +75,11 @@ vector_db:
   rerank_model: BAAI/bge-reranker-base  # 重排序模型
   persist_directory: vector_db  # 持久化目录
 
+# 聊天配置
+chat:
+  enable_history: true  # 开启后发送消息时附带历史上下文
+  history_limit: 10  # 历史记录轮数限制（1轮=1个用户消息+1个助手回复）
+
 # LLM配置
 llm:
   api_key: YOUR_LLM_KEY_HERE  # LLM 密钥，需要用户配置

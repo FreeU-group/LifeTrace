@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 数据清理任务
 负责清理旧的截图数据，防止磁盘空间占用过大
@@ -7,7 +6,7 @@
 import os
 from datetime import datetime, timedelta
 
-from lifetrace.storage.database import db_manager
+from lifetrace.storage import get_session, screenshot_mgr
 from lifetrace.util.config import config
 from lifetrace.util.logging_config import get_logger
 
@@ -73,8 +72,8 @@ class CleanDataService:
         result = {"files": 0, "records": 0, "space": 0}
 
         try:
-            # 获取截图总数
-            total = db_manager.get_screenshot_count()
+            # 获取截图总数（排除已删除文件的记录）
+            total = screenshot_mgr.get_screenshot_count(exclude_deleted=True)
 
             if total <= self.max_screenshots:
                 logger.debug(
@@ -88,12 +87,13 @@ class CleanDataService:
                 f"截图数量超限 ({total} > {self.max_screenshots})，需要删除 {to_delete_count} 张"
             )
 
-            # 获取最旧的截图列表
-            with db_manager.get_session() as session:
+            # 获取最旧的截图列表（排除已删除文件的记录）
+            with get_session() as session:
                 from lifetrace.storage.models import Screenshot
 
                 old_screenshots = (
                     session.query(Screenshot)
+                    .filter(Screenshot.file_deleted.is_not(True))
                     .order_by(Screenshot.created_at.asc())
                     .limit(to_delete_count)
                     .all()
@@ -126,12 +126,15 @@ class CleanDataService:
             cutoff_date = datetime.now() - timedelta(days=self.max_days)
             logger.info(f"开始清理 {cutoff_date.strftime('%Y-%m-%d')} 之前的截图数据")
 
-            # 获取需要清理的截图
-            with db_manager.get_session() as session:
+            # 获取需要清理的截图（排除已删除文件的记录）
+            with get_session() as session:
                 from lifetrace.storage.models import Screenshot
 
                 old_screenshots = (
-                    session.query(Screenshot).filter(Screenshot.created_at < cutoff_date).all()
+                    session.query(Screenshot)
+                    .filter(Screenshot.created_at < cutoff_date)
+                    .filter(Screenshot.file_deleted.is_not(True))
+                    .all()
                 )
 
                 if not old_screenshots:
@@ -178,13 +181,22 @@ class CleanDataService:
                 result["size"] = file_size
                 logger.debug(f"已删除文件: {file_path}")
             else:
-                logger.warning(f"文件不存在: {file_path}")
+                # 检查是否已经标记为已删除
+                if getattr(screenshot, "file_deleted", False):
+                    logger.debug(f"文件已在之前被删除: {file_path}")
+                else:
+                    logger.warning(f"文件不存在: {file_path}")
 
             # 如果配置为同时删除记录，则从数据库中删除
             if not self.delete_file_only:
                 session.delete(screenshot)
                 session.flush()
                 logger.debug(f"已删除数据库记录: screenshot_id={screenshot.id}")
+            else:
+                # 如果只删除文件，标记数据库记录为已删除（前端可根据此标识显示占位图）
+                screenshot.file_deleted = True
+                session.flush()
+                logger.debug(f"已标记文件为已删除: screenshot_id={screenshot.id}")
 
             result["success"] = True
 

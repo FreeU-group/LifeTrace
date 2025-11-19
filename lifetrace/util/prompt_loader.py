@@ -3,12 +3,13 @@
 从配置文件中加载 LLM 提示词
 """
 
-import logging
 from pathlib import Path
 
 import yaml
 
-logger = logging.getLogger(__name__)
+from lifetrace.util.logging_config import get_logger
+
+logger = get_logger()
 
 
 class PromptLoader:

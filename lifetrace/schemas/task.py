@@ -21,7 +21,6 @@ class TaskCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200, description="任务名称")
     description: str | None = Field(None, description="任务描述")
     status: TaskStatus = Field(TaskStatus.PENDING, description="任务状态")
-    parent_task_id: int | None = Field(None, description="父任务ID（用于子任务）")
 
 
 class TaskUpdate(BaseModel):
@@ -30,7 +29,6 @@ class TaskUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200, description="任务名称")
     description: str | None = Field(None, description="任务描述")
     status: TaskStatus | None = Field(None, description="任务状态")
-    parent_task_id: int | None = Field(None, description="父任务ID")
 
 
 class TaskResponse(BaseModel):
@@ -41,7 +39,6 @@ class TaskResponse(BaseModel):
     name: str = Field(..., description="任务名称")
     description: str | None = Field(None, description="任务描述")
     status: str = Field(..., description="任务状态")
-    parent_task_id: int | None = Field(None, description="父任务ID")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
@@ -54,15 +51,6 @@ class TaskListResponse(BaseModel):
 
     total: int = Field(..., description="总数")
     tasks: list[TaskResponse] = Field(..., description="任务列表")
-
-
-class TaskWithChildren(TaskResponse):
-    """带子任务的任务响应模型"""
-
-    children: list["TaskWithChildren"] = Field(default_factory=list, description="子任务列表")
-
-    class Config:
-        from_attributes = True
 
 
 class TaskProgressCreate(BaseModel):

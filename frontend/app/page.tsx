@@ -26,6 +26,14 @@ import { marked } from 'marked';
 import { toast } from '@/lib/toast';
 import MessageContent from '@/components/common/MessageContent';
 
+// 格式化日期为 YYYY-MM-DD（使用本地时区）
+function formatDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -574,8 +582,8 @@ export default function EventsPage() {
     const weekAgo = new Date(today);
     weekAgo.setDate(today.getDate() - 7);
 
-    const todayStr = today.toISOString().split('T')[0];
-    const weekAgoStr = weekAgo.toISOString().split('T')[0];
+    const todayStr = formatDate(today);
+    const weekAgoStr = formatDate(weekAgo);
 
     setEndDate(todayStr);
     setStartDate(weekAgoStr);

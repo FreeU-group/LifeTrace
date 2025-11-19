@@ -4,15 +4,17 @@
 """
 
 import json
-import logging
+import threading
 from datetime import datetime
 from typing import Any
 
 from lifetrace.llm.llm_client import LLMClient
-from lifetrace.storage import db_manager
+from lifetrace.storage import event_mgr, get_session
 from lifetrace.storage.models import Event, OCRResult, Screenshot
+from lifetrace.util.logging_config import get_logger
+from lifetrace.util.prompt_loader import get_prompt
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 class EventSummaryService:
@@ -21,7 +23,6 @@ class EventSummaryService:
     def __init__(self):
         """初始化服务"""
         self.llm_client = LLMClient()
-        self.db_manager = db_manager
 
     def generate_event_summary(self, event_id: int) -> bool:
         """
@@ -62,7 +63,7 @@ class EventSummaryService:
 
             if result:
                 # 更新事件表
-                success = self.db_manager.update_event_summary(
+                success = event_mgr.update_event_summary(
                     event_id=event_id,
                     ai_title=result["title"],
                     ai_summary=result["summary"],
@@ -85,7 +86,7 @@ class EventSummaryService:
     def _get_event_info(self, event_id: int) -> dict[str, Any] | None:
         """获取事件信息"""
         try:
-            with self.db_manager.get_session() as session:
+            with get_session() as session:
                 event = session.query(Event).filter(Event.id == event_id).first()
                 if not event:
                     return None
@@ -106,7 +107,7 @@ class EventSummaryService:
         ocr_texts = []
 
         try:
-            with self.db_manager.get_session() as session:
+            with get_session() as session:
                 # 查询事件下的所有截图
                 screenshots = (
                     session.query(Screenshot).filter(Screenshot.event_id == event_id).all()
@@ -155,50 +156,61 @@ class EventSummaryService:
             if len(combined_text) > 3000:
                 combined_text = combined_text[:3000] + "..."
 
+            # 额外检查：如果合并后的文本太短，使用后备方案
+            if not combined_text or len(combined_text.strip()) < 10:
+                logger.warning("OCR文本内容太少，使用后备方案")
+                return self._generate_fallback_summary(app_name, window_title)
+
             # 格式化时间
             start_str = start_time.strftime("%Y-%m-%d %H:%M:%S") if start_time else "未知"
             end_str = end_time.strftime("%Y-%m-%d %H:%M:%S") if end_time else "进行中"
 
-            # 构建prompt
-            prompt = f"""你是一个活动摘要助手。根据用户在应用中的操作截图OCR文本，生成简洁的标题和摘要。
-
-应用名称：{app_name or "未知应用"}
-窗口标题：{window_title or "未知窗口"}
-时间范围：{start_str} 至 {end_str}
-
-OCR文本内容：
-{combined_text}
-
-要求：
-1. 生成一个标题（不超过10个字），概括用户在做什么
-2. 生成一个摘要（不超过30个字），描述活动的关键内容，重点部分用**加粗**标记
-3. 标题要简洁有力，摘要要突出核心信息
-4. 如果OCR文本内容较杂乱，提取最重要的主题
-
-请以JSON格式返回：
-{{
-  "title": "标题内容",
-  "summary": "摘要内容，**重点部分**"
-}}"""
+            # 从配置文件加载提示词
+            system_prompt = get_prompt("event_summary", "activity_assistant")
+            user_prompt = get_prompt(
+                "event_summary",
+                "activity_summary",
+                app_name=app_name or "未知应用",
+                window_title=window_title or "未知窗口",
+                start_time=start_str,
+                end_time=end_str,
+                ocr_text=combined_text,
+            )
 
             # 调用LLM
             response = self.llm_client.client.chat.completions.create(
                 model=self.llm_client.model,
                 messages=[
-                    {
-                        "role": "system",
-                        "content": "你是一个专业的活动摘要助手，擅长从文本中提取关键信息并生成简洁摘要。",
-                    },
-                    {"role": "user", "content": prompt},
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
                 ],
                 temperature=0.3,
                 max_tokens=200,
             )
 
+            # 记录token使用量
+            if hasattr(response, "usage") and response.usage:
+                from lifetrace.util.token_usage_logger import log_token_usage
+
+                log_token_usage(
+                    model=self.llm_client.model,
+                    input_tokens=response.usage.prompt_tokens,
+                    output_tokens=response.usage.completion_tokens,
+                    endpoint="event_summary",
+                    response_type="summary_generation",
+                    feature_type="event_summary",
+                )
+
             # 解析响应
             content = response.choices[0].message.content.strip()
 
+            # 检查响应是否为空
+            if not content:
+                logger.warning("LLM返回空内容，使用后备方案")
+                return self._generate_fallback_summary(app_name, window_title)
+
             # 尝试提取JSON
+            original_content = content  # 保存原始内容用于日志
             # 如果响应包含```json标记，提取其中的内容
             if "```json" in content:
                 json_start = content.find("```json") + 7
@@ -208,6 +220,11 @@ OCR文本内容：
                 json_start = content.find("```") + 3
                 json_end = content.find("```", json_start)
                 content = content[json_start:json_end].strip()
+
+            # 如果提取后内容仍为空，记录并使用后备方案
+            if not content:
+                logger.warning(f"提取JSON后内容为空，原始响应: {original_content[:200]}")
+                return self._generate_fallback_summary(app_name, window_title)
 
             result = json.loads(content)
 
@@ -223,7 +240,18 @@ OCR文本内容：
                 return self._generate_fallback_summary(app_name, window_title)
 
         except json.JSONDecodeError as e:
-            logger.error(f"解析LLM响应JSON失败: {e}, 响应内容: {content}")
+            # 记录详细的错误信息以便调试
+            ocr_preview = combined_text[:100] if len(combined_text) > 100 else combined_text
+            response_preview = (
+                original_content[:500] if len(original_content) > 500 else original_content
+            )
+            logger.error(
+                f"解析LLM响应JSON失败: {e}\n"
+                f"OCR文本长度: {len(combined_text)}\n"
+                f"OCR文本预览: {ocr_preview}\n"
+                f"LLM原始响应: {response_preview}\n"
+                f"提取的内容: {content[:200]}"
+            )
             return self._generate_fallback_summary(app_name, window_title)
         except Exception as e:
             logger.error(f"LLM生成摘要失败: {e}", exc_info=True)
@@ -266,7 +294,6 @@ def generate_event_summary_async(event_id: int):
     Args:
         event_id: 事件ID
     """
-    import threading
 
     def _generate():
         try:

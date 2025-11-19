@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Token使用量记录器
 记录LLM API调用的token使用情况，便于后续统计分析
@@ -7,7 +6,7 @@ Token使用量记录器
 from datetime import datetime
 from typing import Any
 
-from lifetrace.storage.database import db_manager
+from lifetrace.storage import get_session
 from lifetrace.storage.models import TokenUsage
 from lifetrace.util.logging_config import get_logger
 
@@ -87,7 +86,7 @@ class TokenUsageLogger:
                 query_length = len(user_query)
 
             # 写入数据库
-            with db_manager.get_session() as session:
+            with get_session() as session:
                 token_usage = TokenUsage(
                     model=model,
                     input_tokens=input_tokens,
@@ -145,7 +144,7 @@ class TokenUsageLogger:
             start_date = end_date - timedelta(days=days)
 
             # 从数据库查询
-            with db_manager.get_session() as session:
+            with get_session() as session:
                 # 查询时间范围内的所有记录
                 records = (
                     session.query(TokenUsage)
@@ -170,11 +169,15 @@ class TokenUsageLogger:
                             "output_tokens": 0,
                             "total_tokens": 0,
                             "requests": 0,
+                            "input_cost": 0.0,
+                            "output_cost": 0.0,
                             "total_cost": 0.0,
                         }
                     stats["model_stats"][model]["input_tokens"] += record.input_tokens
                     stats["model_stats"][model]["output_tokens"] += record.output_tokens
                     stats["model_stats"][model]["total_tokens"] += record.total_tokens
+                    stats["model_stats"][model]["input_cost"] += record.input_cost
+                    stats["model_stats"][model]["output_cost"] += record.output_cost
                     stats["model_stats"][model]["total_cost"] += record.total_cost
                     stats["model_stats"][model]["requests"] += 1
 
