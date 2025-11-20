@@ -111,25 +111,6 @@ Once both services are running, open your browser and navigate to `http://localh
 
 For more details, see: [frontend/README.md](frontend/README.md)
 
-## 📋 TODO & Roadmap
-
-### 🚀 High Priority
-
-- ☐ **User Experience Improvements**
-  - ☐ Implement keyboard shortcuts for power users
-  - ☐ Create interactive onboarding tutorial
-
-### 💡 Future Ideas
-
-- ☐ **Mobile & Cross-Platform**
-  - ☐ Develop mobile companion app
-  - ☐ Add tablet-optimized interface
-  - ☐ Create web-based version
-
-### ✅ Recently Completed
-
-- ☑ **Core Infrastructure** - Basic screenshot recording and OCR functionality
-
 ---
 
 > 💡 **Want to contribute?** Check out our [Contributing Guidelines](#contributing) and pick up any TODO item that interests you!
