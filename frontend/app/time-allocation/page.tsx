@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/common/Ca
 import Button from '@/components/common/Button';
 import Loading from '@/components/common/Loading';
 import { Clock } from 'lucide-react';
+import { useLocaleStore } from '@/lib/store/locale';
+import { useTranslations } from '@/lib/i18n';
 // Note: Using img tag instead of Next.js Image for dynamic app icons
 
 interface AppUsageDetail {
@@ -172,21 +174,6 @@ const getAppDisplayName = (appName: string): string => {
   return appName.replace(/\.exe$/i, '');
 };
 
-// 格式化时间（秒转分钟）
-const formatMinutes = (seconds: number): string => {
-  const minutes = Math.round(seconds / 60);
-  return `${minutes}分钟`;
-};
-
-// 格式化总时间
-const formatTotalTime = (seconds: number): string => {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) {
-    return `${hours}小时${minutes}分钟`;
-  }
-  return `${minutes}分钟`;
-};
 
 function formatDate(date: Date) {
   const year = date.getFullYear();
@@ -196,6 +183,8 @@ function formatDate(date: Date) {
 }
 
 export default function TimeAllocationPage() {
+  const { locale } = useLocaleStore();
+  const t = useTranslations(locale);
   const today = new Date();
   const startOfPeriod = new Date(today);
   startOfPeriod.setDate(today.getDate() - 6); // 默认最近7天
@@ -206,13 +195,29 @@ export default function TimeAllocationPage() {
   const [endDate, setEndDate] = useState(formatDate(today));
   const [selectedApp, setSelectedApp] = useState<string | null>(null);
 
+  // 格式化时间（秒转分钟）
+  const formatMinutes = (seconds: number): string => {
+    const minutes = Math.round(seconds / 60);
+    return t.timeAllocation.minutes.replace('{count}', String(minutes));
+  };
+
+  // 格式化总时间
+  const formatTotalTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) {
+      return t.timeAllocation.hours.replace('{hours}', String(hours)).replace('{minutes}', String(minutes));
+    }
+    return t.timeAllocation.minutes.replace('{count}', String(minutes));
+  };
+
   const loadData = async (s = startDate, e = endDate) => {
     setLoading(true);
     try {
       const response = await api.getTimeAllocation({ start_date: s, end_date: e });
       setData(response.data);
     } catch (error) {
-      console.error('加载时间分配数据失败:', error);
+      console.error(t.timeAllocation.loadFailed, error);
     } finally {
       setLoading(false);
     }
@@ -328,7 +333,7 @@ export default function TimeAllocationPage() {
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <Loading text="加载中..." />
+        <Loading />
       </div>
     );
   }
@@ -339,8 +344,8 @@ export default function TimeAllocationPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-foreground mb-2">时间分配</h1>
-        <p className="text-muted-foreground">查看不同应用的使用时间分布情况</p>
+        <h1 className="text-3xl font-bold text-foreground mb-2">{t.timeAllocation.title}</h1>
+        <p className="text-muted-foreground">{t.timeAllocation.subtitle}</p>
       </div>
 
       {/* 查询表单 */}
@@ -348,7 +353,7 @@ export default function TimeAllocationPage() {
         <CardContent className="pt-6">
           <form onSubmit={handleQuery} className="flex flex-wrap items-end gap-4">
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">起始日期</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">{t.timeAllocation.startDate}</label>
               <input
                 className="rounded border px-2 py-1"
                 type="date"
@@ -358,7 +363,7 @@ export default function TimeAllocationPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">截止日期</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">{t.timeAllocation.endDate}</label>
               <input
                 className="rounded border px-2 py-1"
                 type="date"
@@ -367,7 +372,7 @@ export default function TimeAllocationPage() {
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
-            <Button type="submit">查询</Button>
+            <Button type="submit">{t.timeAllocation.query}</Button>
           </form>
         </CardContent>
       </Card>
@@ -385,7 +390,7 @@ export default function TimeAllocationPage() {
                   <div className="text-4xl font-bold text-foreground">
                     {formatTotalTime(data.total_time)}
                   </div>
-                  <div className="text-sm text-muted-foreground mt-1">总使用时间</div>
+                  <div className="text-sm text-muted-foreground mt-1">{t.timeAllocation.totalTime}</div>
                 </div>
               </div>
             </CardContent>
@@ -394,7 +399,7 @@ export default function TimeAllocationPage() {
           {/* 每日使用分布 */}
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>每日使用分布</CardTitle>
+              <CardTitle>{t.timeAllocation.hourlyDistribution}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -428,7 +433,7 @@ export default function TimeAllocationPage() {
                                       minHeight: categoryMinutes > 0 ? '2px' : '0',
                                       borderRadius: isTop ? '4px 4px 0 0' : '0',
                                     }}
-                                    title={`${i}时 ${category}: ${categoryMinutes}分钟`}
+                                    title={`${t.timeAllocation.hourLabel.replace('{hour}', String(i))} ${category}: ${categoryMinutes}${locale === 'zh-CN' ? '分钟' : ' min'}`}
                                   />
                                 );
                               })}
@@ -466,9 +471,9 @@ export default function TimeAllocationPage() {
             <Card className="mb-6">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>应用时间分布 - {getAppDisplayName(selectedApp)}</CardTitle>
+                  <CardTitle>{t.timeAllocation.appName} - {getAppDisplayName(selectedApp)}</CardTitle>
                   <Button variant="outline" size="sm" onClick={() => setSelectedApp(null)}>
-                    关闭
+                    {t.common.close}
                   </Button>
                 </div>
               </CardHeader>
@@ -487,12 +492,12 @@ export default function TimeAllocationPage() {
                             <div
                               className="absolute bottom-0 left-0 right-0 bg-primary hover:opacity-90 transition-opacity rounded-t"
                               style={{ height: `${height}%`, minHeight: '2px' }}
-                              title={`${i}时: ${hourUsage}分钟`}
+                              title={`${t.timeAllocation.hourLabel.replace('{hour}', String(i))}: ${hourUsage}${locale === 'zh-CN' ? '分钟' : ' min'}`}
                             />
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1" style={{ height: '20px', display: 'flex', alignItems: 'center' }}>
-                          {i % 4 === 0 ? `${i}时` : ''}
+                          {i % 4 === 0 ? t.timeAllocation.hourLabel.replace('{hour}', String(i)) : ''}
                         </div>
                       </div>
                     );
@@ -505,12 +510,12 @@ export default function TimeAllocationPage() {
           {/* 应用使用详情 */}
           <Card>
             <CardHeader>
-              <CardTitle>应用使用详情</CardTitle>
+              <CardTitle>{t.timeAllocation.appUsageDetails}</CardTitle>
             </CardHeader>
             <CardContent>
               {data.app_details.length === 0 ? (
                 <div className="py-12 text-center text-muted-foreground font-medium">
-                  暂无数据
+                  {t.timeAllocation.noData}
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -579,7 +584,7 @@ export default function TimeAllocationPage() {
                                     height: `${height}%`,
                                     minHeight: usage > 0 ? '2px' : '0'
                                   }}
-                                  title={`${hourIndex}时: ${usage}分钟`}
+                                  title={`${t.timeAllocation.hourLabel.replace('{hour}', String(hourIndex))}: ${usage}${locale === 'zh-CN' ? '分钟' : ' min'}`}
                                 />
                               );
                             })}
