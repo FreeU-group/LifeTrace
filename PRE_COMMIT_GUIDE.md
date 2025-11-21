@@ -38,16 +38,6 @@ pre-commit install
 # 验证安装
 ls -la .git/hooks/pre-commit
 ```
-
-### 3. 运行初始检查（首次使用）
-
-```bash
-# 对所有文件运行检查（首次运行会自动下载工具）
-pre-commit run --all-files
-```
-
-这将下载并运行所有配置的检查工具，可能需要几分钟时间。
-
 ---
 
 ## 使用方法
@@ -136,26 +126,6 @@ Some files have trailing whitespace, please remove them.
 ```bash
 git commit -m "emergency fix" --no-verify
 ```
-
-### 场景3：更新检查工具
-
-```bash
-# 更新到最新版本的检查工具
-pre-commit autoupdate
-
-# 重新运行检查
-pre-commit run --all-files
-```
-
-### 场景4：暂时禁用特定检查
-
-如果某个检查过于严格，可以临时禁用：
-
-```bash
-# 运行除 ruff 外的所有检查
-pre-commit run --all-files --skip ruff
-```
-
 ---
 
 ## 配置说明
@@ -200,7 +170,7 @@ repos:
 # 激活虚拟环境
 source .venv/bin/activate
 
-# 或使用 uv run
+# uv run
 uv run pre-commit --version
 ```
 
