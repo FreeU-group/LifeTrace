@@ -91,6 +91,18 @@ cp lifetrace/config/default_config.yaml lifetrace/config/config.yaml
 
 > **注意**：首次运行时，如果 `config.yaml` 不存在，系统会自动从 `default_config.yaml` 创建。您可以通过编辑 `lifetrace/config/config.yaml` 来自定义设置。
 
+### 数据库迁移
+
+**应用数据库迁移（首次运行跳过此步骤）：**
+
+```bash
+# 进入 lifetrace 目录
+cd lifetrace
+
+# 升级到最新版本
+alembic upgrade head
+```
+
 ### 启动后端服务
 
 **启动服务器：**
@@ -122,6 +134,29 @@ pnpm dev
 
 详细说明请参考：[frontend/README.md](frontend/README.md)
 
+## 📋 待办事项与路线图
+
+### 🚀 高优先级
+
+- ☐ **用户体验改进**
+  - ☐ 为高级用户实现键盘快捷键
+  - ☐ 创建交互式入门教程
+
+### 💡 未来计划
+
+- ☐ **移动端与跨平台**
+  - ☐ 开发移动配套应用
+  - ☐ 添加平板优化界面
+  - ☐ 创建 Web 版本
+
+### ✅ 最近完成
+
+- ☑ **核心基础设施** - 基础截图记录和 OCR 功能
+
+---
+
+> 💡 **想要贡献？** 查看我们的[贡献指南](#贡献)并选择任何你感兴趣的待办事项！
+
 ## 开发指南
 
 ### 项目结构
@@ -132,6 +167,11 @@ pnpm dev
 │   └── ...                     # 其他 GitHub 仓库文件
 ├── lifetrace/                  # 核心后端模块
 │   ├── server.py               # Web API 服务
+│   ├── alembic/                # 数据库迁移工具
+│   │   ├── env.py              # Alembic 环境配置
+│   │   ├── script.py.mako      # 迁移脚本模板
+│   │   └── README              # Alembic 文档
+│   ├── alembic.ini             # Alembic 配置文件
 │   ├── config/                 # 配置文件
 │   │   ├── config.yaml         # 主配置文件（自动生成）
 │   │   ├── default_config.yaml # 默认配置模板

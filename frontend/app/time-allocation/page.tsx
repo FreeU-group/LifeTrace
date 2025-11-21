@@ -25,11 +25,145 @@ interface TimeAllocationData {
   app_details: AppUsageDetail[]; // 应用详情
 }
 
+// 应用图标映射表（与后端保持一致）
+const APP_ICON_MAPPING: Record<string, string> = {
+  // 浏览器
+  'chrome.exe': 'chrome.png',
+  'chrome': 'chrome.png',
+  'google chrome': 'chrome.png',
+  'msedge.exe': 'msedge.png',
+  'msedge': 'msedge.png',
+  'edge': 'msedge.png',
+  'edge.exe': 'msedge.png',
+  'microsoft edge': 'msedge.png',
+  'firefox.exe': 'firefox.png',
+  'firefox': 'firefox.png',
+  'mozilla firefox': 'firefox.png',
+  // 开发工具
+  'code.exe': 'vscode.png',
+  'code': 'vscode.png',
+  'vscode': 'vscode.png',
+  'visual studio code': 'vscode.png',
+  'pycharm64.exe': 'pycharm.png',
+  'pycharm.exe': 'pycharm.png',
+  'pycharm': 'pycharm.png',
+  'idea64.exe': 'intellij.png',
+  'intellij': 'intellij.png',
+  'intellij idea': 'intellij.png',
+  'webstorm64.exe': 'webstorm.png',
+  'webstorm.exe': 'webstorm.png',
+  'webstorm': 'webstorm.png',
+  'githubdesktop.exe': 'github.png',
+  'github desktop': 'github.png',
+  'github': 'github.png',
+  // 通讯工具
+  'wechat.exe': 'weixin.png',
+  'weixin.exe': 'weixin.png',
+  'wechat': 'weixin.png',
+  'weixin': 'weixin.png',
+  '微信': 'weixin.png',
+  'qq.exe': 'qq.png',
+  'qq': 'qq.png',
+  'telegram.exe': 'telegram.png',
+  'telegram': 'telegram.png',
+  'discord.exe': 'discord.png',
+  'discord': 'discord.png',
+  // Office 套件
+  'winword.exe': 'word.png',
+  'word': 'word.png',
+  'microsoft word': 'word.png',
+  'excel.exe': 'excel.png',
+  'excel': 'excel.png',
+  'microsoft excel': 'excel.png',
+  'powerpnt.exe': 'powerpoint.png',
+  'powerpoint.exe': 'powerpoint.png',
+  'powerpoint': 'powerpoint.png',
+  'microsoft powerpoint': 'powerpoint.png',
+  'wps.exe': 'wps.png',
+  'wps': 'wps.png',
+  'wpp.exe': 'powerpoint.png',
+  'et.exe': 'excel.png',
+  // 设计工具
+  'photoshop.exe': 'photoshop.png',
+  'photoshop': 'photoshop.png',
+  'xmind.exe': 'xmind.png',
+  'xmind': 'xmind.png',
+  'snipaste.exe': 'snipaste.png',
+  'snipaste': 'snipaste.png',
+  // 媒体工具
+  'spotify.exe': 'spotify.png',
+  'spotify': 'spotify.png',
+  'vlc.exe': 'vlc.png',
+  'vlc': 'vlc.png',
+  // macOS 应用
+  'finder': 'explorer.png',
+  '访达': 'explorer.png',
+  'iterm2': 'vscode.png',
+  'iterm': 'vscode.png',
+  'terminal': 'vscode.png',
+  'cursor': 'cursor.png',
+  'cursor.exe': 'cursor.png',
+  'chatgpt': 'chrome.png',
+  'chatgpt atlas': 'chrome.png',
+  'chatgpt desktop': 'chrome.png',
+  'atlas': 'chrome.png',  // ChatGPT Atlas 的简称
+  // 飞书相关
+  'feishu': 'feishu.png',
+  'feishu.exe': 'feishu.png',
+  'lark': 'feishu.png',
+  'lark.exe': 'feishu.png',
+  '飞书': 'feishu.png',
+  '飞书会议': 'feishu.png',
+  // 系统工具
+  'explorer.exe': 'explorer.png',
+  'explorer': 'explorer.png',
+  'file explorer': 'explorer.png',
+  '文件资源管理器': 'explorer.png',
+  'notepad.exe': 'notepad.png',
+  'notepad': 'notepad.png',
+  '记事本': 'notepad.png',
+  'calc.exe': 'calculator.png',
+  'calculator.exe': 'calculator.png',
+  'calculator': 'calculator.png',
+  '计算器': 'calculator.png',
+};
+// 替代图标列表
+const REPLACE_ICONS = ['logo1.png', 'logo2.png', 'logo3.png', 'logo4.png', 'logo5.png', 'logo6.png', 'logo7.png', 'logo8.png'];
+const REPLACE_ICONS_COUNT = REPLACE_ICONS.length;
+// 用于跟踪已使用的应用和对应的替代图标索引
+const appReplaceIconMap = new Map<string, number>();
+let replaceIconCounter = 0;
+// 获取替代图标路径（按顺序循环分配）
+const getReplaceIcon = (appName: string): string => {
+  if (!appName) {
+    appName = 'unknown';
+  }
+  if (!appReplaceIconMap.has(appName)) {
+    const index = replaceIconCounter % REPLACE_ICONS_COUNT;
+    appReplaceIconMap.set(appName, index);
+    replaceIconCounter++;
+  }
+  const index = appReplaceIconMap.get(appName)!;
+  return `/app-icons-replace/${REPLACE_ICONS[index]}`;
+};
 // 获取应用图标路径
 const getAppIcon = (appName: string): string => {
-  // 移除.exe后缀并转换为小写
+  if (!appName) {
+    return getReplaceIcon('');
+  }
+  const appNameLower = appName.toLowerCase().trim();
+  // 精确匹配
+  if (appNameLower in APP_ICON_MAPPING) {
+    return `/app-icons/${APP_ICON_MAPPING[appNameLower]}`;
+  }
+  // 模糊匹配（部分包含）
+  for (const [key, iconFile] of Object.entries(APP_ICON_MAPPING)) {
+    if (key.includes(appNameLower) || appNameLower.includes(key)) {
+      return `/app-icons/${iconFile}`;
+    }
+  }
+  // 如果没有匹配到，尝试移除.exe后缀并转小写
   const iconName = appName.replace(/\.exe$/i, '').toLowerCase();
-  // 尝试加载图标，如果不存在则返回默认图标
   return `/app-icons/${iconName}.png`;
 };
 
@@ -405,13 +539,18 @@ export default function TimeAllocationPage() {
                               onError={(e) => {
                                 try {
                                   const target = e.target as HTMLImageElement;
-                                  target.style.display = 'none';
-                                  const parent = target.parentElement;
-                                  if (parent && !parent.querySelector('.fallback-text')) {
-                                    const fallback = document.createElement('div');
-                                    fallback.className = 'fallback-text text-2xl font-bold text-muted-foreground';
-                                    fallback.textContent = getAppDisplayName(app.app_name).charAt(0).toUpperCase();
-                                    parent.appendChild(fallback);
+                                  const replaceIconPath = getReplaceIcon(app.app_name);
+                                  if (target.src !== replaceIconPath) {
+                                    target.src = replaceIconPath;
+                                  } else {
+                                    target.style.display = 'none';
+                                    const parent = target.parentElement;
+                                    if (parent && !parent.querySelector('.fallback-text')) {
+                                      const fallback = document.createElement('div');
+                                      fallback.className = 'fallback-text text-2xl font-bold text-muted-foreground';
+                                      fallback.textContent = getAppDisplayName(app.app_name).charAt(0).toUpperCase();
+                                      parent.appendChild(fallback);
+                                    }
                                   }
                                 } catch (error) {/* 静默处理，无需控制台输出 */}
                               }}

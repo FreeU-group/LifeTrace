@@ -272,7 +272,7 @@ export default function EventsPage() {
       console.error('加载聊天历史失败:', error);
       toast.error('加载聊天历史失败');
     }
-  }; 
+  };
 
   // 加载特定会话的历史消息
   const loadSessionMessages = async (sessionId: string) => {
@@ -632,16 +632,12 @@ export default function EventsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 只在组件挂载时执行一次
 
-  const chatWidth = isChatCollapsed ? '64px' : '33.3333%';
-  const timelineWidth = isChatCollapsed ? 'calc(100% - 64px)' : '66.6667%';
-
   return (
     <div className="flex h-full overflow-hidden relative">
       {/* 左侧事件管理区域 - 占2/3或更宽 */}
-      <div
-        className="flex flex-col overflow-hidden p-4 border-r transition-[width] duration-300 ease-in-out min-w-0"
-        style={{ width: timelineWidth }}
-      >
+      <div className={`flex flex-col overflow-hidden p-4 border-r transition-all duration-300 ${
+        isChatCollapsed ? 'flex-1' : 'w-2/3'
+      }`}>
         {/* 选中事件提示 */}
         {selectedEvents.size > 0 && (
           <div className={`mb-4 flex items-center justify-between rounded-lg px-4 py-3 border ${
@@ -960,10 +956,9 @@ export default function EventsPage() {
       </div>
 
       {/* 右侧聊天区域 - 占1/3或窄列 */}
-      <div
-        className="bg-card flex flex-col flex-shrink-0 h-full overflow-hidden transition-[width] duration-300 ease-in-out"
-        style={{ width: chatWidth }}
-      >
+      <div className={`bg-card flex flex-col flex-shrink-0 h-full overflow-hidden transition-all duration-300 ${
+        isChatCollapsed ? 'w-16' : 'w-1/3'
+      }`}>
         {/* 折叠状态：显示展开按钮 */}
         {isChatCollapsed && (
           <div className="flex flex-col items-center h-full">
@@ -1127,6 +1122,50 @@ export default function EventsPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground">数字镜像</p>
                         <p className="text-xs text-muted-foreground mt-0.5">查看今天的活动时间线</p>
+                      </div>
+                    </button>
+
+                    {/* 应用分析 */}
+                    <button
+                      onClick={() => handleQuickAction('analytics')}
+                      className={`flex items-center gap-3 p-4 rounded-lg border transition-colors text-left group ${
+                        activeQuickAction === 'analytics'
+                          ? 'border-primary bg-primary/10 hover:bg-primary/15'
+                          : 'border-border bg-card hover:bg-muted/50'
+                      }`}
+                    >
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                        activeQuickAction === 'analytics'
+                          ? 'bg-primary/20'
+                          : 'bg-primary/10 group-hover:bg-primary/20'
+                      }`}>
+                        <TrendingUp className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">应用分析</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">分析应用使用情况和趋势</p>
+                      </div>
+                    </button>
+
+                    {/* 内容搜索 */}
+                    <button
+                      onClick={() => handleQuickAction('search')}
+                      className={`flex items-center gap-3 p-4 rounded-lg border transition-colors text-left group ${
+                        activeQuickAction === 'search'
+                          ? 'border-primary bg-primary/10 hover:bg-primary/15'
+                          : 'border-border bg-card hover:bg-muted/50'
+                      }`}
+                    >
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                        activeQuickAction === 'search'
+                          ? 'bg-primary/20'
+                          : 'bg-primary/10 group-hover:bg-primary/20'
+                      }`}>
+                        <Search className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">内容搜索</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">搜索包含特定内容的截图</p>
                       </div>
                     </button>
                   </div>

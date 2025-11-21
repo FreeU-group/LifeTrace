@@ -71,6 +71,18 @@ cp lifetrace/config/default_config.yaml lifetrace/config/config.yaml
 
 > **Note**: On first run, the system will automatically create `config.yaml` from `default_config.yaml` if it doesn't exist. You can customize your settings by editing `lifetrace/config/config.yaml`.
 
+### Database Migration
+
+**Apply database migrations (first time skip this step):**
+
+```bash
+# Navigate to lifetrace directory
+cd lifetrace
+
+# Apply all migrations to the latest version
+alembic upgrade head
+```
+
 ### Start the Backend Service
 
 **Start the server:**
@@ -99,6 +111,25 @@ Once both services are running, open your browser and navigate to `http://localh
 
 For more details, see: [frontend/README.md](frontend/README.md)
 
+## 📋 TODO & Roadmap
+
+### 🚀 High Priority
+
+- ☐ **User Experience Improvements**
+  - ☐ Implement keyboard shortcuts for power users
+  - ☐ Create interactive onboarding tutorial
+
+### 💡 Future Ideas
+
+- ☐ **Mobile & Cross-Platform**
+  - ☐ Develop mobile companion app
+  - ☐ Add tablet-optimized interface
+  - ☐ Create web-based version
+
+### ✅ Recently Completed
+
+- ☑ **Core Infrastructure** - Basic screenshot recording and OCR functionality
+
 ---
 
 > 💡 **Want to contribute?** Check out our [Contributing Guidelines](#contributing) and pick up any TODO item that interests you!
@@ -113,6 +144,11 @@ For more details, see: [frontend/README.md](frontend/README.md)
 │   └── ...                     # Other GitHub repository files
 ├── lifetrace/                  # Core backend modules
 │   ├── server.py               # Web API service
+│   ├── alembic/                # Database migration tool
+│   │   ├── env.py              # Alembic environment config
+│   │   ├── script.py.mako      # Migration script template
+│   │   └── README              # Alembic documentation
+│   ├── alembic.ini             # Alembic configuration
 │   ├── config/                 # Configuration files
 │   │   ├── config.yaml         # Main configuration (auto-generated)
 │   │   ├── default_config.yaml # Default configuration template

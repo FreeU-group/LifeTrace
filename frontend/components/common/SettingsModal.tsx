@@ -574,59 +574,59 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </CardContent>
               </Card>
 
-              {/* 对话设置（暂时隐藏，需要恢复时将条件改为 true） */}
-              {false && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">对话设置</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">启用上下文</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            开启后发送消息时附带历史上下文
-                          </p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="sr-only peer"
-                            checked={settings.chatContextEnabled}
-                            onChange={(e) => handleChange('chatContextEnabled', e.target.checked)}
-                          />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                        </label>
+              {/* 对话设置 */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">对话设置</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          启用上下文
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          开启后发送消息时附带历史上下文
+                        </p>
                       </div>
-
-                      {settings.chatContextEnabled && (
-                        <div>
-                          <label className="mb-1 block text-sm font-medium text-foreground">
-                            上下文轮次
-                          </label>
-                          <Input
-                            type="number"
-                            min="1"
-                            max="20"
-                            className="px-3 py-2 h-9"
-                            value={settings.chatContextRounds}
-                            onChange={(e) => {
-                              const value = parseInt(e.target.value);
-                              if (value >= 1 && value <= 20) {
-                                handleChange('chatContextRounds', value);
-                              }
-                            }}
-                          />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            附带最近 {settings.chatContextRounds} 轮历史对话作为上下文（最多 20 轮）
-                          </p>
-                        </div>
-                      )}
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={settings.chatContextEnabled}
+                          onChange={(e) => handleChange('chatContextEnabled', e.target.checked)}
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                      </label>
                     </div>
-                  </CardContent>
-                </Card>
-              )}
+
+                    {settings.chatContextEnabled && (
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-foreground">
+                          上下文轮次
+                        </label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="20"
+                          className="px-3 py-2 h-9"
+                          value={settings.chatContextRounds}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value);
+                            if (value >= 1 && value <= 20) {
+                              handleChange('chatContextRounds', value);
+                            }
+                          }}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          附带最近 {settings.chatContextRounds} 轮历史对话作为上下文（最多 20 轮）
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* 开发者选项 */}
               <Card>
