@@ -315,6 +315,14 @@ export const zh = {
     viewHourlyDetails: '查看 {hour} 时的应用分布',
     hourLabel: '{hour}时',
     clickToViewDetails: '点击查看详情',
+    categories: {
+      social: '社交',
+      browser: '浏览器',
+      development: '开发工具',
+      file_management: '文件管理',
+      office: '办公软件',
+      other: '其他',
+    },
   },
   searchBar: {
     startDate: '开始日期',

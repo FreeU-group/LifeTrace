@@ -117,15 +117,21 @@ export default function TimeAllocationPage() {
     }), 1);
   };
 
+  // 获取分类翻译
+  const getCategoryLabel = (category: string): string => {
+    const categoryKey = category as keyof typeof t.timeAllocation.categories;
+    return t.timeAllocation.categories[categoryKey] || category;
+  };
+
   // 获取类别颜色映射
   const getCategoryColor = (category: string): string => {
     const colorMap: { [key: string]: string } = {
-      '社交': 'bg-yellow-500',
-      '浏览器': 'bg-blue-500',
-      '开发工具': 'bg-purple-500',
-      '文件管理': 'bg-green-500',
-      '办公软件': 'bg-orange-500',
-      '其他': 'bg-gray-500',
+      'social': 'bg-yellow-500',
+      'browser': 'bg-blue-500',
+      'development': 'bg-purple-500',
+      'file_management': 'bg-green-500',
+      'office': 'bg-orange-500',
+      'other': 'bg-gray-500',
     };
     return colorMap[category] || 'bg-gray-500';
   };
@@ -142,12 +148,12 @@ export default function TimeAllocationPage() {
     // 创建应用名到类别的映射
     const appCategoryMap: { [appName: string]: string } = {};
     data.app_details.forEach((app) => {
-      appCategoryMap[app.app_name] = app.category || '其他';
+      appCategoryMap[app.app_name] = app.category || 'other';
     });
 
     // 计算每个类别的使用时间
     Object.entries(hourData.apps).forEach(([appName, seconds]) => {
-      const category = appCategoryMap[appName] || '其他';
+      const category = appCategoryMap[appName] || 'other';
       if (!categoryUsage[category]) {
         categoryUsage[category] = 0;
       }
@@ -166,11 +172,11 @@ export default function TimeAllocationPage() {
   // 按类别分组应用
   const categorizeApps = (apps: AppUsageDetail[]) => {
     const categories: { [key: string]: AppUsageDetail[] } = {
-      其他: [],
+      other: [],
     };
 
     apps.forEach((app) => {
-      const category = app.category || '其他';
+      const category = app.category || 'other';
       if (!categories[category]) {
         categories[category] = [];
       }
@@ -277,7 +283,7 @@ export default function TimeAllocationPage() {
                     const height = maxUsage > 0 ? (hourUsage / maxUsage) * 100 : 0;
 
                     // 按固定顺序排列类别，确保堆叠顺序一致（从下到上）
-                    const categoryOrder = ['社交', '浏览器', '开发工具', '文件管理', '办公软件', '其他'];
+                    const categoryOrder = ['social', 'browser', 'development', 'file_management', 'office', 'other'];
                     const sortedCategories = categoryOrder.filter(cat => categoryUsage[cat] && categoryUsage[cat] > 0);
 
                     return (
@@ -299,7 +305,7 @@ export default function TimeAllocationPage() {
                                       minHeight: categoryMinutes > 0 ? '2px' : '0',
                                       borderRadius: isTop ? '4px 4px 0 0' : '0',
                                     }}
-                                    title={`${t.timeAllocation.hourLabel.replace('{hour}', String(i))} ${category}: ${categoryMinutes}${locale === 'zh-CN' ? '分钟' : ' min'}`}
+                                    title={`${t.timeAllocation.hourLabel.replace('{hour}', String(i))} ${getCategoryLabel(category)}: ${categoryMinutes}${locale === 'zh-CN' ? '分钟' : ' min'}`}
                                   />
                                 );
                               })}
@@ -322,7 +328,7 @@ export default function TimeAllocationPage() {
                       <div key={category} className="flex items-center gap-2">
                         <div className={`w-4 h-4 rounded ${getCategoryColor(category)}`} />
                         <span className="text-sm text-muted-foreground">
-                          {category} {formatMinutes(categoryTime)}
+                          {getCategoryLabel(category)} {formatMinutes(categoryTime)}
                         </span>
                       </div>
                     );

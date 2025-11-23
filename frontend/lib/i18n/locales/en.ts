@@ -317,6 +317,14 @@ export const en: Translation = {
     viewHourlyDetails: 'App distribution at {hour}:00',
     hourLabel: '{hour}:00',
     clickToViewDetails: 'Click to view details',
+    categories: {
+      social: 'Social',
+      browser: 'Browser',
+      development: 'Development',
+      file_management: 'File Management',
+      office: 'Office',
+      other: 'Other',
+    },
   },
   searchBar: {
     startDate: 'Start Date',
