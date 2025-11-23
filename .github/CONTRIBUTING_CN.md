@@ -11,6 +11,7 @@
 - [行为准则](#-行为准则)
 - [如何开始贡献](#-如何开始贡献)
 - [开发环境设置](#️-开发环境设置)
+- [Git Flow 工作流程](#-git-flow-工作流程)
 - [贡献流程](#-贡献流程)
 - [编码规范](#-编码规范)
 - [提交信息规范](#-提交信息规范)
@@ -164,6 +165,57 @@ pnpm dev
 2. 前端应该在 `http://localhost:3000` 运行
 3. 访问 `http://localhost:8000/docs` 查看 API 文档
 4. 访问 `http://localhost:3000` 查看前端界面
+
+## 🌿 Git Flow 工作流程
+
+LifeTrace 项目采用规范的 Git Flow 分支管理策略，以确保代码质量和开发流程的规范性。
+
+### 分支结构
+
+我们维护以下分支：
+
+- **`main`** - 生产环境分支，包含最稳定的代码，可直接部署
+- **`dev`** - 开发环境分支，用于日常开发和功能集成
+- **`test`** - 测试环境分支，用于完整的集成测试
+- **`feature/*`** - 功能开发分支，从 `dev` 创建
+- **`fix/*`** - Bug 修复分支，从 `dev`、`test` 或 `main` 创建
+- **`hotfix/*`** - 紧急修复分支，从 `main` 创建
+
+### 详细工作流程
+
+关于 Git Flow 的完整说明，包括分支策略、工作流程、命名规范、常见场景和最佳实践，请参考：
+
+📖 **[Git Flow 工作流程详细文档](GIT_FLOW_CN.md)**
+
+该文档包含：
+
+- 🌳 完整的分支策略说明
+- 🔄 各种场景的详细工作流程
+- 📝 分支命名规范
+- 🎯 常见开发场景示例
+- 💡 最佳实践和技巧
+- ❓ 常见问题解答
+- 🚦 工作流程图
+- 📚 Git 命令速查表
+
+### 快速开始
+
+如果您已经熟悉 Git Flow，以下是快速参考：
+
+```bash
+# 1. 从 dev 创建功能分支
+git checkout dev
+git pull origin dev
+git checkout -b feature/your-feature-name
+
+# 2. 开发并提交
+git add .
+git commit -m "feat: your feature description"
+
+# 3. 推送并创建 PR
+git push origin feature/your-feature-name
+# 在 GitHub 上创建 PR 到 dev 分支
+```
 
 ## 📝 贡献流程
 
@@ -464,6 +516,7 @@ PR 标题应该遵循与提交信息相同的规范：
 
 ### Git 相关
 
+- [LifeTrace Git Flow 工作流程](GIT_FLOW_CN.md) - 项目专用 Git 工作流程文档
 - [Git 简明教程](https://rogerdudler.github.io/git-guide/index.zh.html)
 - [如何使用 Git 和 GitHub](https://www.freecodecamp.org/chinese/news/git-and-github-for-beginners/)
 

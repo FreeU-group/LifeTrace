@@ -11,6 +11,7 @@ Thank you for your interest in the LifeTrace project! We welcome and appreciate 
 - [Code of Conduct](#-code-of-conduct)
 - [Getting Started](#-getting-started)
 - [Development Setup](#️-development-setup)
+- [Git Flow Workflow](#-git-flow-workflow)
 - [Contribution Workflow](#-contribution-workflow)
 - [Coding Standards](#-coding-standards)
 - [Commit Message Guidelines](#-commit-message-guidelines)
@@ -164,6 +165,57 @@ pnpm dev
 2. Frontend should run on `http://localhost:3000`
 3. Visit `http://localhost:8000/docs` for API documentation
 4. Visit `http://localhost:3000` for frontend interface
+
+## 🌿 Git Flow Workflow
+
+LifeTrace project adopts a standardized Git Flow branch management strategy to ensure code quality and standardized development processes.
+
+### Branch Structure
+
+We maintain the following branches:
+
+- **`main`** - Production environment branch, contains the most stable code, directly deployable
+- **`dev`** - Development environment branch for daily development and feature integration
+- **`test`** - Testing environment branch for complete integration testing
+- **`feature/*`** - Feature development branches, created from `dev`
+- **`fix/*`** - Bug fix branches, created from `dev`, `test`, or `main`
+- **`hotfix/*`** - Emergency fix branches, created from `main`
+
+### Detailed Workflow
+
+For complete documentation on Git Flow, including branch strategy, workflow, naming conventions, common scenarios, and best practices, please refer to:
+
+📖 **[Git Flow Workflow Documentation](GIT_FLOW.md)**
+
+This documentation includes:
+
+- 🌳 Complete branch strategy explanation
+- 🔄 Detailed workflows for various scenarios
+- 📝 Branch naming conventions
+- 🎯 Common development scenario examples
+- 💡 Best practices and tips
+- ❓ FAQ
+- 🚦 Workflow diagrams
+- 📚 Git command cheat sheet
+
+### Quick Start
+
+If you're already familiar with Git Flow, here's a quick reference:
+
+```bash
+# 1. Create feature branch from dev
+git checkout dev
+git pull origin dev
+git checkout -b feature/your-feature-name
+
+# 2. Develop and commit
+git add .
+git commit -m "feat: your feature description"
+
+# 3. Push and create PR
+git push origin feature/your-feature-name
+# Create PR to dev branch on GitHub
+```
 
 ## 📝 Contribution Workflow
 
@@ -461,6 +513,7 @@ When creating a feature request, include:
 
 ### Git
 
+- [LifeTrace Git Flow Workflow](GIT_FLOW.md) - Project-specific Git workflow documentation
 - [Git Guide](https://rogerdudler.github.io/git-guide/)
 - [Git and GitHub Tutorial](https://www.freecodecamp.org/news/git-and-github-for-beginners/)
 
