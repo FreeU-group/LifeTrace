@@ -2,8 +2,6 @@
 
 **Language**: [English](FRONTEND_GUIDELINES.md) | [中文](FRONTEND_GUIDELINES_CN.md)
 
----
-
 ## ⚛️ React + TypeScript Frontend Development Standards
 
 This document details the development standards and best practices for the LifeTrace project frontend (Next.js + React + TypeScript).

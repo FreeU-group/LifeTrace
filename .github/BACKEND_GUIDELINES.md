@@ -2,8 +2,6 @@
 
 **Language**: [English](BACKEND_GUIDELINES.md) | [中文](BACKEND_GUIDELINES_CN.md)
 
----
-
 ## 🐍 Python Backend Development Standards
 
 This document details the development standards and best practices for the LifeTrace project backend (Python + FastAPI).
@@ -73,6 +71,103 @@ def calculate_result(
 def calculate_result(param1: int, param2: str, param3: float, param4: dict, param5: list) -> dict[str, Any]:
     return {"result": param1}
 ```
+
+#### File Length Limits
+
+To maintain code maintainability and readability, we provide the following guidelines for Python file length:
+
+**Code Length Guidelines**:
+
+- **Recommended Standard**: Keep single files under **500 lines**
+- **Warning Threshold**: Consider refactoring when exceeding **700 lines**
+- **Review Required**: Files over **1000 lines** must include justification and refactoring plan in PR
+
+**Refactoring Guidelines**:
+
+- Single function should not exceed **50 statements**
+- Single class should not exceed **400 lines**
+- Cyclomatic complexity must not exceed **15**
+- Prioritize functional cohesion over strict line count limits
+
+```python
+# ✅ Correct: Moderate file length (~450 lines)
+# task_service.py
+class TaskService:
+    """Task service containing complete task business logic."""
+
+    def create_task(self, data: dict) -> Task:
+        """Create a task."""
+        pass
+
+    def update_task(self, task_id: int, data: dict) -> Task:
+        """Update a task."""
+        pass
+
+    # ... other related methods
+
+# ⚠️ Needs Review: Files over 1000 lines
+# complex_processor.py (1200 lines)
+# PR must explain:
+# 1. Why is this file so long?
+# 2. Can it be split? How?
+# 3. If not, what's the refactoring plan?
+
+# ❌ Wrong: Function too complex (over 50 statements)
+def process_data(data):
+    # ... 100 lines of code
+    pass
+```
+
+**When to Split Files**:
+
+1. **Multiple Responsibilities**: A file handles multiple unrelated responsibilities
+
+   ```text
+   # Before: user_operations.py (800 lines)
+   # Contains: user management, permissions, data export, email notifications
+
+   # After:
+   users/
+   ├── manager.py          # User management
+   ├── permissions.py      # Permission validation
+   ├── export_service.py   # Data export
+   └── notifications.py    # Email notifications
+   ```
+
+2. **Large Classes**: A single class exceeds 400 lines
+
+   ```text
+   # Before: task_handler.py (600 lines)
+   class TaskHandler:
+       # Contains: CRUD, validation, statistics, reporting
+
+   # After:
+   tasks/
+   ├── manager.py      # TaskManager - CRUD operations
+   ├── validator.py    # TaskValidator - Data validation
+   ├── stats.py        # TaskStats - Statistics
+   └── reporter.py     # TaskReporter - Report generation
+   ```
+
+3. **Long Functions**: A single function exceeds 50 statements, extract sub-functions
+
+   ```python
+   # ❌ Wrong: Function too long
+   def process_order(order_data):
+       # Validate data (20 lines)
+       # Calculate price (30 lines)
+       # Create order (25 lines)
+       # Send notification (15 lines)
+       pass  # Total 90 lines
+
+   # ✅ Correct: Split into multiple functions
+   def process_order(order_data):
+       validated_data = validate_order_data(order_data)
+       price = calculate_order_price(validated_data)
+       order = create_order(validated_data, price)
+       send_order_notification(order)
+       return order
+   ```
 
 #### Imports
 

@@ -2,8 +2,6 @@
 
 **Language**: [English](CONTRIBUTING.md) | [中文](CONTRIBUTING_CN.md)
 
----
-
 ## 🎉 Welcome Contributors
 
 Thank you for your interest in the LifeTrace project! We welcome and appreciate any form of contribution. Whether you're fixing a typo, reporting a bug, or proposing a major new feature, we're grateful.

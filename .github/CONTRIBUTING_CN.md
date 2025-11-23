@@ -2,8 +2,6 @@
 
 **语言**: [English](CONTRIBUTING.md) | [中文](CONTRIBUTING_CN.md)
 
----
-
 ## 🎉 欢迎贡献
 
 感谢您对 LifeTrace 项目的关注！我们非常欢迎并感谢任何形式的贡献。无论您是修复一个拼写错误、报告一个 bug，还是提出一个重大的新功能，我们都非常感激。

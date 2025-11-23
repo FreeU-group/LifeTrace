@@ -2,8 +2,6 @@
 
 **语言**: [English](FRONTEND_GUIDELINES.md) | [中文](FRONTEND_GUIDELINES_CN.md)
 
----
-
 ## ⚛️ React + TypeScript 前端开发规范
 
 本文档详细说明了 LifeTrace 项目前端（Next.js + React + TypeScript）的开发规范和最佳实践。
