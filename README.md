@@ -208,10 +208,9 @@ For more details, see: [frontend/README.md](frontend/README.md)
 │   │   ├── query_parser.py     # Query parsing
 │   │   ├── token_usage_logger.py # Token usage tracking
 │   │   └── utils.py            # General utilities
-│   ├── models/                 # OCR model files
-│   │   ├── ch_PP-OCRv4_det_infer.onnx
-│   │   ├── ch_PP-OCRv4_rec_infer.onnx
-│   │   └── ch_ppocr_mobile_v2.0_cls_infer.onnx
+│   ├── models/                 # Model files
+│   │   ├── bge-small-zh-v1.5/  # Embedding model
+│   │   └── RapidOCR/           # OCR model files
 │   ├── devlog/                 # Development logs
 │   │   ├── AUTO_ASSOCIATION_*.md
 │   │   ├── CONFIG_CHANGE_*.md

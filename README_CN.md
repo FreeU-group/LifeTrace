@@ -220,10 +220,9 @@ pnpm dev
 │   │   ├── query_parser.py     # 查询解析
 │   │   ├── token_usage_logger.py # Token 使用跟踪
 │   │   └── utils.py            # 通用工具
-│   ├── models/                 # OCR 模型文件
-│   │   ├── ch_PP-OCRv4_det_infer.onnx
-│   │   ├── ch_PP-OCRv4_rec_infer.onnx
-│   │   └── ch_ppocr_mobile_v2.0_cls_infer.onnx
+│   ├── models/                 # 模型文件
+│   │   ├── bge-small-zh-v1.5/  # 嵌入模型
+│   │   └── RapidOCR/           # OCR 模型文件
 │   ├── devlog/                 # 开发日志
 │   │   ├── AUTO_ASSOCIATION_*.md
 │   │   ├── CONFIG_CHANGE_*.md
