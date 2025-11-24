@@ -27,8 +27,6 @@ async def semantic_search(request: SemanticSearchRequest):
         results = deps.vector_service.semantic_search(
             query=request.query,
             top_k=request.top_k,
-            use_rerank=request.use_rerank,
-            retrieve_k=request.retrieve_k,
             filters=request.filters,
         )
 

@@ -980,10 +980,9 @@ lifetrace/
 │   ├── app_utils.py         # 应用工具
 │   ├── query_parser.py      # 查询解析
 │   └── token_usage_logger.py  # Token 使用跟踪
-├── models/                   # OCR 模型文件
-│   ├── ch_PP-OCRv4_det_infer.onnx
-│   ├── ch_PP-OCRv4_rec_infer.onnx
-│   └── ch_ppocr_mobile_v2.0_cls_infer.onnx
+├── models/                   # 模型文件
+│   ├── RapidOCR/             # OCR 模型文件
+│   └── bge-small-zh-v1.5/   # 嵌入模型
 └── data/                     # 数据目录
     ├── lifetrace.db         # SQLite 数据库
     ├── screenshots/         # 截图文件

@@ -8,8 +8,6 @@ from pydantic import BaseModel
 class SemanticSearchRequest(BaseModel):
     query: str
     top_k: int = 10
-    use_rerank: bool = True
-    retrieve_k: int | None = None
     filters: dict[str, Any] | None = None
 
 
