@@ -52,8 +52,6 @@ export const api = {
   semanticSearch: (params: {
     query: string;
     top_k?: number;
-    use_rerank?: boolean;
-    retrieve_k?: number;
     filters?: any;
   }) => apiClient.post('/api/semantic-search', params),
 

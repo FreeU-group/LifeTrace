@@ -17,12 +17,11 @@ try:
     import chromadb
     import numpy as np
     from chromadb.config import Settings
-    from sentence_transformers import CrossEncoder, SentenceTransformer
+    from sentence_transformers import SentenceTransformer
 except ImportError as e:
     logger.warning(f"Vector database dependencies not installed: {e}")
     logger.warning("Please install with: pip install -r requirements_vector.txt")
     SentenceTransformer = None
-    CrossEncoder = None
     chromadb = None
     np = None
 
@@ -49,14 +48,12 @@ class VectorDatabase:
 
         # 初始化模型和数据库
         self.embedding_model = None
-        self.cross_encoder = None
         self.chroma_client = None
         self.collection = None
 
         # 配置参数
         self.vector_db_path = Path(config.vector_db_persist_directory)
         self.embedding_model_name = config.vector_db_embedding_model
-        self.cross_encoder_model_name = config.vector_db_rerank_model
         self.collection_name = config.vector_db_collection_name
 
         # 初始化
@@ -67,7 +64,6 @@ class VectorDatabase:
         return all(
             [
                 SentenceTransformer is not None,
-                CrossEncoder is not None,
                 chromadb is not None,
                 np is not None,
             ]
@@ -105,13 +101,6 @@ class VectorDatabase:
         except Exception as e:
             self.logger.error(f"Failed to initialize vector database: {e}")
             raise
-
-    def _get_cross_encoder(self) -> CrossEncoder:
-        """延迟加载交叉编码器"""
-        if self.cross_encoder is None:
-            self.logger.info(f"Loading cross-encoder model: {self.cross_encoder_model_name}")
-            self.cross_encoder = CrossEncoder(self.cross_encoder_model_name)
-        return self.cross_encoder
 
     def embed_text(self, text: str) -> list[float]:
         """将文本转换为向量嵌入
@@ -353,87 +342,6 @@ class VectorDatabase:
 
         return cleaned if cleaned else None
 
-    def rerank(
-        self, query: str, documents: list[str], top_k: int | None = None
-    ) -> list[tuple[str, float]]:
-        """使用交叉编码器重排序文档
-
-        Args:
-            query: 查询文本
-            documents: 文档列表
-            top_k: 返回的文档数量，None 表示返回全部
-
-        Returns:
-            重排序后的文档列表，每个元素为 (document, score)
-        """
-        if not query or not documents:
-            return []
-
-        try:
-            cross_encoder = self._get_cross_encoder()
-
-            # 构建查询-文档对
-            pairs = [(query, doc) for doc in documents]
-
-            # 计算相关性分数
-            scores = cross_encoder.predict(pairs)
-
-            # 排序
-            scored_docs = list(zip(documents, scores, strict=False))
-            scored_docs.sort(key=lambda x: x[1], reverse=True)
-
-            # 返回指定数量
-            if top_k is not None:
-                scored_docs = scored_docs[:top_k]
-
-            self.logger.debug(f"Reranked {len(documents)} documents, returning {len(scored_docs)}")
-            return scored_docs
-
-        except Exception as e:
-            self.logger.error(f"Failed to rerank documents: {e}")
-            return [(doc, 0.0) for doc in documents]
-
-    def search_and_rerank(
-        self,
-        query: str,
-        retrieve_k: int = 20,
-        rerank_k: int = 5,
-        where: dict[str, Any] | None = None,
-    ) -> list[dict[str, Any]]:
-        """搜索并重排序
-
-        Args:
-            query: 查询文本
-            retrieve_k: 初始检索数量
-            rerank_k: 重排序后返回数量
-            where: 元数据过滤条件
-
-        Returns:
-            重排序后的搜索结果
-        """
-        # 初始检索
-        search_results = self.search(query, retrieve_k, where)
-        if not search_results:
-            return []
-
-        # 提取文档文本
-        documents = [result["document"] for result in search_results]
-
-        # 重排序
-        reranked_docs = self.rerank(query, documents, rerank_k)
-
-        # 构建最终结果
-        final_results = []
-        for doc, score in reranked_docs:
-            # 找到对应的原始结果
-            for result in search_results:
-                if result["document"] == doc:
-                    result["rerank_score"] = float(score)
-                    final_results.append(result)
-                    break
-
-        return final_results
-
     def get_collection_stats(self) -> dict[str, Any]:
         """获取集合统计信息
 
@@ -446,7 +354,6 @@ class VectorDatabase:
                 "collection_name": self.collection_name,
                 "document_count": count,
                 "embedding_model": self.embedding_model_name,
-                "cross_encoder_model": self.cross_encoder_model_name,
                 "vector_db_path": str(self.vector_db_path),
             }
         except Exception as e:
@@ -482,7 +389,7 @@ def create_vector_db(config) -> VectorDatabase | None:
         向量数据库实例，如果依赖不可用则返回 None
     """
     # 检查依赖
-    if not all([SentenceTransformer, CrossEncoder, chromadb, np]):
+    if not all([SentenceTransformer, chromadb, np]):
         logger.warning("Vector database dependencies not available")
         return None
 

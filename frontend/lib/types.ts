@@ -81,8 +81,6 @@ export interface SearchParams {
   searchType: SearchType;
   // 语义搜索参数
   topK?: number;
-  useRerank?: boolean;
-  retrieveK?: number;
   // 多模态搜索参数
   textWeight?: number;
   imageWeight?: number;

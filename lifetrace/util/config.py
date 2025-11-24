@@ -254,11 +254,17 @@ class LifeTraceConfig:
 
     @property
     def vector_db_embedding_model(self) -> str:
-        return self.get("vector_db.embedding_model", "shibing624/text2vec-base-chinese")
-
-    @property
-    def vector_db_rerank_model(self) -> str:
-        return self.get("vector_db.rerank_model", "BAAI/bge-reranker-base")
+        model_name = self.get("vector_db.embedding_model", "shibing624/text2vec-base-chinese")
+        # 如果是本地路径（以 models/ 开头或包含路径分隔符但不是绝对路径），则转换为绝对路径
+        if model_name.startswith("models/") or (
+            os.path.sep in model_name and not model_name.startswith("/")
+        ):
+            # 获取 lifetrace 包目录（config.py 在 lifetrace/util/config.py）
+            lifetrace_dir = Path(__file__).parent.parent
+            model_path = lifetrace_dir / model_name
+            if model_path.exists():
+                return str(model_path)
+        return model_name
 
     @property
     def vector_db_persist_directory(self) -> str:

@@ -71,8 +71,7 @@ jobs:
 vector_db:
   enabled: true  # 启用向量数据库
   collection_name: lifetrace_ocr  # 集合名称
-  embedding_model: shibing624/text2vec-base-chinese  # 嵌入模型
-  rerank_model: BAAI/bge-reranker-base  # 重排序模型
+  embedding_model: models/bge-small-zh-v1.5  # 嵌入模型（本地模型）
   persist_directory: vector_db  # 持久化目录
 
 # 聊天配置

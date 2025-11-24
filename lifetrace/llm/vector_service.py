@@ -195,12 +195,10 @@ class VectorService:
             )
             return False
 
-    def semantic_search(
+    def semantic_search(  # noqa: C901
         self,
         query: str,
         top_k: int = 10,
-        use_rerank: bool = True,
-        retrieve_k: int | None = None,
         filters: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """语义搜索 OCR 结果
@@ -208,8 +206,6 @@ class VectorService:
         Args:
             query: 搜索查询
             top_k: 返回结果数量
-            use_rerank: 是否使用重排序
-            retrieve_k: 初始检索数量（用于重排序）
             filters: 元数据过滤条件
 
         Returns:
@@ -222,28 +218,16 @@ class VectorService:
             return []
 
         try:
-            if use_rerank:
-                # 使用重排序搜索
-                if retrieve_k is None:
-                    retrieve_k = min(top_k * 3, 50)  # 默认检索 3 倍数量用于重排序
-
-                results = self.vector_db.search_and_rerank(
-                    query=query, retrieve_k=retrieve_k, rerank_k=top_k, where=filters
-                )
-            else:
-                # 直接搜索
-                results = self.vector_db.search(query=query, top_k=top_k, where=filters)
+            # 直接搜索
+            results = self.vector_db.search(query=query, top_k=top_k, where=filters)
 
             # 增强结果信息
             enhanced_results = []
             for result in results:
                 enhanced_result = result.copy()
 
-                # 统一score字段：优先使用rerank_score，其次使用distance转换为相似度
-                if "rerank_score" in result:
-                    enhanced_result["score"] = result["rerank_score"]
-                elif "distance" in result:
-                    # 将距离转换为相似度分数（0-1之间）
+                # 将距离转换为相似度分数（0-1之间）
+                if "distance" in result:
                     enhanced_result["score"] = max(0, 1 - result["distance"])
                 else:
                     enhanced_result["score"] = 0.0
@@ -331,7 +315,7 @@ class VectorService:
             self.logger.error(f"事件{event_id}写入向量库失败: {e}")
             return False
 
-    def semantic_search_events(self, query: str, top_k: int = 10) -> list[dict[str, Any]]:
+    def semantic_search_events(self, query: str, top_k: int = 10) -> list[dict[str, Any]]:  # noqa: C901
         """对事件文档进行语义搜索（基于 event_{id} 文档）"""
         if not self.is_enabled():
             return []
@@ -422,7 +406,7 @@ class VectorService:
             self.logger.error(f"事件语义搜索失败: {e}")
             return []
 
-    def sync_from_database(self, limit: int | None = None, force_reset: bool = False) -> int:
+    def sync_from_database(self, limit: int | None = None, force_reset: bool = False) -> int:  # noqa: C901
         """从 SQLite 数据库同步 OCR 结果到向量数据库
 
         Args:
