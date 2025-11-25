@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
-import { Circle, CircleDot, CheckCircle2, XCircle } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Circle, CircleDot, CheckCircle2, XCircle, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { Task, TaskStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import Button from '@/components/common/Button';
 
 interface TaskRoadMapProps {
   tasks: Task[];
@@ -135,11 +136,37 @@ const mockTasks: Task[] = [
     created_at: "2025-01-17T12:00:00Z",
     updated_at: "2025-01-17T12:00:00Z",
   },
+  {
+    id: 10,
+    project_id: 101,
+    name: "Core Feaature C",
+    description: "Quality assurance before release.",
+    status: 'pending' as TaskStatus,
+    parent_task_id: 2, // depends on integration tests
+    created_at: "2025-01-17T12:00:00Z",
+    updated_at: "2025-01-17T12:00:00Z",
+  },
+    {
+    id: 11,
+    project_id: 101,
+    name: "Core Feaature D",
+    description: "Quality assurance before release.",
+    status: 'pending' as TaskStatus,
+    parent_task_id: 2, // depends on integration tests
+    created_at: "2025-01-17T12:00:00Z",
+    updated_at: "2025-01-17T12:00:00Z",
+  },
 ];
 
 
 export default function TaskRoadMap({ tasks, onTaskClick }: TaskRoadMapProps) {
-  tasks = mockTasks
+  tasks = mockTasks;
+  const [zoom, setZoom] = useState(1);
+  const [hoveredTaskId, setHoveredTaskId] = useState<number | null>(null);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
   // 构建任务树结构
   const taskTree = useMemo(() => {
     const taskMap = new Map<number, Task>();
@@ -148,21 +175,41 @@ export default function TaskRoadMap({ tasks, onTaskClick }: TaskRoadMapProps) {
     // 找到根任务（没有父任务的）
     const rootTasks = tasks.filter((task) => !task.parent_task_id);
 
-    // 递归构建树
-    const buildTree = (task: Task, level: number = 0, column: number = 0): TaskNode => {
+    // 递归构建树（先构建层级信息，column 会在后续布局中分配）
+    const buildTree = (task: Task, level: number = 0): TaskNode => {
       const children = tasks
         .filter((t) => t.parent_task_id === task.id)
-        .map((childTask, index) => buildTree(childTask, level + 1, index));
+        .map((childTask) => buildTree(childTask, level + 1));
 
       return {
         task,
         level,
-        column,
+        column: 0,
         children,
       };
     };
 
-    return rootTasks.map((task, index) => buildTree(task, 0, index));
+    const roots = rootTasks.map((task) => buildTree(task, 0));
+
+    // 分配横向列号，避免同一父节点的子任务重叠
+    // 使用叶子优先的顺序为每个叶子节点分配一个递增的列号，
+    // 然后将父节点列号设置为其子节点列号范围的中点。
+    let nextColumn = 0;
+    const assignColumns = (node: TaskNode) => {
+      if (node.children.length === 0) {
+        node.column = nextColumn++;
+        return;
+      }
+
+      node.children.forEach(assignColumns);
+      const first = node.children[0].column;
+      const last = node.children[node.children.length - 1].column;
+      node.column = Math.floor((first + last) / 2);
+    };
+
+    roots.forEach(assignColumns);
+
+    return roots;
   }, [tasks]);
 
   // 扁平化树结构用于渲染
@@ -179,6 +226,45 @@ export default function TaskRoadMap({ tasks, onTaskClick }: TaskRoadMapProps) {
 
   const flatTasks = flattenTree(taskTree);
 
+  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.2, 2));
+  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.2, 0.5));
+  const handleResetZoom = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  // 鼠标滚轮缩放
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = -e.deltaY * 0.001;
+    setZoom((prev) => Math.min(Math.max(prev + delta, 0.5), 2));
+  };
+
+  // 鼠标拖拽平移
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 0) { // 左键
+      setIsDragging(true);
+      setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isDragging) {
+      setPan({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y,
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
   if (tasks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -188,31 +274,67 @@ export default function TaskRoadMap({ tasks, onTaskClick }: TaskRoadMapProps) {
   }
 
   return (
-    <div className="w-full h-full overflow-auto p-8">
-      <div className="min-w-max">
-        {/* 图例 */}
-        <div className="flex gap-6 mb-8 pb-4 border-b border-border">
-          {Object.entries(statusConfig).map(([status, config]) => {
-            const Icon = config.icon;
-            const count = tasks.filter((t) => t.status === status).length;
-            const label =
-              status === 'completed'
-                ? '已完成'
-                : status === 'in_progress'
-                ? '进行中'
-                : status === 'pending'
-                ? '待办'
-                : '已取消';
+    <div 
+      className="w-full h-full overflow-hidden p-8 relative"
+      onWheel={handleWheel}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
+      style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+    >
+      {/* Zoom Controls */}
+      <div className="absolute top-4 right-4 z-10 flex gap-2 bg-card border border-border rounded-lg p-2 shadow-lg">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleZoomOut}
+          disabled={zoom <= 0.5}
+          className="h-8 w-8 p-0"
+          title="缩小"
+        >
+          <ZoomOut className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleResetZoom}
+          className="h-8 px-3 text-xs"
+          title="重置缩放"
+        >
+          {Math.round(zoom * 100)}%
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleZoomIn}
+          disabled={zoom >= 2}
+          className="h-8 w-8 p-0"
+          title="放大"
+        >
+          <ZoomIn className="h-4 w-4" />
+        </Button>
+        <div className="w-px bg-border" />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleResetZoom}
+          className="h-8 w-8 p-0"
+          title="适应屏幕"
+        >
+          <Maximize2 className="h-4 w-4" />
+        </Button>
+      </div>
 
-            return (
-              <div key={status} className="flex items-center gap-2">
-                <Icon className={cn('h-4 w-4', config.color)} />
-                <span className="text-sm text-foreground">{label}</span>
-                <span className="text-xs text-muted-foreground">({count})</span>
-              </div>
-            );
-          })}
-        </div>
+      <div 
+        className="min-w-max" 
+        style={{ 
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, 
+          transformOrigin: 'top left',
+          transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+          pointerEvents: isDragging ? 'none' : 'auto',
+        }}
+      >
 
         {/* 路线图 */}
         <div className="relative">
@@ -221,8 +343,8 @@ export default function TaskRoadMap({ tasks, onTaskClick }: TaskRoadMapProps) {
             const Icon = config.icon;
 
             // 计算位置 - 垂直布局
-            const top = node.level * 180; // 垂直层级间距
-            const left = node.column * 300; // 水平列间距
+            const top = node.level * 300; // 垂直层级间距
+            const left = node.column * 360; // 水平列间距
 
             // 查找子任务用于绘制连接线
             const hasChildren = node.children.length > 0;
@@ -232,35 +354,53 @@ export default function TaskRoadMap({ tasks, onTaskClick }: TaskRoadMapProps) {
 
             return (
               <div key={node.task.id}>
-                {/* 连接线 */}
+            {/* 连接线 */}
                 {hasChildren &&
                   childIndices.map((childIndex) => {
                     const childNode = flatTasks[childIndex];
-                    const childTop = childNode.level * 180;
-                    const childLeft = childNode.column * 300 + 132; // 对齐到节点中心 (264/2)
+                    const childTop = childNode.level * 300;
+                    const childLeft = childNode.column * 360;
+
+                    // Calculate node dimensions (base width is 256px = w-64)
+                    const nodeWidth = 256;
+                    const nodeHeight = 50; // Approximate height for non-hovered state
+
+                    const parentCenterX = left + nodeWidth / 2;
+                    const parentBottomY = top + nodeHeight;
+                    const childCenterX = childLeft + nodeWidth / 2;
+                    const childTopY = childTop;
+
+                    // Calculate SVG container bounds
+                    const svgLeft = Math.min(parentCenterX, childCenterX);
+                    const svgTop = parentBottomY;
+                    const svgWidth = Math.max(Math.abs(childCenterX - parentCenterX), 1);
+                    const svgHeight = childTopY - parentBottomY;
+
+                    // Calculate relative coordinates within SVG
+                    const startX = parentCenterX - svgLeft;
+                    const startY = 0;
+                    const endX = childCenterX - svgLeft;
+                    const endY = svgHeight;
+                    const midY = svgHeight / 2;
 
                     return (
                       <svg
                         key={`line-${node.task.id}-${childNode.task.id}`}
                         className="absolute pointer-events-none"
                         style={{
-                          left: left + 132, // 从父节点中心开始
-                          top: top + 110, // 从父节点底部开始
-                          width: Math.abs(childLeft - (left + 132)),
-                          height: childTop - (top + 110),
+                          left: svgLeft,
+                          top: svgTop,
+                          width: svgWidth,
+                          height: svgHeight,
+                          overflow: 'visible',
                         }}
                       >
                         <path
-                          d={`M 0 0 L 0 ${(childTop - (top + 110)) / 2} L ${
-                            childLeft - (left + 132)
-                          } ${(childTop - (top + 110)) / 2} L ${
-                            childLeft - (left + 132)
-                          } ${childTop - (top + 110)}`}
+                          d={`M ${startX} ${startY} L ${startX} ${midY} L ${endX} ${midY} L ${endX} ${endY}`}
                           stroke="currentColor"
                           strokeWidth="2"
                           fill="none"
                           className="text-border"
-                          strokeDasharray="4 4"
                         />
                       </svg>
                     );
@@ -268,50 +408,77 @@ export default function TaskRoadMap({ tasks, onTaskClick }: TaskRoadMapProps) {
 
                 {/* 任务节点 */}
                 <div
-                  className="absolute transition-all"
-                  style={{ top: `${top}px`, left: `${left}px` }}
+                  className="absolute transition-all duration-200"
+                  style={{ 
+                    top: `${top}px`, 
+                    left: `${left}px`,
+                    zIndex: hoveredTaskId === node.task.id ? 50 : 1,
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={() => setHoveredTaskId(node.task.id)}
+                  onMouseLeave={() => setHoveredTaskId(null)}
+                  onMouseDown={(e) => e.stopPropagation()}
                 >
                   <div
                     onClick={() => onTaskClick?.(node.task)}
                     className={cn(
-                      'w-64 p-4 rounded-lg border-2 bg-card cursor-pointer',
-                      'hover:shadow-lg transition-all group',
+                      'rounded-lg border-2 bg-card cursor-pointer transition-all duration-200',
                       config.borderColor,
-                      config.bgColor
+                      config.bgColor,
+                      hoveredTaskId === node.task.id
+                        ? 'w-80 p-4 shadow-2xl scale-110'
+                        : 'w-64 p-3 shadow-sm hover:shadow-md'
                     )}
                   >
-                    {/* 顶部状态栏 */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <Icon className={cn('h-4 w-4', config.color)} />
-                      <span className={cn('text-xs font-medium', config.color)}>
-                        {node.task.status === 'completed'
-                          ? '已完成'
-                          : node.task.status === 'in_progress'
-                          ? '进行中'
-                          : node.task.status === 'pending'
-                          ? '待办'
-                          : '已取消'}
-                      </span>
+                    {/* 任务名称 - 始终显示 */}
+                    <div className="flex items-center gap-2">
+                      <Icon className={cn('h-4 w-4 shrink-0', config.color)} />
+                      <h4 className={cn(
+                        'font-semibold text-foreground transition-colors flex-1',
+                        hoveredTaskId === node.task.id ? 'text-primary' : '',
+                        hoveredTaskId === node.task.id ? 'line-clamp-2' : 'line-clamp-1 text-sm'
+                      )}>
+                        {node.task.name}
+                      </h4>
                     </div>
 
-                    {/* 任务名称 */}
-                    <h4 className="font-semibold text-foreground line-clamp-1 group-hover:text-primary transition-colors mb-1">
-                      {node.task.name}
-                    </h4>
+                    {/* 详细信息 - 仅悬停时显示 */}
+                    {hoveredTaskId === node.task.id && (
+                      <div className="mt-3 space-y-2 animate-in fade-in duration-200">
+                        {/* 状态 */}
+                        <div className="flex items-center gap-2 pb-2 border-b border-border">
+                          <span className={cn('text-xs font-medium', config.color)}>
+                            {node.task.status === 'completed'
+                              ? '已完成'
+                              : node.task.status === 'in_progress'
+                              ? '进行中'
+                              : node.task.status === 'pending'
+                              ? '待办'
+                              : '已取消'}
+                          </span>
+                        </div>
 
-                    {/* 任务描述 */}
-                    {node.task.description && (
-                      <p className="text-xs text-muted-foreground line-clamp-2">
-                        {node.task.description}
-                      </p>
-                    )}
+                        {/* 任务描述 */}
+                        {node.task.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-3">
+                            {node.task.description}
+                          </p>
+                        )}
 
-                    {/* 子任务数量 */}
-                    {node.children.length > 0 && (
-                      <div className="mt-3 pt-2 border-t border-border">
-                        <span className="text-xs text-muted-foreground">
-                          {node.children.length} 个依赖任务
-                        </span>
+                        {/* 子任务数量 */}
+                        {node.children.length > 0 && (
+                          <div className="pt-2 border-t border-border">
+                            <span className="text-xs text-muted-foreground">
+                              {node.children.length} 个依赖任务
+                            </span>
+                          </div>
+                        )}
+
+                        {/* 时间信息 */}
+                        <div className="pt-2 border-t border-border text-xs text-muted-foreground">
+                          <div>创建: {new Date(node.task.created_at).toLocaleDateString('zh-CN')}</div>
+                          <div>更新: {new Date(node.task.updated_at).toLocaleDateString('zh-CN')}</div>
+                        </div>
                       </div>
                     )}
                   </div>

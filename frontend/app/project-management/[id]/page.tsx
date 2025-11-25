@@ -2,19 +2,21 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, FolderOpen, ChevronRight, History, Send, User, Bot, X, Activity, TrendingUp, Search, Clock, LayoutList, Map } from 'lucide-react';
+import { ArrowLeft, Plus, FolderOpen, ChevronRight, History, Send, User, Bot, X, Activity, TrendingUp, Search, Clock, LayoutList, Map, List, CheckCircle2, CircleDot, Circle, XCircle } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Loading from '@/components/common/Loading';
 import Input from '@/components/common/Input';
 import { Card, CardContent } from '@/components/common/Card';
 import Tabs from '@/components/common/Tabs';
 import TaskBoard from '@/components/task/TaskBoard';
+import TaskList from '@/components/task/TaskList';
 import CreateTaskModal from '@/components/task/CreateTaskModal';
 import { Project, Task } from '@/lib/types';
 import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import MessageContent from '@/components/common/MessageContent';
 import TaskRoadMap from '@/components/task/TaskRoadMap';
+import { cn } from '@/lib/utils';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -105,6 +107,33 @@ function TaskEmptyState({
   );
 }
 
+const statusConfig = {
+  completed: {
+    icon: CheckCircle2,
+    color: 'text-green-600 dark:text-green-400',
+    bgColor: 'bg-green-500/10',
+    borderColor: 'border-green-500/30',
+  },
+  in_progress: {
+    icon: CircleDot,
+    color: 'text-blue-600 dark:text-blue-400',
+    bgColor: 'bg-blue-500/10',
+    borderColor: 'border-blue-500/30',
+  },
+  pending: {
+    icon: Circle,
+    color: 'text-muted-foreground',
+    bgColor: 'bg-muted/30',
+    borderColor: 'border-muted-foreground/20',
+  },
+  cancelled: {
+    icon: XCircle,
+    color: 'text-destructive',
+    bgColor: 'bg-destructive/10',
+    borderColor: 'border-destructive/30',
+  },
+};
+
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -134,8 +163,8 @@ export default function ProjectDetailPage() {
   const [selectedTasks, setSelectedTasks] = useState<Set<number>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 视图控制：'board' 或 'roadmap'
-  const [activeView, setActiveView] = useState<'board' | 'roadmap'>('board');
+  // 视图控制：'board'、'list' 或 'roadmap'
+  const [activeView, setActiveView] = useState<'board' | 'list' | 'roadmap'>('board');
 
   // 滚动到聊天底部
   const scrollToBottom = () => {
@@ -511,18 +540,44 @@ export default function ProjectDetailPage() {
               <Tabs
                 tabs={[
                   { id: 'board', label: '任务看板', icon: LayoutList },
+                  { id: 'list', label: '任务列表', icon: List },
                   { id: 'roadmap', label: '路线图', icon: Map },
                 ]}
                 activeTab={activeView}
-                onTabChange={(tabId) => setActiveView(tabId as 'board' | 'roadmap')}
+                onTabChange={(tabId) => setActiveView(tabId as 'board' | 'list' | 'roadmap')}
                 className="mb-6"
               />
             )}
 
             {/* 任务统计面板 - 只在看板视图显示 */}
+
             {!loading && tasks.length > 0 && activeView === 'board' && (
               <TaskStats tasks={tasks} />
             )}
+            {!loading && tasks.length > 0 && activeView === 'roadmap' && (
+                        (<div className="flex gap-6 pb-4 border-border">
+                          {Object.entries(statusConfig).map(([status, config]) => {
+                            const Icon = config.icon;
+                            const count = tasks.filter((t) => t.status === status).length;
+                            const label =
+                              status === 'completed'
+                                ? '已完成'
+                                : status === 'in_progress'
+                                ? '进行中'
+                                : status === 'pending'
+                                ? '待办'
+                                : '已取消';
+                
+                            return (
+                              <div key={status} className="flex items-center gap-2">
+                                <Icon className={cn('h-4 w-4', config.color)} />
+                                <span className="text-sm text-foreground">{label}</span>
+                                <span className="text-xs text-muted-foreground">({count})</span>
+                              </div>
+                            );
+                          })}
+                        </div>))
+            }
           </div>
         </div>
 
@@ -548,6 +603,16 @@ export default function ProjectDetailPage() {
                 projectId={projectId}
                 selectedTaskIds={selectedTasks}
                 onToggleSelect={handleToggleTaskSelect}
+              />
+            ) : activeView === 'list' ? (
+              // 任务列表视图
+              <TaskList
+                tasks={tasks}
+                onEdit={handleEditTask}
+                onDelete={handleDeleteTask}
+                onStatusChange={handleTaskStatusChange}
+                onCreateSubtask={handleCreateTask}
+                projectId={projectId}
               />
             ) : (
               // 路线图视图
