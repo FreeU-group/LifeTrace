@@ -135,9 +135,11 @@ export const zh = {
     title: '事件助手',
     newConversation: '新建对话',
     history: '历史记录',
-    collapse: '收起对话',
-    expand: '展开 AI 助手',
     inputPlaceholder: '输入消息...',
+    collapse: '折叠',
+    expand: '展开',
+    compact: '紧凑宽度',
+    roomy: '宽松宽度',
     send: '发送',
     thinking: '正在思考',
     welcome: '我可以帮您做什么？',
@@ -220,7 +222,11 @@ export const zh = {
       inputPlaceholder: '告诉机器人你想怎么改...',
       send: '发送消息',
       thinking: '正在思考：',
-      empty: '暂无聊天记录，先描述一个需求吧。'
+      empty: '暂无聊天记录，先描述一个需求吧。',
+      collapse: '折叠',
+      expand: '展开',
+      compact: '紧凑宽度',
+      roomy: '宽松宽度'
     },
     actionsPanel: {
       title: 'Bot 动作',

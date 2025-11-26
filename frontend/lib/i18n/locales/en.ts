@@ -139,6 +139,8 @@ export const en: Translation = {
     history: 'History',
     collapse: 'Collapse Chat',
     expand: 'Expand AI Assistant',
+    compact: 'Compact Width',
+    roomy: 'Roomy Width',
     inputPlaceholder: 'Type a message...',
     send: 'Send',
     thinking: 'Thinking',
@@ -527,7 +529,11 @@ export const en: Translation = {
       inputPlaceholder: 'Describe what you want to change...',
       send: 'Send Message',
       thinking: 'Thinking through your request:',
-      empty: 'No messages yet. Share a request to start collaborating.'
+      empty: 'No messages yet. Share a request to start collaborating.',
+      collapse: 'Collapse',
+      expand: 'Expand',
+      compact: 'Compact Width',
+      roomy: 'Roomy Width'
     },
     actionsPanel: {
       title: 'Bot Actions',
