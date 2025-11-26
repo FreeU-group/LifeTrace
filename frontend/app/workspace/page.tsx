@@ -5,6 +5,7 @@ import { useLocaleStore } from "@/lib/store/locale";
 import { useTranslations } from "@/lib/i18n";
 import { SimpleEditor } from "@/components/editor/markdownEditor/tiptap-templates/simple/simple-editor";
 import { ChatBot } from "@/components/editor/chatBot/ChatBot";
+import { InlineDiffViewer } from "@/components/editor/InlineDiffViewer";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -39,6 +40,7 @@ export default function WorkspacePage() {
   const [isAiEditing, setIsAiEditing] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<AiEditSuggestion | null>(null);
   const [showAiDiff, setShowAiDiff] = useState(false);
+  const [inlineDiffMode, setInlineDiffMode] = useState(false);
   const [chatbotWidth, setChatbotWidth] = useState(400)
   const [isChatbotCollapsed, setIsChatbotCollapsed] = useState(false)
   const [isResizing, setIsResizing] = useState(false)
@@ -173,7 +175,7 @@ export default function WorkspacePage() {
       // const suggestedContent = response.data.content;
       
       // Mock AI service - simulates AI processing with delay
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise(resolve => setTimeout(resolve, 800));
       
       // Mock transformation: add metadata, TOC, and formatting improvements
       const suggestedContent = `---
@@ -197,7 +199,8 @@ ${markdown}
         suggested: suggestedContent,
         instruction,
       });
-      setShowAiDiff(true);
+      setShowAiDiff(false);
+      setInlineDiffMode(true);
     } catch (error) {
       console.error('AI edit failed:', error);
       toast.error('AI编辑失败');
@@ -206,12 +209,14 @@ ${markdown}
     }
   }, [currentFile, markdown, isAiEditing]);
 
-  const handleAcceptAiEdit = useCallback(() => {
+  const handleAcceptAiEdit = useCallback((mergedContent?: string) => {
     if (!aiSuggestion) return;
     
-    setMarkdown(aiSuggestion.suggested);
+    const contentToApply = mergedContent ?? aiSuggestion.suggested;
+    setMarkdown(contentToApply);
     setAiSuggestion(null);
     setShowAiDiff(false);
+    setInlineDiffMode(false);
     
     // Set dirty state after a short delay to ensure SimpleEditor's effect runs first
     setTimeout(() => {
@@ -224,6 +229,7 @@ ${markdown}
   const handleRejectAiEdit = useCallback(() => {
     setAiSuggestion(null);
     setShowAiDiff(false);
+    setInlineDiffMode(false);
     toast.info('已拒绝AI建议');
   }, []);
 
@@ -377,7 +383,7 @@ ${markdown}
                     拒绝
                   </Button>
                   <Button
-                    onClick={handleAcceptAiEdit}
+                    onClick={() => handleAcceptAiEdit()}
                     variant="default"
                     size="sm"
                   >
@@ -391,14 +397,23 @@ ${markdown}
           )}
 
           <div className="mx-auto flex w-full max-h-[80vh] flex-1">
-            <SimpleEditor
-              key={currentFile?.path || 'no-file'}
-              markdown={markdown}
-              onMarkdownChange={setMarkdown}
-              onDirtyChange={setIsDirty}
-              readOnly={isSaving || isAiEditing}
-              onSelectionChange={setSelectedText}
-            />
+            {inlineDiffMode && aiSuggestion ? (
+              <InlineDiffViewer
+                original={aiSuggestion.original}
+                suggested={aiSuggestion.suggested}
+                onAccept={handleAcceptAiEdit}
+                onCancel={handleRejectAiEdit}
+              />
+            ) : (
+              <SimpleEditor
+                key={currentFile?.path || 'no-file'}
+                markdown={markdown}
+                onMarkdownChange={setMarkdown}
+                onDirtyChange={setIsDirty}
+                readOnly={isSaving || isAiEditing}
+                onSelectionChange={setSelectedText}
+              />
+            )}
           </div>
         </section>
 
