@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, FolderOpen, ChevronRight, History, Send, User, Bot, X, Activity, TrendingUp, Search, Clock } from 'lucide-react';
 import Button from '@/components/common/Button';
@@ -94,6 +94,11 @@ export default function ProjectDetailPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedTasks, setSelectedTasks] = useState<Set<number>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // 项目助手宽度与拖拽相关状态
+  const [chatWidth, setChatWidth] = useState(400);
+  const [isResizing, setIsResizing] = useState(false);
 
   // 滚动到聊天底部
   const scrollToBottom = () => {
@@ -414,6 +419,72 @@ export default function ProjectDetailPage() {
     });
   };
 
+  // 聊天区域宽度初始化与窗口缩放自适应
+  useEffect(() => {
+    const updateWidthByContainer = () => {
+      if (!containerRef.current || isChatCollapsed) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const totalWidth = rect.width;
+      if (!totalWidth) return;
+
+      const minWidth = totalWidth * 0.25;
+      const maxWidth = totalWidth * 0.5;
+      const defaultWidth = Math.min(400, totalWidth * 0.4);
+
+      setChatWidth((prev) => {
+        if (!prev) {
+          return Math.min(maxWidth, Math.max(minWidth, defaultWidth));
+        }
+        return Math.min(maxWidth, Math.max(minWidth, prev));
+      });
+    };
+
+    updateWidthByContainer();
+    window.addEventListener('resize', updateWidthByContainer);
+    return () => {
+      window.removeEventListener('resize', updateWidthByContainer);
+    };
+  }, [isChatCollapsed]);
+
+  // 分割线拖拽处理
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!isResizing || !containerRef.current || isChatCollapsed) return;
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const totalWidth = rect.width;
+      if (!totalWidth) return;
+
+      const minWidth = totalWidth * 0.25;
+      const maxWidth = totalWidth * 0.5;
+
+      // 右侧区域宽度 = 容器右边界到当前鼠标位置的距离
+      let newWidth = rect.right - event.clientX;
+      newWidth = Math.min(maxWidth, Math.max(minWidth, newWidth));
+      setChatWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (isResizing) {
+        setIsResizing(false);
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, isChatCollapsed]);
+
+  const handleResizeMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (isChatCollapsed) return;
+    setIsResizing(true);
+  };
+
   // 格式化日期时间
   const formatDateTime = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -442,9 +513,9 @@ export default function ProjectDetailPage() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden relative">
+    <div className="flex h-full overflow-hidden relative" ref={containerRef}>
       {/* 左侧任务管理区域 - 占2/3或更宽 */}
-      <div className="flex-1 flex flex-col overflow-hidden border-r bg-background min-w-0">
+      <div className="flex-1 flex flex-col overflow-hidden bg-background min-w-0">
         {/* 固定顶部区域 */}
         <div className="flex-shrink-0 p-6 pb-4 border-b">
           <div className="mx-auto max-w-7xl w-full">
@@ -545,12 +616,20 @@ export default function ProjectDetailPage() {
         />
       </div>
 
-      {/* 右侧聊天区域 - 固定宽度，避免百分比导致的两段式动画 */}
+      {/* 中间可拖动分割线 */}
+      <div
+        className={`w-[3px] cursor-col-resize bg-border hover:bg-primary/60 transition-colors flex-shrink-0 ${
+          isChatCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'
+        }`}
+        onMouseDown={handleResizeMouseDown}
+      />
+
+      {/* 右侧聊天区域 - 可调节宽度 */}
       <div
         className="bg-card flex flex-col flex-shrink-0 h-full border-l relative overflow-hidden"
         style={{
-          width: isChatCollapsed ? '60px' : '400px',
-          transition: 'width 300ms ease-in-out',
+          width: isChatCollapsed ? '60px' : `${chatWidth}px`,
+          transition: isResizing ? 'none' : 'width 300ms ease-in-out',
         }}
       >
         {/* 折叠状态：显示展开按钮 - 使用绝对定位防止布局挤压 */}
