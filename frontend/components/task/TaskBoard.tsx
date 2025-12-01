@@ -249,6 +249,7 @@ function DroppableColumn({
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [taskName, setTaskName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const handleCreateTask = async () => {
     if (!taskName.trim() || !projectId) return;
@@ -285,6 +286,8 @@ function DroppableColumn({
   return (
     <div
       ref={setNodeRef}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className={cn(
         'flex-1 flex flex-col overflow-hidden rounded-b-lg border-x border-b',
         'bg-muted/10',
@@ -292,15 +295,19 @@ function DroppableColumn({
         isOver && 'bg-primary/5 border-primary/30'
       )}
     >
-      {/* 任务列表区域 - 可滚动 */}
-      <div className={cn(
-        'flex-1 overflow-y-auto p-3 space-y-2',
-        'scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent'
-      )}>
+      {/* 任务列表区域 + 添加任务按钮 - 一起滚动，按钮紧跟在最后一个任务后面 */}
+      <div
+        className={cn(
+          'flex-1 overflow-y-auto p-3 space-y-2',
+          'scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent'
+        )}
+      >
         {tasks.length === 0 && !isAddingTask ? (
-          <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-            {isOver ? t.projectDetail.dropHere : t.projectDetail.noTasksInColumn}
-          </div>
+          isOver ? (
+            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+              {t.projectDetail.dropHere}
+            </div>
+          ) : null
         ) : (
           tasks.map((task) => (
             <DraggableTask
@@ -314,52 +321,54 @@ function DroppableColumn({
             />
           ))
         )}
-      </div>
 
-      {/* 快速添加任务区域 - 固定在底部 */}
-      <div className="flex-shrink-0 p-2 border-t border-border/50">
-        {isAddingTask ? (
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={taskName}
-              onChange={(e) => setTaskName(e.target.value)}
-              onKeyDown={handleKeyPress}
-              placeholder={t.projectDetail.taskNamePlaceholder || '输入任务名称...'}
-              className="flex-1 px-3 py-2 text-sm rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              autoFocus
-              disabled={isCreating}
-            />
-            <button
-              onClick={handleCreateTask}
-              disabled={!taskName.trim() || isCreating}
-              className={cn(
-                'px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                'bg-primary text-primary-foreground hover:bg-primary/90',
-                'disabled:opacity-50 disabled:cursor-not-allowed'
-              )}
-            >
-              {isCreating ? '...' : t.common.confirm || '确认'}
-            </button>
-            <button
-              onClick={() => {
-                setIsAddingTask(false);
-                setTaskName('');
-              }}
-              className="px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent"
-              disabled={isCreating}
-            >
-              <X className="h-4 w-4" />
-            </button>
+        {/* 快速添加任务区域 - 紧跟在任务列表后面 */}
+        {(isHovered || isAddingTask) && (
+          <div className="pt-1 border-t border-border/30 mt-1">
+            {isAddingTask ? (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={taskName}
+                  onChange={(e) => setTaskName(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  placeholder={t.projectDetail.taskNamePlaceholder || '输入任务名称...'}
+                  className="flex-1 px-3 py-2 text-sm rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  autoFocus
+                  disabled={isCreating}
+                />
+                <button
+                  onClick={handleCreateTask}
+                  disabled={!taskName.trim() || isCreating}
+                  className={cn(
+                    'px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                    'bg-primary text-primary-foreground hover:bg-primary/90',
+                    'disabled:opacity-50 disabled:cursor-not-allowed'
+                  )}
+                >
+                  {isCreating ? '...' : t.common.confirm || '确认'}
+                </button>
+                <button
+                  onClick={() => {
+                    setIsAddingTask(false);
+                    setTaskName('');
+                  }}
+                  className="px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent"
+                  disabled={isCreating}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsAddingTask(true)}
+                className="w-full px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors flex items-center gap-2 justify-center"
+              >
+                <Plus className="h-4 w-4" />
+                <span>{t.projectDetail.addTask || '添加任务'}</span>
+              </button>
+            )}
           </div>
-        ) : (
-          <button
-            onClick={() => setIsAddingTask(true)}
-            className="w-full px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors flex items-center gap-2 justify-center"
-          >
-            <Plus className="h-4 w-4" />
-            <span>{t.projectDetail.addTask || '添加任务'}</span>
-          </button>
         )}
       </div>
     </div>

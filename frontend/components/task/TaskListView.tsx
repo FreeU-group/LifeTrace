@@ -1,8 +1,21 @@
 'use client';
 
+import { useState } from 'react';
 import { Task } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Circle, CircleDot, CheckCircle2, XCircle, Edit2, Trash2, Square, Check, ChevronRight } from 'lucide-react';
+import {
+  Circle,
+  CircleDot,
+  CheckCircle2,
+  XCircle,
+  Edit2,
+  Trash2,
+  Square,
+  Check,
+  ChevronRight,
+  Plus,
+  X,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLocaleStore } from '@/lib/store/locale';
 import { useTranslations } from '@/lib/i18n';
@@ -71,6 +84,10 @@ export default function TaskListView({
   const locale = useLocaleStore((state) => state.locale);
   const t = useTranslations(locale);
 
+  const [isAddingTask, setIsAddingTask] = useState(false);
+  const [taskName, setTaskName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+
   // 点击任务行跳转到详情
   const handleTaskClick = (task: Task) => {
     if (projectId) {
@@ -108,6 +125,39 @@ export default function TaskListView({
       month: '2-digit',
       day: '2-digit',
     });
+  };
+
+  const handleCreateTask = async () => {
+    if (!projectId || !taskName.trim()) return;
+
+    setIsCreating(true);
+    try {
+      await api.createTask(projectId, {
+        name: taskName.trim(),
+        status: 'pending',
+        description: '',
+      });
+      toast.success(t.task.createSuccess);
+      setTaskName('');
+      setIsAddingTask(false);
+      onTaskUpdated?.();
+    } catch (error) {
+      console.error('创建任务失败:', error);
+      toast.error(t.task.createFailed);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleCreateTask();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsAddingTask(false);
+      setTaskName('');
+    }
   };
 
   return (
@@ -239,6 +289,61 @@ export default function TaskListView({
                 </div>
               );
             })}
+
+            {/* 列表末尾的内联新增任务区域 */}
+            <div className="px-4 py-3 bg-background">
+              {isAddingTask ? (
+                <div className="grid grid-cols-12 gap-4 items-center">
+                  <div className="col-span-1 flex items-center justify-center text-muted-foreground">
+                    <Plus className="h-4 w-4" />
+                  </div>
+                  <div className="col-span-5">
+                    <input
+                      type="text"
+                      value={taskName}
+                      onChange={(e) => setTaskName(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder={t.projectDetail?.taskNamePlaceholder || '输入任务名称...'}
+                      className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                      autoFocus
+                      disabled={isCreating}
+                    />
+                  </div>
+                  <div className="col-span-3 flex items-center gap-2">
+                    <button
+                      onClick={handleCreateTask}
+                      disabled={!taskName.trim() || isCreating}
+                      className={cn(
+                        'px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                        'bg-primary text-primary-foreground hover:bg-primary/90',
+                        'disabled:opacity-50 disabled:cursor-not-allowed'
+                      )}
+                    >
+                      {isCreating ? '...' : t.common?.confirm || '确认'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsAddingTask(false);
+                        setTaskName('');
+                      }}
+                      disabled={isCreating}
+                      className="px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent text-muted-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="col-span-3" />
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsAddingTask(true)}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>{t.projectDetail?.addTask || '添加任务'}</span>
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
