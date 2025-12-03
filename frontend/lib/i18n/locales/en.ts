@@ -507,6 +507,11 @@ export const en: Translation = {
     generateTasksSuccess: 'Successfully generated {count} tasks',
     generateTasksFailed: 'AI task decomposition failed',
     noProjectInfo: 'Please fill in project description or definition of done first',
+    batchDelete: 'Batch Delete',
+    batchDeleteConfirm: 'Are you sure you want to delete {count} selected tasks? This action cannot be undone.',
+    batchDeleteSuccess: 'Successfully deleted {count} tasks',
+    batchDeleteFailed: 'Failed to batch delete tasks',
+    batchDeletePartial: 'Partial success: {success} deleted, {failed} failed',
   },
   screenshot: {
     title: 'Screenshot Details',

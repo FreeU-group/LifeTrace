@@ -290,6 +290,9 @@ export const api = {
   deleteTask: (projectId: number, taskId: number) =>
     apiClient.delete(`/api/projects/${projectId}/tasks/${taskId}`),
 
+  batchDeleteTasks: (projectId: number, taskIds: number[]) =>
+    apiClient.post(`/api/projects/${projectId}/tasks/batch-delete`, { task_ids: taskIds }),
+
   getTaskChildren: (projectId: number, taskId: number) =>
     apiClient.get(`/api/projects/${projectId}/tasks/${taskId}/children`),
 

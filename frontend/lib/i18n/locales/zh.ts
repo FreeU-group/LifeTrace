@@ -505,6 +505,11 @@ export const zh = {
     generateTasksSuccess: '成功生成 {count} 个任务',
     generateTasksFailed: 'AI任务拆解失败',
     noProjectInfo: '请先填写项目描述或完成标准，以便AI生成任务',
+    batchDelete: '批量删除',
+    batchDeleteConfirm: '确定要删除选中的 {count} 个任务吗？此操作不可恢复。',
+    batchDeleteSuccess: '成功删除 {count} 个任务',
+    batchDeleteFailed: '批量删除任务失败',
+    batchDeletePartial: '部分删除成功：{success} 个成功，{failed} 个失败',
   },
   screenshot: {
     title: '截图详情',

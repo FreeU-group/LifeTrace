@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, FolderOpen, ChevronRight, ChevronDown, ChevronUp, History, Send, User, Bot, X, Activity, TrendingUp, Search, Clock, Sparkles } from 'lucide-react';
+import { ArrowLeft, Plus, FolderOpen, ChevronRight, ChevronDown, ChevronUp, History, Send, User, Bot, X, Activity, TrendingUp, Search, Clock, Sparkles, Trash2 } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Loading from '@/components/common/Loading';
 import Input from '@/components/common/Input';
@@ -502,6 +502,43 @@ export default function ProjectDetailPage() {
     });
   };
 
+  // 批量删除任务
+  const handleBatchDeleteTasks = async () => {
+    if (selectedTasks.size === 0) return;
+
+    const confirmMessage = t.projectDetail.batchDeleteConfirm.replace('{count}', String(selectedTasks.size));
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      const response = await api.batchDeleteTasks(projectId, Array.from(selectedTasks));
+      const result = response.data;
+
+      if (result.deleted_count > 0) {
+        if (result.failed_ids.length > 0 || result.not_found_ids.length > 0 || result.wrong_project_ids.length > 0) {
+          // 部分成功
+          const failedCount = result.failed_ids.length + result.not_found_ids.length + result.wrong_project_ids.length;
+          toast.warning(
+            t.projectDetail.batchDeletePartial
+              .replace('{success}', String(result.deleted_count))
+              .replace('{failed}', String(failedCount))
+          );
+        } else {
+          // 全部成功
+          toast.success(t.projectDetail.batchDeleteSuccess.replace('{count}', String(result.deleted_count)));
+        }
+        setSelectedTasks(new Set());
+        loadTasks();
+      } else {
+        toast.error(t.projectDetail.batchDeleteFailed);
+      }
+    } catch (error) {
+      console.error('批量删除任务失败:', error);
+      toast.error(t.projectDetail.batchDeleteFailed);
+    }
+  };
+
   const handleSaveDescription = async () => {
     if (!project || savingDescription) return;
     const trimmed = descriptionDraft.trim();
@@ -788,6 +825,36 @@ export default function ProjectDetailPage() {
 
           </div>
         </div>
+
+        {/* 批量操作栏 - 当有任务被选中时显示 */}
+        {selectedTasks.size > 0 && !loading && tasks.length > 0 && (
+          <div className="flex-shrink-0 px-6 py-3 bg-primary/5 border-b border-primary/20">
+            <div className="mx-auto max-w-7xl w-full flex items-center justify-between">
+              <span className="text-sm text-foreground">
+                {t.projectDetail.selectedTasks.replace('{count}', String(selectedTasks.size))}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearSelectedTasks}
+                  className="text-muted-foreground"
+                >
+                  {t.common.clearAll}
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={handleBatchDeleteTasks}
+                  className="gap-1.5"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {t.projectDetail.batchDelete}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 可滚动的任务视图区域 */}
         <div className="flex-1 overflow-hidden min-h-0">
