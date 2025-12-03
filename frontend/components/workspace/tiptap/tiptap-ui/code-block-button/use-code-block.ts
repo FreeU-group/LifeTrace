@@ -88,57 +88,89 @@ export function toggleCodeBlock(editor: Editor | null): boolean {
   if (!canToggle(editor)) return false
 
   try {
-    const view = editor.view
-    let state = view.state
-    let tr = state.tr
+    const { state } = editor
+    const { from, to } = state.selection
 
-    // No selection, find the the cursor position
-    if (state.selection.empty || state.selection instanceof TextSelection) {
+    // Handle empty selection - convert to NodeSelection
+    if (state.selection.empty) {
       const pos = findNodePosition({
         editor,
         node: state.selection.$anchor.node(1),
       })?.pos
       if (!isValidPosition(pos)) return false
 
-      tr = tr.setSelection(NodeSelection.create(state.doc, pos))
+      const view = editor.view
+      const tr = state.tr.setSelection(NodeSelection.create(state.doc, pos))
       view.dispatch(tr)
-      state = view.state
+
+      const newState = view.state
+      const selection = newState.selection
+
+      let chain = editor.chain().focus()
+
+      // Handle NodeSelection
+      if (selection instanceof NodeSelection) {
+        const firstChild = selection.node.firstChild?.firstChild
+        const lastChild = selection.node.lastChild?.lastChild
+
+        const nodeFrom = firstChild
+          ? selection.from + firstChild.nodeSize
+          : selection.from + 1
+
+        const nodeTo = lastChild
+          ? selection.to - lastChild.nodeSize
+          : selection.to - 1
+
+        const resolvedFrom = newState.doc.resolve(nodeFrom)
+        const resolvedTo = newState.doc.resolve(nodeTo)
+
+        chain = chain
+          .setTextSelection(TextSelection.between(resolvedFrom, resolvedTo))
+          .clearNodes()
+      }
+
+      const toggle = editor.isActive("codeBlock")
+        ? chain.setNode("paragraph")
+        : chain.toggleNode("codeBlock", "paragraph")
+
+      toggle.run()
+      editor.chain().focus().selectTextblockEnd().run()
+
+      return true
     }
 
-    const selection = state.selection
+    // Handle TextSelection - check if it spans multiple blocks
+    if (state.selection instanceof TextSelection) {
+      const $from = state.doc.resolve(from)
+      const $to = state.doc.resolve(to)
+      const range = $from.blockRange($to)
 
-    let chain = editor.chain().focus()
+      // If selection spans multiple blocks, ensure all are included
+      if (range) {
+        const rangeFrom = range.start
+        const rangeTo = range.end
 
-    // Handle NodeSelection
-    if (selection instanceof NodeSelection) {
-      const firstChild = selection.node.firstChild?.firstChild
-      const lastChild = selection.node.lastChild?.lastChild
-
-      const from = firstChild
-        ? selection.from + firstChild.nodeSize
-        : selection.from + 1
-
-      const to = lastChild
-        ? selection.to - lastChild.nodeSize
-        : selection.to - 1
-
-      const resolvedFrom = state.doc.resolve(from)
-      const resolvedTo = state.doc.resolve(to)
-
-      chain = chain
-        .setTextSelection(TextSelection.between(resolvedFrom, resolvedTo))
-        .clearNodes()
+        // Set selection to span all blocks
+        editor
+          .chain()
+          .focus()
+          .setTextSelection({ from: rangeFrom, to: rangeTo })
+          .run()
+      }
     }
 
+    // Apply code block toggle to the entire selection
     const toggle = editor.isActive("codeBlock")
-      ? chain.setNode("paragraph")
-      : chain.toggleNode("codeBlock", "paragraph")
+      ? editor.chain().focus().setNode("paragraph")
+      : editor.chain().focus().toggleNode("codeBlock", "paragraph")
 
-    toggle.run()
+    const success = toggle.run()
 
-    editor.chain().focus().selectTextblockEnd().run()
+    if (success) {
+      editor.chain().focus().selectTextblockEnd().run()
+    }
 
-    return true
+    return success
   } catch {
     return false
   }
