@@ -6,7 +6,8 @@ import type { NodeType } from "@tiptap/pm/model"
 export type UploadFunction = (
   file: File,
   onProgress?: (event: { progress: number }) => void,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  projectId?: string
 ) => Promise<string>
 
 export interface ImageUploadNodeOptions {
@@ -30,6 +31,10 @@ export interface ImageUploadNodeOptions {
    * @default 0
    */
   maxSize?: number
+  /**
+   * Project ID for organizing uploaded images.
+   */
+  projectId?: string
   /**
    * Function to handle the upload process.
    */
@@ -81,6 +86,7 @@ export const ImageUploadNode = Node.create<ImageUploadNodeOptions>({
       limit: 1,
       maxSize: 0,
       upload: undefined,
+      projectId: undefined,
       onError: undefined,
       onSuccess: undefined,
       HTMLAttributes: {},
@@ -97,6 +103,9 @@ export const ImageUploadNode = Node.create<ImageUploadNodeOptions>({
       },
       maxSize: {
         default: this.options.maxSize,
+      },
+      projectId: {
+        default: this.options.projectId,
       },
     }
   },

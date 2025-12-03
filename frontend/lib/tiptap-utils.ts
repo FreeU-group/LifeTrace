@@ -361,7 +361,8 @@ export function selectionWithinConvertibleTypes(
 export const handleImageUpload = async (
   file: File,
   onProgress?: (event: { progress: number }) => void,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  projectId?: string
 ): Promise<string> => {
   // Validate file
   if (!file) {
@@ -374,17 +375,34 @@ export const handleImageUpload = async (
     )
   }
 
-  // For demo/testing: Simulate upload progress. In production, replace the following code
-  // with your own upload implementation.
-  for (let progress = 0; progress <= 100; progress += 10) {
-    if (abortSignal?.aborted) {
-      throw new Error("Upload cancelled")
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    onProgress?.({ progress })
+  // Require projectId for upload
+  if (!projectId) {
+    throw new Error("Project ID is required for image upload")
   }
 
-  return "/images/tiptap-ui-placeholder-image.jpg"
+  try {
+    const { api } = await import('./api');
+    
+    const response = await api.uploadWorkspaceImage(
+      projectId,
+      file,
+      (progress) => {
+        onProgress?.({ progress });
+      },
+      abortSignal
+    );
+
+    if (!response.success || !response.url) {
+      throw new Error(response.error || 'Upload failed');
+    }
+
+    // Return the full URL
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    return `${baseUrl}${response.url}`;
+  } catch (error) {
+    console.error('Image upload error:', error);
+    throw error;
+  }
 }
 
 type ProtocolOptions = {

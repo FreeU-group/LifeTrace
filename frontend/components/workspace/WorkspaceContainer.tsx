@@ -1229,6 +1229,7 @@ export default function WorkspaceContainer({
             const ext = selectedFile.name.toLowerCase().substring(selectedFile.name.lastIndexOf('.'));
             return supportedExtensions.includes(ext) ? selectedFile.name : undefined;
           })() : undefined}
+          projectId={currentProject || undefined}
           unsupportedFileInfo={selectedFile?.type === 'file' ? (() => {
             const supportedExtensions = ['.txt', '.md', '.doc', '.docx'];
             const ext = selectedFile.name.toLowerCase().substring(selectedFile.name.lastIndexOf('.'));

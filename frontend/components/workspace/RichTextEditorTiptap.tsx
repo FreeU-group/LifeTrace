@@ -158,6 +158,8 @@ interface RichTextEditorProps {
   /** Unique file ID used as key for editor re-mounting */
   fileId?: string;
   fileName?: string;
+  /** Project ID for image uploads and other project-specific operations */
+  projectId?: string;
   saveLabel: string;
   editLabel: string;
   previewLabel: string;
@@ -222,6 +224,7 @@ export default function RichTextEditorTiptap({
   readOnly = false,
   fileId,
   fileName,
+  projectId,
   saveLabel,
   editLabel,
   previewLabel,
@@ -564,6 +567,7 @@ export default function RichTextEditorTiptap({
               initialContent={content}
               placeholder={placeholder}
               readOnly={readOnly}
+              projectId={projectId}
               onUpdate={(markdown) => {
                 contentRef.current = markdown;
                 onChange(markdown);
@@ -650,6 +654,7 @@ function EditorComponent({
   initialContent,
   placeholder,
   readOnly,
+  projectId,
   onUpdate,
   onEditorInitialized,
   onKeyDown,
@@ -679,6 +684,7 @@ function EditorComponent({
   initialContent: string;
   placeholder?: string;
   readOnly: boolean;
+  projectId?: string;
   onUpdate: (markdown: string) => void;
   onEditorInitialized: (editor: Editor) => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
@@ -788,6 +794,7 @@ function EditorComponent({
         maxSize: MAX_FILE_SIZE,
         limit: 3,
         upload: handleImageUpload,
+        projectId: projectId,
         onError: (error) => console.error('Upload failed:', error),
       }),
     ],

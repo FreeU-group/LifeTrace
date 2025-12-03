@@ -54,16 +54,23 @@ export interface UploadOptions {
    */
   accept: string
   /**
+   * Project ID for organizing uploaded images
+   * @optional
+   */
+  projectId?: string
+  /**
    * Function that handles the actual file upload process
    * @param {File} file - The file to be uploaded
    * @param {Function} onProgress - Callback function to report upload progress
    * @param {AbortSignal} signal - Signal that can be used to abort the upload
+   * @param {string} projectId - Optional project ID for upload
    * @returns {Promise<string>} Promise resolving to the URL of the uploaded file
    */
   upload: (
     file: File,
     onProgress: (event: { progress: number }) => void,
-    signal: AbortSignal
+    signal: AbortSignal,
+    projectId?: string
   ) => Promise<string>
   /**
    * Callback triggered when a file is uploaded successfully
@@ -121,7 +128,8 @@ function useFileUpload(options: UploadOptions) {
             )
           )
         },
-        abortController.signal
+        abortController.signal,
+        options.projectId
       )
 
       if (!url) throw new Error("Upload failed: No URL returned")
@@ -434,7 +442,7 @@ const DropZoneContent: React.FC<{ maxSize: number; limit: number }> = ({
 )
 
 export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
-  const { accept, limit, maxSize } = props.node.attrs
+  const { accept, limit, maxSize, projectId } = props.node.attrs
   const inputRef = useRef<HTMLInputElement>(null)
   const extension = props.extension
 
@@ -443,6 +451,7 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
     limit,
     accept,
     upload: extension.options.upload,
+    projectId: projectId || extension.options.projectId,
     onSuccess: extension.options.onSuccess,
     onError: extension.options.onError,
   }
