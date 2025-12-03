@@ -724,6 +724,11 @@ function EditorComponent({
   handleChatBack: () => void;
   aiMenuItems: Array<{ icon: any; action: string; label: string }>;
 }) {
+  // AI 菜单元素引用（用于计算尺寸和边界约束）
+  const aiMenuRef = useRef<HTMLDivElement | null>(null);
+  // 防抖计时器引用
+  const selectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // 将 markdown 转换为 HTML（用于 Tiptap）
   const markdownToHtml = useCallback((md: string): string => {
     if (!md) return '';
@@ -795,14 +800,79 @@ function EditorComponent({
     },
   });
 
-  // 监听选区变化，更新 AI 菜单位置与选中文本
+  // 计算 AI 菜单位置的核心函数（考虑滚动、边界约束和行高）
+  const calculateMenuPosition = useCallback(() => {
+    if (!editor || !editorContainerRef.current) return null;
+
+    const { state, view } = editor;
+    const { from, to } = state.selection;
+
+    try {
+      const start = view.coordsAtPos(from);
+      const end = view.coordsAtPos(to);
+      const container = editorContainerRef.current;
+      const containerRect = container.getBoundingClientRect();
+
+      // 获取滚动偏移量
+      const scrollTop = container.scrollTop;
+      const scrollLeft = container.scrollLeft;
+
+      // 计算选区第一行顶部位置（使用 Math.min 确保在最上面一行）
+      const selectionTop = Math.min(start.top, end.top);
+      
+      // 计算行高（用于更精确的菜单定位）
+      const lineHeight = Math.max(start.bottom - start.top, 24); // 最小24px
+      
+      // 菜单距离选区上方的偏移量（基于行高动态调整）
+      const menuOffset = Math.max(lineHeight * 0.5, 8); // 至少8px间距
+
+      // 转换为容器相对坐标（viewport坐标 - 容器viewport位置 + 滚动偏移）
+      let top = selectionTop - containerRect.top + scrollTop - menuOffset;
+      let left = (start.left + end.right) / 2 - containerRect.left + scrollLeft;
+
+      // 边界约束：获取菜单尺寸
+      const menuWidth = aiMenuRef.current?.offsetWidth || 300; // 默认估计300px
+
+      // 水平边界约束：确保菜单不超出容器左右边界
+      const horizontalPadding = 16; // 左右各留16px边距
+      if (left - menuWidth / 2 < horizontalPadding) {
+        // 左侧溢出，左对齐
+        left = horizontalPadding + menuWidth / 2;
+      } else if (left + menuWidth / 2 > containerRect.width - horizontalPadding) {
+        // 右侧溢出，右对齐
+        left = containerRect.width - horizontalPadding - menuWidth / 2;
+      }
+
+      // 垂直边界约束：如果上方空间不足，放到选区下方
+      const verticalPadding = 8;
+      if (top - scrollTop < verticalPadding) {
+        // 上方空间不足，放到选区下方
+        const selectionBottom = Math.max(start.bottom, end.bottom);
+        top = selectionBottom - containerRect.top + scrollTop + verticalPadding;
+      }
+
+      return { top, left };
+    } catch (error) {
+      console.error('Failed to calculate AI menu position:', error);
+      return null;
+    }
+  }, [editor, editorContainerRef]);
+
+  // 监听选区变化，带防抖的 AI 菜单显示逻辑
   useEffect(() => {
     if (!editor || readOnly) return;
 
     const updateSelection = () => {
-      const { state, view } = editor;
+      const { state } = editor;
       const { from, to } = state.selection;
 
+      // 清除之前的防抖计时器
+      if (selectionTimeoutRef.current) {
+        clearTimeout(selectionTimeoutRef.current);
+        selectionTimeoutRef.current = null;
+      }
+
+      // 如果没有选中内容，立即隐藏菜单
       if (from === to) {
         setShowAIMenu(false);
         setSelectedText('');
@@ -820,31 +890,56 @@ function EditorComponent({
         return;
       }
 
+      // 更新选中文本
       setSelectedText(text);
 
-      try {
-        const start = view.coordsAtPos(from);
-        const end = view.coordsAtPos(to);
-        const containerRect = editorContainerRef.current?.getBoundingClientRect();
-        if (!containerRect) return;
-
-        const top = Math.max(start.top, end.top) - containerRect.top - 40;
-        const left =
-          (start.left + end.right) / 2 - containerRect.left;
-
-        setAIMenuPosition({ top, left });
-        setShowAIMenu(true);
-      } catch (error) {
-        console.error('Failed to calculate AI menu position:', error);
-        setShowAIMenu(false);
-      }
+      // 延迟300ms后显示菜单（防止干扰正常选择操作）
+      selectionTimeoutRef.current = setTimeout(() => {
+        const position = calculateMenuPosition();
+        if (position) {
+          setAIMenuPosition(position);
+          setShowAIMenu(true);
+        } else {
+          setShowAIMenu(false);
+        }
+      }, 300);
     };
 
     editor.on('selectionUpdate', updateSelection);
+    
     return () => {
       editor.off('selectionUpdate', updateSelection);
+      // 清理计时器
+      if (selectionTimeoutRef.current) {
+        clearTimeout(selectionTimeoutRef.current);
+      }
     };
-  }, [editor, readOnly, editorContainerRef, setShowAIMenu, setSelectedText, setIsChatMode, setChatInput, setAIMenuPosition]);
+  }, [editor, readOnly, calculateMenuPosition, setShowAIMenu, setSelectedText, setIsChatMode, setChatInput, setAIMenuPosition]);
+
+  // 监听滚动事件，实时更新菜单位置
+  useEffect(() => {
+    if (!editor || readOnly || !editorContainerRef.current) return;
+
+    const container = editorContainerRef.current;
+
+    const handleScroll = () => {
+      // 只在菜单可见时重新计算位置
+      if (showAIMenu) {
+        const position = calculateMenuPosition();
+        if (position) {
+          setAIMenuPosition(position);
+        } else {
+          setShowAIMenu(false);
+        }
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+    };
+  }, [editor, readOnly, showAIMenu, calculateMenuPosition, setAIMenuPosition, setShowAIMenu, editorContainerRef]);
 
   // 通知父组件 editor 已初始化
   useEffect(() => {
@@ -960,10 +1055,12 @@ function EditorComponent({
                             !aiEditState?.isProcessing &&
                             !aiEditState?.previewText && (
                               <div
+                                ref={aiMenuRef}
                                 className="ai-edit-menu absolute z-50 bg-popover border border-border rounded-lg shadow-lg p-1"
                                 style={{
                                   top: aiMenuPosition.top,
                                   left: aiMenuPosition.left,
+                                  transform: 'translateX(-50%)', // 水平居中对齐
                                 }}
                               >
                                 {isChatMode ? (
