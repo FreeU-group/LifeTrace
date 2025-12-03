@@ -1042,12 +1042,6 @@ export default function WorkspaceContainer({
     // 等待一帧，确保 RichTextEditorTiptap 的 handleDiffConfirm 已执行完毕
     await new Promise(resolve => requestAnimationFrame(resolve));
 
-    // 获取编辑器更新后的 markdown 内容并保存
-    const htmlToMarkdown = (html: string): string => {
-      // 简单的 HTML 转 Markdown（实际应该使用 turndown 或编辑器内置方法）
-      return html;
-    };
-
     const newContent = editor.getHTML();
     setFileContent(newContent);
     updateFileContent(selectedFile.id, newContent);

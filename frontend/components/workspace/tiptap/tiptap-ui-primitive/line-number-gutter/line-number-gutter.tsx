@@ -102,7 +102,7 @@ export function LineNumberGutter({ editor, containerRef }: LineNumberGutterProps
           <div
             key={line.index}
             className={
-              'tiptap-line-number pointer-events-none select-none text-xs text-muted-foreground text-right pr-2 flex items-center justify-center' +
+              'tiptap-line-number pointer-events-none select-none text-xs text-muted-foreground text-right flex justify-center' +
               (activeIndex === line.index ? ' font-bold' : '')
             }
             style={{
