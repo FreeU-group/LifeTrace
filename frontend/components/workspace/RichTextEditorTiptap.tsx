@@ -40,7 +40,8 @@ import { Selection } from '@tiptap/extensions';
 
 // --- Tiptap UI Primitives ---
 import { Spacer } from '@/components/workspace/tiptap/tiptap-ui-primitive/spacer';
-import { LineNumberGutter } from '@/components/workspace/tiptap/tiptap-ui-primitive/line-number-gutter/line-number-gutter';
+// 行号暂时不使用
+// import { LineNumberGutter } from '@/components/workspace/tiptap/tiptap-ui-primitive/line-number-gutter/line-number-gutter';
 import {
   Toolbar,
   ToolbarGroup,
@@ -53,7 +54,7 @@ import { HorizontalRule } from '@/components/workspace/tiptap/tiptap-node/horizo
 
 // --- Tiptap Extension ---
 import { AIDiffDelete, AIDiffInsert } from '@/components/workspace/tiptap/tiptap-extension/ai-diff-extension';
-import { LineNumbers } from '@/components/workspace/tiptap/tiptap-extension/line-numbers-extension';
+// import { LineNumbers } from '@/components/workspace/tiptap/tiptap-extension/line-numbers-extension';
 
 // --- Tiptap Node Styles ---
 import '@/components/workspace/tiptap/tiptap-scss/blockquote-node.scss';
@@ -768,6 +769,10 @@ function EditorComponent({
 }) {
   // AI 菜单元素引用（用于计算尺寸和边界约束）
   const aiMenuRef = useRef<HTMLDivElement | null>(null);
+  // AI Diff 按钮元素引用（用于计算尺寸和边界约束）
+  const aiDiffButtonRef = useRef<HTMLDivElement | null>(null);
+  // AI Diff 按钮位置状态
+  const [aiDiffButtonPosition, setAiDiffButtonPosition] = useState<{ top: number; left: number } | null>(null);
   // 防抖计时器引用
   const selectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -837,7 +842,6 @@ function EditorComponent({
       Selection,
       AIDiffDelete,
       AIDiffInsert,
-      LineNumbers,
       ImageUploadNode.configure({
         accept: 'image/*',
         maxSize: MAX_FILE_SIZE,
@@ -918,6 +922,72 @@ function EditorComponent({
     }
   }, [editor, editorContainerRef]);
 
+  // 计算 AI Diff 按钮位置的核心函数（跟随新插入文本的结束位置）
+  const calculateDiffButtonPosition = useCallback(() => {
+    if (!editor || !editorContainerRef.current || !aiEditState) return null;
+
+    const { selectionTo, previewText } = aiEditState;
+    const actualInsertedLength = lastPreviewLengthRef.current || previewText.length || 0;
+    
+    // 计算新插入文本的结束位置
+    const insertEndPos = selectionTo + actualInsertedLength;
+
+    try {
+      const view = editor.view;
+      const container = editorContainerRef.current;
+      const containerRect = container.getBoundingClientRect();
+
+      // 获取滚动偏移量
+      const scrollTop = container.scrollTop;
+      const scrollLeft = container.scrollLeft;
+
+      // 获取新插入文本结束位置的坐标
+      const endCoords = view.coordsAtPos(insertEndPos);
+      
+      // 计算行高
+      const lineHeight = Math.max(endCoords.bottom - endCoords.top, 24); // 最小24px
+      
+      // 按钮距离文本的偏移量（放在文本右侧，稍微下移一点）
+      const buttonOffsetX = 12; // 水平间距
+      const buttonOffsetY = lineHeight * 0.5; // 垂直偏移（行高的一半）
+
+      // 转换为容器相对坐标
+      let top = endCoords.top - containerRect.top + scrollTop + buttonOffsetY;
+      let left = endCoords.right - containerRect.left + scrollLeft + buttonOffsetX;
+
+      // 边界约束：获取按钮组尺寸
+      const buttonWidth = aiDiffButtonRef.current?.offsetWidth || 200; // 默认估计200px
+      const buttonHeight = aiDiffButtonRef.current?.offsetHeight || 40; // 默认估计40px
+
+      // 水平边界约束：确保按钮不超出容器右边界
+      const horizontalPadding = 16;
+      if (left + buttonWidth > containerRect.width - horizontalPadding) {
+        // 右侧溢出，放在文本左侧
+        left = endCoords.left - containerRect.left + scrollLeft - buttonWidth - buttonOffsetX;
+        // 如果左侧也溢出，则放在文本上方
+        if (left < horizontalPadding) {
+          left = Math.max(endCoords.left - containerRect.left + scrollLeft - buttonWidth / 2, horizontalPadding);
+        }
+      }
+
+      // 垂直边界约束：确保按钮不超出容器底部
+      const verticalPadding = 8;
+      if (top + buttonHeight > containerRect.height - verticalPadding) {
+        // 底部溢出，放在文本上方
+        top = endCoords.top - containerRect.top + scrollTop - buttonHeight - buttonOffsetY;
+        // 如果上方也溢出，则放在容器底部
+        if (top < verticalPadding) {
+          top = containerRect.height - buttonHeight - verticalPadding;
+        }
+      }
+
+      return { top, left };
+    } catch (error) {
+      console.error('Failed to calculate AI diff button position:', error);
+      return null;
+    }
+  }, [editor, editorContainerRef, aiEditState]);
+
   // 监听选区变化，带防抖的 AI 菜单显示逻辑
   useEffect(() => {
     if (!editor || readOnly) return;
@@ -976,7 +1046,7 @@ function EditorComponent({
     };
   }, [editor, readOnly, calculateMenuPosition, setShowAIMenu, setSelectedText, setIsChatMode, setChatInput, setAIMenuPosition]);
 
-  // 监听滚动事件，实时更新菜单位置
+  // 监听滚动事件，实时更新菜单位置和按钮位置
   useEffect(() => {
     if (!editor || readOnly || !editorContainerRef.current) return;
 
@@ -992,6 +1062,11 @@ function EditorComponent({
           setShowAIMenu(false);
         }
       }
+      // 只在按钮应该显示时重新计算位置
+      if (aiEditState && !aiEditState.isProcessing && aiEditState.previewText) {
+        const position = calculateDiffButtonPosition();
+        setAiDiffButtonPosition(position);
+      }
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
@@ -999,7 +1074,7 @@ function EditorComponent({
     return () => {
       container.removeEventListener('scroll', handleScroll);
     };
-  }, [editor, readOnly, showAIMenu, calculateMenuPosition, setAIMenuPosition, setShowAIMenu, editorContainerRef]);
+  }, [editor, readOnly, showAIMenu, calculateMenuPosition, setAIMenuPosition, setShowAIMenu, editorContainerRef, aiEditState, calculateDiffButtonPosition]);
 
   // 通知父组件 editor 已初始化
   useEffect(() => {
@@ -1014,8 +1089,9 @@ function EditorComponent({
 
   useEffect(() => {
     if (!editor || !aiEditState) {
-      // 重置时清除 ref
+      // 重置时清除 ref 和按钮位置
       lastPreviewLengthRef.current = 0;
+      setAiDiffButtonPosition(null);
       return;
     }
 
@@ -1023,6 +1099,7 @@ function EditorComponent({
 
     // 如果没有预览文本，不需要渲染 diff（但允许 isProcessing 时显示流式更新）
     if (!previewText) {
+      setAiDiffButtonPosition(null);
       return;
     }
 
@@ -1031,6 +1108,7 @@ function EditorComponent({
     if (selectionFrom < 0 || selectionFrom >= docSize || selectionTo > docSize || selectionFrom > selectionTo) {
       console.warn('Invalid AI diff positions:', { selectionFrom, selectionTo, docSize });
       lastPreviewLengthRef.current = 0;
+      setAiDiffButtonPosition(null);
       return;
     }
 
@@ -1050,6 +1128,7 @@ function EditorComponent({
       } else {
         console.warn('Cannot delete preview text - range exceeds document size');
         lastPreviewLengthRef.current = 0;
+        setAiDiffButtonPosition(null);
         return;
       }
     }
@@ -1084,16 +1163,24 @@ function EditorComponent({
       // 6. 应用事务（不添加到历史记录）
       tr.setMeta('addToHistory', false);
       editor.view.dispatch(tr);
+
+      // 7. 在下一帧更新按钮位置（等待 DOM 更新）
+      requestAnimationFrame(() => {
+        const position = calculateDiffButtonPosition();
+        setAiDiffButtonPosition(position);
+      });
     } else {
       // 文本不匹配，可能文档已被修改，跳过此次渲染
       console.warn('Text mismatch - expected:', originalText, 'got:', currentText);
       lastPreviewLengthRef.current = 0;
+      setAiDiffButtonPosition(null);
     }
-  }, [editor, aiEditState]);
+  }, [editor, aiEditState, calculateDiffButtonPosition]);
 
   // AI diff 接受/拒绝处理
   const handleDiffConfirm = useCallback(() => {
     if (!editor || !aiEditState) {
+      setAiDiffButtonPosition(null);
       onAIEditConfirm?.();
       return;
     }
@@ -1118,8 +1205,9 @@ function EditorComponent({
       tr.insertText(previewText, selectionFrom);
     }
 
-    // 重置追踪的预览长度
+    // 重置追踪的预览长度和按钮位置
     lastPreviewLengthRef.current = 0;
+    setAiDiffButtonPosition(null);
 
     // 应用事务
     editor.view.dispatch(tr);
@@ -1130,6 +1218,7 @@ function EditorComponent({
 
   const handleDiffCancel = useCallback(() => {
     if (!editor || !aiEditState) {
+      setAiDiffButtonPosition(null);
       onAIEditCancel?.();
       return;
     }
@@ -1149,8 +1238,9 @@ function EditorComponent({
     tr.removeMark(selectionFrom, selectionTo, editor.schema.marks.aiDiffDelete);
     tr.removeMark(selectionFrom, selectionTo, editor.schema.marks.aiDiffInsert);
 
-    // 重置追踪的预览长度
+    // 重置追踪的预览长度和按钮位置
     lastPreviewLengthRef.current = 0;
+    setAiDiffButtonPosition(null);
 
     // 应用事务
     editor.view.dispatch(tr);
@@ -1171,10 +1261,6 @@ function EditorComponent({
                       <MainToolbarContent />
                     </Toolbar>
                     <div className="relative w-full">
-                      {/* 左侧行号栏 */}
-                      <div className="absolute left-0 -top-12 bottom-0 w-8 border-r border-border bg-muted/40">
-                        <LineNumberGutter editor={editor} containerRef={editorContainerRef} />
-                      </div>
                       {/* 右侧正文内容，留出行号栏空间 */}
                       <div className="ml-8 h-full">
                         <EditorContent
@@ -1184,24 +1270,31 @@ function EditorComponent({
                         />
                       </div>
 
-                      {/* AI Diff 确认/取消按钮（固定在视口底部居中） */}
-                      {aiEditState && !aiEditState.isProcessing && aiEditState.previewText && (
-                        <div className="fixed inset-x-0 bottom-20 z-60 flex items-center justify-center pointer-events-none">
+                      {/* AI Diff 确认/取消按钮（跟随新插入文本位置） */}
+                      {aiEditState && !aiEditState.isProcessing && aiEditState.previewText && aiDiffButtonPosition && (
+                        <div
+                          ref={aiDiffButtonRef}
+                          className="absolute z-60 pointer-events-none"
+                          style={{
+                            top: `${aiDiffButtonPosition.top}px`,
+                            left: `${aiDiffButtonPosition.left}px`,
+                          }}
+                        >
                           <div className="flex items-center gap-2 rounded-md bg-background/95 px-3 py-1.5 shadow-lg ring-1 ring-border backdrop-blur">
-                          <button
-                            onClick={handleDiffCancel}
-                            className="inline-flex items-center gap-1 rounded border border-destructive/60 bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/15 transition-colors pointer-events-auto"
-                          >
-                            <X />
-                            <span>{aiEditLabels?.cancel ?? '取消'}</span>
-                          </button>
-                          <button
-                            onClick={handleDiffConfirm}
-                            className="inline-flex items-center gap-1 rounded border border-emerald-500/60 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-500/15 transition-colors pointer-events-auto"
-                          >
-                            <Check />
-                            <span>{aiEditLabels?.confirm ?? '确认'}</span>
-                          </button>
+                            <button
+                              onClick={handleDiffCancel}
+                              className="inline-flex items-center gap-1 rounded border border-destructive/60 bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/15 transition-colors pointer-events-auto"
+                            >
+                              <X />
+                              <span>{aiEditLabels?.cancel ?? '取消'}</span>
+                            </button>
+                            <button
+                              onClick={handleDiffConfirm}
+                              className="inline-flex items-center gap-1 rounded border border-emerald-500/60 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-500/15 transition-colors pointer-events-auto"
+                            >
+                              <Check />
+                              <span>{aiEditLabels?.confirm ?? '确认'}</span>
+                            </button>
                           </div>
                         </div>
                       )}
