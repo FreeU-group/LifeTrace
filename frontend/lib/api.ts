@@ -518,6 +518,10 @@ export const api = {
   deleteWorkspaceFile: (fileId: string) =>
     apiClient.post('/api/workspace/delete', { file_id: fileId }),
 
+  // 获取 slides 文件夹中的图片列表
+  getSlidesImages: (projectId: string) =>
+    apiClient.get(`/api/workspace/slides/${encodeURIComponent(projectId)}/images`),
+
   // 工作区文档 AI 操作
   processDocumentAI: (params: {
     action: 'summarize' | 'improve' | 'explain' | 'custom' | 'beautify' | 'expand' | 'condense' | 'correct' | 'translate';

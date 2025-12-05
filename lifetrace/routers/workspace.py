@@ -25,6 +25,9 @@ from lifetrace.schemas.workspace import (
     DocumentAIResponse,
     FileContentResponse,
     FileNode,
+    GenerateSlidesRequest,
+    GenerateSlidesResponse,
+    GeneratedSlideInfo,
     ProjectType,
     RenameFileRequest,
     RenameFileResponse,
@@ -32,6 +35,8 @@ from lifetrace.schemas.workspace import (
     RenameWorkspaceProjectResponse,
     SaveFileRequest,
     SaveFileResponse,
+    SlideImageInfo,
+    SlidesImagesResponse,
     UploadFileResponse,
     UploadImageResponse,
     WorkspaceFilesResponse,
@@ -1182,6 +1187,122 @@ async def get_image(project_id: str, filename: str):
         raise
     except Exception as e:
         logger.error(f"获取图片失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/slides/{project_id}/images", response_model=SlidesImagesResponse)
+async def get_slides_images(project_id: str):
+    """获取项目中 slides 文件夹下的所有图片
+
+    Args:
+        project_id: 项目ID
+
+    Returns:
+        图片列表响应
+    """
+    try:
+        workspace_dir = deps.config.workspace_dir
+        slides_dir = Path(workspace_dir) / project_id / "slides"
+
+        # 安全检查：确保路径在 workspace 目录内
+        try:
+            slides_dir.resolve().relative_to(Path(workspace_dir).resolve())
+        except ValueError:
+            return SlidesImagesResponse(
+                success=False,
+                images=[],
+                error="禁止访问工作区外的目录",
+            )
+
+        # 检查 slides 目录是否存在
+        if not slides_dir.exists() or not slides_dir.is_dir():
+            return SlidesImagesResponse(
+                success=True,
+                images=[],
+            )
+
+        # 获取所有图片文件
+        image_files = []
+        for file_path in sorted(slides_dir.iterdir()):
+            if file_path.is_file():
+                file_ext = file_path.suffix.lower()
+                if file_ext in ALLOWED_IMAGE_EXTENSIONS:
+                    # 构建访问URL
+                    image_url = f"/api/workspace/slides/{project_id}/{file_path.name}"
+                    image_files.append(
+                        SlideImageInfo(
+                            url=image_url,
+                            name=file_path.name,
+                        )
+                    )
+
+        logger.info(f"获取项目 {project_id} 的 slides 图片列表成功，共 {len(image_files)} 张")
+        return SlidesImagesResponse(
+            success=True,
+            images=image_files,
+        )
+
+    except Exception as e:
+        logger.error(f"获取 slides 图片列表失败: {e}")
+        return SlidesImagesResponse(
+            success=False,
+            images=[],
+            error=str(e),
+        )
+
+
+@router.get("/slides/{project_id}/{filename}")
+async def get_slide_image(project_id: str, filename: str):
+    """获取项目中 slides 文件夹下的图片文件
+
+    Args:
+        project_id: 项目ID
+        filename: 图片文件名
+
+    Returns:
+        图片文件流
+    """
+    try:
+        workspace_dir = deps.config.workspace_dir
+        image_path = Path(workspace_dir) / project_id / "slides" / filename
+
+        # 安全检查：确保路径在 workspace 目录内
+        try:
+            image_path.resolve().relative_to(Path(workspace_dir).resolve())
+        except ValueError:
+            raise HTTPException(status_code=403, detail="禁止访问工作区外的文件") from None
+
+        # 检查文件是否存在
+        if not image_path.exists() or not image_path.is_file():
+            raise HTTPException(status_code=404, detail="图片不存在")
+
+        # 验证是否为图片文件
+        file_ext = image_path.suffix.lower()
+        if file_ext not in ALLOWED_IMAGE_EXTENSIONS:
+            raise HTTPException(status_code=400, detail="不是有效的图片文件")
+
+        # 确定 MIME 类型
+        mime_types = {
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+            ".svg": "image/svg+xml",
+        }
+        media_type = mime_types.get(file_ext, "application/octet-stream")
+
+        # 创建文件流响应
+        def iter_file():
+            with open(image_path, "rb") as f:
+                yield from f
+
+        return StreamingResponse(iter_file(), media_type=media_type)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取 slides 图片失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

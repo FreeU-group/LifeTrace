@@ -13,6 +13,7 @@ import {
   X,
   Lock,
   Sparkles,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 // 文件/文件夹节点类型
@@ -101,12 +102,16 @@ function TreeNode({
     }
   }, [isEditing]);
 
+  // 检查是否是slides文件夹
+  const isSlidesFolder = node.type === 'folder' && node.name.toLowerCase() === 'slides';
+
   const handleClick = () => {
     if (isEditing || showDeleteConfirm) return;
     // 选中当前节点（无论是文件还是文件夹）
     onSelectFile(node);
-    // 如果是文件夹，同时展开/折叠
-    if (node.type === 'folder') {
+    // 如果是普通文件夹，同时展开/折叠
+    // slides文件夹不展开，直接显示图片
+    if (node.type === 'folder' && !isSlidesFolder) {
       toggleFolder(node.id);
     }
   };
@@ -174,8 +179,8 @@ function TreeNode({
         onMouseEnter={() => setShowActions(true)}
         onMouseLeave={() => !isEditing && !showDeleteConfirm && setShowActions(false)}
       >
-        {/* 展开/折叠图标 */}
-        {node.type === 'folder' ? (
+        {/* 展开/折叠图标 - slides文件夹不显示 */}
+        {node.type === 'folder' && !isSlidesFolder ? (
           <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
             {isExpanded ? (
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -188,7 +193,9 @@ function TreeNode({
         )}
 
         {/* 文件/文件夹图标 */}
-        {node.type === 'folder' ? (
+        {isSlidesFolder ? (
+          <ImageIcon className="h-4 w-4 text-purple-500 flex-shrink-0" />
+        ) : node.type === 'folder' ? (
           isExpanded ? (
             <FolderOpen className="h-4 w-4 text-amber-500 flex-shrink-0" />
           ) : (
@@ -288,8 +295,8 @@ function TreeNode({
         )}
       </div>
 
-      {/* 子节点 */}
-      {node.type === 'folder' && isExpanded && node.children && (
+      {/* 子节点 - slides文件夹不显示子节点 */}
+      {node.type === 'folder' && !isSlidesFolder && isExpanded && node.children && (
         <div>
           {node.children.map((child) => (
             <TreeNode

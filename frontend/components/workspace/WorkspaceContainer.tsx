@@ -6,6 +6,7 @@ import FileTree, { FileNode } from './FileTree';
 // import RichTextEditor from './RichTextEditor';
 import RichTextEditorTiptap from './RichTextEditorTiptap';
 import ImageViewer from './ImageViewer';
+import MultiImageViewer from './MultiImageViewer';
 import WorkspaceChat from './WorkspaceChat';
 import WorkspaceProjectList from './WorkspaceProjectList';
 import ChapterGenerationModal from './ChapterGenerationModal';
@@ -187,6 +188,10 @@ export default function WorkspaceContainer({
   const [currentChapterIndex, setCurrentChapterIndex] = useState<number | null>(null);
   const [isChapterGenerationComplete, setIsChapterGenerationComplete] = useState(false);
   const [hasChapterError, setHasChapterError] = useState(false);
+
+  // 幻灯片查看器状态
+  const [slidesImages, setSlidesImages] = useState<Array<{ url: string; name: string }>>([]);
+  const [showSlidesViewer, setShowSlidesViewer] = useState(false);
 
   // Refs
   const containerRef = useRef<HTMLDivElement>(null);
@@ -449,6 +454,8 @@ export default function WorkspaceContainer({
     setSelectedFile(null);
     setFileContent('');
     lastSavedContentRef.current = '';
+    setShowSlidesViewer(false);
+    setSlidesImages([]);
   };
 
   // 判断文件是否为图片
@@ -595,9 +602,40 @@ export default function WorkspaceContainer({
   // 确保切换文件时先加载内容，再更新选中状态
   // 这样可以保证编辑器重新挂载时使用的是新文件的内容，而不是旧内容
   const handleSelectFile = async (node: FileNode) => {
-    // 如果是文件夹，只选中不加载内容
+    // 如果是文件夹，检查是否是 slides 文件夹
     if (node.type === 'folder') {
       setSelectedFile(node);
+      
+      // 检查是否是 slides 文件夹
+      const isSlidesFolder = node.name.toLowerCase() === 'slides';
+      if (isSlidesFolder && currentProject) {
+        try {
+          // 获取 slides 文件夹中的图片列表
+          const response = await api.getSlidesImages(currentProject);
+          if (response.data?.success && response.data?.images) {
+            // 构建完整的图片URL
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            const imagesWithFullUrl = response.data.images.map((img: { url: string; name: string }) => ({
+              url: img.url.startsWith('http') ? img.url : `${baseUrl}${img.url}`,
+              name: img.name,
+            }));
+            setSlidesImages(imagesWithFullUrl);
+            setShowSlidesViewer(imagesWithFullUrl.length > 0);
+          } else {
+            // 如果没有图片，不显示查看器
+            setSlidesImages([]);
+            setShowSlidesViewer(false);
+          }
+        } catch (error) {
+          console.error('获取 slides 图片列表失败:', error);
+          setSlidesImages([]);
+          setShowSlidesViewer(false);
+        }
+      } else {
+        // 不是 slides 文件夹，关闭查看器
+        setShowSlidesViewer(false);
+        setSlidesImages([]);
+      }
       return;
     }
 
@@ -612,6 +650,10 @@ export default function WorkspaceContainer({
       setFileContent(content);
       lastSavedContentRef.current = content;
       
+      // 关闭幻灯片查看器（如果打开）
+      setShowSlidesViewer(false);
+      setSlidesImages([]);
+      
       // 更新文件树中的内容缓存
       updateFileContent(node.id, content);
     } catch (error) {
@@ -620,6 +662,10 @@ export default function WorkspaceContainer({
       setSelectedFile(node);
       setFileContent('');
       lastSavedContentRef.current = '';
+      
+      // 关闭幻灯片查看器（如果打开）
+      setShowSlidesViewer(false);
+      setSlidesImages([]);
     }
   };
 
@@ -1212,8 +1258,17 @@ export default function WorkspaceContainer({
 
       {/* 中间：富文本编辑器 */}
       <div className="flex-1 h-full overflow-hidden relative">
-       {/* 编辑器 / 图片查看器 */}
-        {selectedFile?.type === 'file' && isImageFile(selectedFile.name) ? (
+       {/* 编辑器 / 图片查看器 / 幻灯片查看器 */}
+        {showSlidesViewer && slidesImages.length > 0 ? (
+          <MultiImageViewer
+            images={slidesImages}
+            initialIndex={0}
+            onClose={() => {
+              setShowSlidesViewer(false);
+              setSlidesImages([]);
+            }}
+          />
+        ) : selectedFile?.type === 'file' && isImageFile(selectedFile.name) ? (
           <ImageViewer
             imageUrl={getImageUrl(selectedFile)}
             imageName={selectedFile.name}

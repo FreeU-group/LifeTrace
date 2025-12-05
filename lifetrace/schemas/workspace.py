@@ -244,3 +244,50 @@ class DeleteFileResponse(BaseModel):
     success: bool
     file_id: str
     error: str | None = None
+
+
+class SlideImageInfo(BaseModel):
+    """幻灯片图片信息"""
+
+    url: str  # 图片访问URL
+    name: str  # 图片文件名
+
+
+class SlidesImagesResponse(BaseModel):
+    """获取幻灯片图片列表响应"""
+
+    success: bool
+    images: list[SlideImageInfo] = []
+    error: str | None = None
+
+
+class GenerateSlidesRequest(BaseModel):
+    """生成幻灯片请求"""
+
+    project_id: str  # 项目ID
+    prompts: list[str]  # 每页PPT对应的prompt列表
+    model: str = "gemini-nano-banana-pro"  # Gemini模型名称，默认为nano-banana-pro
+    slide_width: int = 1920  # 幻灯片宽度（像素）
+    slide_height: int = 1080  # 幻灯片高度（像素）
+    api_key: str | None = None  # Gemini API密钥（可选，如果提供则使用，否则从配置读取）
+
+
+class GeneratedSlideInfo(BaseModel):
+    """生成的幻灯片信息"""
+
+    slide_number: int  # 幻灯片编号（从1开始）
+    prompt: str  # 对应的prompt
+    filename: str  # 生成的文件名
+    url: str  # 访问URL
+    success: bool  # 是否成功生成
+    error: str | None = None  # 错误信息（如果有）
+
+
+class GenerateSlidesResponse(BaseModel):
+    """生成幻灯片响应"""
+
+    success: bool
+    project_id: str
+    total_slides: int
+    generated_slides: list[GeneratedSlideInfo] = []
+    error: str | None = None
