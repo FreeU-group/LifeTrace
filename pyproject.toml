@@ -45,6 +45,8 @@ dependencies = [
     "chromadb>=0.4.0",
     # OpenAI API
     "openai>=1.0.0",
+    # Google Generative AI (Gemini)
+    "google-genai>=0.2.0",
     # Environment variables
     "python-dotenv>=1.0.0",
     # macOS specific dependencies (only install on macOS)

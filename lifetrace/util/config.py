@@ -293,6 +293,12 @@ class LifeTraceConfig:
         """LLM最大token数"""
         return self.get("llm.max_tokens", 2048)
 
+    # Gemini API配置属性
+    @property
+    def gemini_api_key(self) -> str:
+        """Gemini API 密钥"""
+        return self.get("gemini.api_key", "")
+
     # 服务器配置属性
     @property
     def server_host(self) -> str:

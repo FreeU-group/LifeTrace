@@ -419,6 +419,99 @@ export const api = {
     }
   },
 
+  // 预览幻灯片 prompts
+  previewSlidesPrompts: async (projectId: string, customRequirements?: string) => {
+    const url = new URL(
+      `${API_BASE_URL}/api/workspace/projects/${encodeURIComponent(projectId)}/slides/preview`
+    );
+    if (customRequirements && customRequirements.trim()) {
+      url.searchParams.append('custom_requirements', customRequirements.trim());
+    }
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!response.ok) {
+      throw new Error('Request failed');
+    }
+    return response.json();
+  },
+
+  // 流式生成幻灯片
+  generateSlidesStream: async (
+    projectId: string,
+    onMessage: (message: {
+      type: 'slides' | 'slide_start' | 'slide_progress' | 'slide_done' | 'slide_error' | 'done' | 'error';
+      data?: { title: string; index: number; prompt: string }[];
+      index?: number;
+      title?: string;
+      prompt?: string;
+      message?: string;
+      filename?: string;
+      url?: string;
+      error?: string;
+    }) => void,
+    customRequirements?: string
+  ): Promise<void> => {
+    // 构建URL，添加自定义要求参数
+    const url = new URL(
+      `${API_BASE_URL}/api/workspace/projects/${encodeURIComponent(projectId)}/slides/generate`
+    );
+    if (customRequirements && customRequirements.trim()) {
+      url.searchParams.append('custom_requirements', customRequirements.trim());
+    }
+    
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Request failed');
+    }
+
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+
+    if (reader) {
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const message = JSON.parse(line);
+              onMessage(message);
+            } catch (e) {
+              console.error('Failed to parse message:', line, e);
+            }
+          }
+        }
+      }
+
+      // 处理最后的内容
+      if (buffer.trim()) {
+        try {
+          const message = JSON.parse(buffer);
+          onMessage(message);
+        } catch (e) {
+          console.error('Failed to parse final message:', buffer, e);
+        }
+      }
+    }
+  },
+
   // 工作区文件管理
   getWorkspaceFiles: () =>
     apiClient.get('/api/workspace/files'),

@@ -628,6 +628,33 @@ export const zh = {
       errorStatus: '失败',
       progress: '{completed}/{total}',
     },
+    // 幻灯片生成
+    generateSlides: '生成幻灯片',
+    generatingSlides: '正在生成幻灯片...',
+    generateSlidesDesc: '根据大纲内容自动生成幻灯片图片',
+    slidesGenerated: '幻灯片生成完成',
+    slideGenerating: '正在生成: {title}',
+    slideDone: '已生成: {title}',
+    slideError: '生成失败: {title}',
+    totalSlides: '共 {count} 张幻灯片',
+    // 幻灯片生成确认对话框
+    slidesConfirmTitle: '确认生成幻灯片',
+    slidesConfirmMessage: '将根据大纲生成 {count} 张幻灯片，请确认以下 prompts：',
+    slidesConfirmConfirm: '确认生成',
+    slidesConfirmCancel: '取消',
+    // 幻灯片生成模态框
+    slidesModal: {
+      title: '生成幻灯片',
+      generating: '正在根据大纲生成幻灯片...',
+      complete: '所有幻灯片已生成完成',
+      failed: '部分幻灯片生成失败',
+      close: '关闭',
+      pending: '等待中',
+      generatingStatus: '生成中',
+      doneStatus: '已完成',
+      errorStatus: '失败',
+      progress: '{completed}/{total}',
+    },
     // 重新生成确认
     regenerateConfirmTitle: '重新生成章节',
     regenerateConfirmMessage: '检测到已有生成的章节文件，重新生成将覆盖现有内容。确定要继续吗？',

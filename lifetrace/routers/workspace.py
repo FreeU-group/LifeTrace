@@ -28,6 +28,7 @@ from lifetrace.schemas.workspace import (
     GenerateSlidesRequest,
     GenerateSlidesResponse,
     GeneratedSlideInfo,
+    PreviewSlidesPromptsResponse,
     ProjectType,
     RenameFileRequest,
     RenameFileResponse,
@@ -268,44 +269,59 @@ def _parse_outline_chapters(outline_content: str) -> list[dict]:
         outline_content: 大纲内容
 
     Returns:
-        章节列表，每个章节包含 title, points, level
+        章节列表，每个章节包含 title, points, content
+        - title: 章节标题
+        - points: 要点列表（- 开头的行）
+        - content: 章节的完整内容（标题之间的所有文本）
     """
     chapters = []
     lines = outline_content.strip().split("\n")
     current_chapter = None
     current_points = []
+    current_content_lines = []  # 存储当前章节的所有内容行
 
     for line in lines:
         stripped = line.strip()
-        # 跳过空行
-        if not stripped:
-            continue
-
+        
         # 检测二级标题 (## xxx)
         if stripped.startswith("## "):
             # 保存之前的章节
             if current_chapter:
+                # 合并内容行，去除首尾空行
+                content_text = "\n".join(current_content_lines).strip()
                 chapters.append(
                     {
                         "title": current_chapter,
                         "points": current_points,
+                        "content": content_text,
                     }
                 )
             # 开始新章节
             current_chapter = stripped[3:].strip()
             current_points = []
-        # 检测要点 (- xxx)
-        elif stripped.startswith("- ") and current_chapter:
-            point = stripped[2:].strip()
-            if point:
-                current_points.append(point)
+            current_content_lines = []
+        elif current_chapter:
+            # 当前章节下的所有内容
+            if stripped:
+                # 检测要点 (- xxx)
+                if stripped.startswith("- "):
+                    point = stripped[2:].strip()
+                    if point:
+                        current_points.append(point)
+                # 所有非空行都添加到内容中
+                current_content_lines.append(line)
+            else:
+                # 保留空行以保持格式
+                current_content_lines.append("")
 
     # 保存最后一个章节
     if current_chapter:
+        content_text = "\n".join(current_content_lines).strip()
         chapters.append(
             {
                 "title": current_chapter,
                 "points": current_points,
+                "content": content_text,
             }
         )
 
@@ -547,6 +563,735 @@ async def generate_project_chapters_stream(project_id: str):
 
     except Exception as e:
         logger.error(f"流式生成章节失败: {e}")
+        async def error_gen():
+            import json
+
+            yield (
+                json.dumps(
+                    {"type": "error", "message": f"生成章节失败: {str(e)}"},
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+
+        return StreamingResponse(error_gen(), media_type="application/x-ndjson; charset=utf-8")
+
+
+def _create_slides_stream_generator(
+    project_id: str, outline_content: str, project_path: Path, custom_requirements: str = ""
+):
+    """创建流式幻灯片生成器
+    
+    Args:
+        project_id: 项目 ID
+        outline_content: 大纲内容
+        project_path: 项目路径
+        custom_requirements: 用户自定义要求（如颜色、风格等）
+    """
+    import json
+
+    def generator():
+        # 解析大纲获取章节
+        chapters = _parse_outline_chapters(outline_content)
+
+        if not chapters:
+            yield (
+                json.dumps(
+                    {"type": "error", "message": "无法从大纲中解析出章节"}, ensure_ascii=False
+                )
+                + "\n"
+            )
+            return
+
+        # 为每个章节生成 prompt（章节标题 + 内容）
+        # 注意：实际的章节文档内容将在生成时读取并添加到prompt中
+        slides_data = []
+        for i, chapter in enumerate(chapters):
+            chapter_title = chapter["title"]
+            chapter_content = chapter.get("content", "").strip()
+            chapter_points = chapter.get("points", [])
+            
+            # 构建基础 prompt：章节标题
+            base_prompt = f"生成一个专业的学术演示文稿幻灯片，主题为：{chapter_title}"
+            
+            # 尝试读取对应的章节.md文件
+            safe_title = _sanitize_filename(chapter_title)
+            chapter_filename = f"{i + 1:02d}_{safe_title}.md"
+            chapter_file_path = project_path / chapter_filename
+            
+            chapter_doc_content = None
+            if chapter_file_path.exists():
+                try:
+                    chapter_doc_content = chapter_file_path.read_text(encoding="utf-8").strip()
+                    logger.info(f"已读取章节文档: {chapter_filename}")
+                except Exception as e:
+                    logger.warning(f"读取章节文档 {chapter_filename} 失败: {e}")
+            
+            # 构建完整 prompt
+            # 结构：主题 -> 所有要求（集中在前） -> 章节内容
+            prompt_parts = [base_prompt]
+            
+            # 收集所有要求，集中放在前面
+            requirements_parts = []
+            
+            # 1. 默认要求
+            requirements_parts.append("要求：简洁、专业、美观，适合学术演示。")
+            
+            # 2. 自定义要求（如果有）
+            if custom_requirements and custom_requirements.strip():
+                requirements_parts.append(f"自定义要求：{custom_requirements.strip()}")
+            
+            # 将所有要求添加到 prompt（在内容之前）
+            if requirements_parts:
+                prompt_parts.append("\n\n" + "\n\n".join(requirements_parts))
+            
+            # 3. 章节内容（放在要求之后）
+            if chapter_doc_content:
+                prompt_parts.append(f"\n\n章节详细内容：\n{chapter_doc_content}")
+            # 如果没有章节文档，使用大纲中的内容
+            elif chapter_content:
+                prompt_parts.append(f"\n\n章节内容：\n{chapter_content}")
+            # 如果都没有，使用要点
+            elif chapter_points:
+                chapter_points_text = "\n".join(f"- {p}" for p in chapter_points)
+                prompt_parts.append(f"\n\n要点：\n{chapter_points_text}")
+            
+            prompt = "".join(prompt_parts)
+            
+            slides_data.append({
+                "title": chapter_title,
+                "index": i,
+                "prompt": prompt,
+            })
+
+        # 发送幻灯片列表
+        yield (
+            json.dumps(
+                {
+                    "type": "slides",
+                    "data": slides_data,
+                },
+                ensure_ascii=False,
+            )
+            + "\n"
+        )
+
+        # 检查 Gemini API 是否可用
+        try:
+            from google import genai
+            from google.genai import types
+            
+            # 从配置读取 Gemini API key
+            api_key = deps.config.gemini_api_key
+            if not api_key or api_key in ["YOUR_API_KEY_HERE", "YOUR_GEMINI_API_KEY_HERE", "YOUR_LLM_KEY_HERE", "xxx"]:
+                yield (
+                    json.dumps(
+                        {"type": "error", "message": "Gemini API Key 未配置，请在配置文件中设置 gemini.api_key"},
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+                return
+
+            # 初始化 Gemini 客户端
+            client = genai.Client(api_key=api_key)
+            # 使用支持图像生成的模型
+            model_name = "gemini-3-pro-image-preview"  # 使用支持图像生成的模型
+            
+        except ImportError:
+            yield (
+                json.dumps(
+                    {"type": "error", "message": "google-genai 包未安装，请运行: pip install google-genai"},
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+            return
+        except Exception as e:
+            logger.error(f"初始化 Gemini 客户端失败: {e}")
+            yield (
+                json.dumps(
+                    {"type": "error", "message": f"初始化 Gemini 客户端失败: {str(e)}"},
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+            return
+
+        # 创建 slides 目录
+        slides_dir = project_path / "slides"
+        slides_dir.mkdir(exist_ok=True)
+
+        # 跟踪已生成的幻灯片文件路径
+        generated_slide_paths = []
+
+        # 为每个章节生成幻灯片
+        for i, slide_info in enumerate(slides_data):
+            chapter_title = slide_info["title"]
+            base_prompt = slide_info["prompt"]
+            
+            # 确定参考窗口大小
+            # gemini-3-pro-image-preview: 5 images high fidelity, up to 14 total
+            reference_window_size = 5
+            logger.info(f"幻灯片 {i + 1}/{len(slides_data)}: 使用模型 {model_name}，参考窗口大小: {reference_window_size}")
+            
+            # 构建包含参考图片的 contents 数组
+            contents = []
+            
+            # 第一张幻灯片特殊处理：不添加任何参考图片，只使用文本 prompt
+            if i == 0:
+                # 第一张幻灯片，无参考图片，直接使用文本 prompt
+                prompt = base_prompt
+                contents.append(prompt)
+                logger.info(f"第一张幻灯片，不使用参考图片")
+            else:
+                # 后续幻灯片：添加参考图片
+                start_idx = max(0, i - reference_window_size)
+                reference_count = 0
+                
+                for prev_idx in range(start_idx, i):
+                    if prev_idx < len(generated_slide_paths) and generated_slide_paths[prev_idx] is not None:
+                        prev_image_path = generated_slide_paths[prev_idx]
+                        if prev_image_path.exists():
+                            try:
+                                with open(prev_image_path, 'rb') as f:
+                                    image_bytes = f.read()
+                                contents.append(types.Part.from_bytes(
+                                    data=image_bytes,
+                                    mime_type='image/png'
+                                ))
+                                reference_count += 1
+                                logger.info(f"已加载参考幻灯片 {prev_idx + 1}: {prev_image_path.name}")
+                            except Exception as e:
+                                logger.warning(f"加载参考幻灯片 {prev_idx + 1} 失败: {e}")
+                        else:
+                            logger.warning(f"参考幻灯片文件不存在: {prev_image_path}")
+                    else:
+                        logger.warning(f"参考幻灯片 {prev_idx + 1} 尚未生成，跳过")
+                
+                # base_prompt 已经包含了：主题 -> 要求（集中在前）-> 章节内容
+                # 如果有参考图片，需要在要求部分添加视觉风格要求
+                if reference_count > 0:
+                    # 在 base_prompt 的要求部分之后添加视觉风格要求
+                    # base_prompt 格式：主题\n\n要求...\n\n章节内容...
+                    # 需要在"要求"部分之后、"章节内容"之前插入视觉风格要求
+                    
+                    continuity_instruction = (
+                        "视觉风格要求："
+                        "\n- 参考提供的之前幻灯片，在整体风格（如配色方案、字体风格、布局结构）上保持适度的一致性"
+                        "\n- 但不要过度模仿或完全复制之前的幻灯片，每张幻灯片应该有自己独特的内容呈现方式"
+                        "\n- 在保持视觉连贯性的同时，允许适当的创新和变化，确保每张幻灯片都有其独特的视觉表达"
+                        "\n- 重点关注内容本身的呈现，而不是机械地复制之前的视觉元素"
+                    )
+                    
+                    # 找到"章节详细内容："或"章节内容："或"要点："的位置，在其之前插入视觉风格要求
+                    content_markers = ["章节详细内容：", "章节内容：", "要点："]
+                    insert_position = -1
+                    for marker in content_markers:
+                        if marker in base_prompt:
+                            insert_position = base_prompt.find(marker)
+                            break
+                    
+                    if insert_position > 0:
+                        # 在章节内容之前插入视觉风格要求
+                        prompt = (
+                            base_prompt[:insert_position].rstrip() +
+                            "\n\n" + continuity_instruction +
+                            base_prompt[insert_position:]
+                        )
+                    else:
+                        # 如果找不到章节内容标记，直接追加到末尾（不应该发生）
+                        prompt = base_prompt + "\n\n" + continuity_instruction
+                    
+                    logger.info(f"幻灯片 {i + 1} 使用 {reference_count} 张参考图片")
+                else:
+                    prompt = base_prompt
+                
+                # 将文本 prompt 添加到 contents（在参考图片之后）
+                contents.append(prompt)
+
+            # 发送开始生成某幻灯片的消息
+            yield (
+                json.dumps(
+                    {"type": "slide_start", "index": i, "title": chapter_title, "prompt": prompt},
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+
+            try:
+                # 发送进度消息
+                # 第一张幻灯片：contents 只有 prompt（字符串），所以 len(contents) = 1
+                # 后续幻灯片：contents 包含参考图片（Part对象）+ prompt（字符串），所以 len(contents) > 1
+                if i == 0:
+                    reference_info = "（第一张幻灯片，无参考图片）"
+                else:
+                    # 计算参考图片数量（contents 中除了最后一个 prompt，其他都是图片）
+                    ref_count = len(contents) - 1 if len(contents) > 1 else 0
+                    reference_info = f"（使用 {ref_count} 张参考图片）" if ref_count > 0 else ""
+                yield (
+                    json.dumps(
+                        {"type": "slide_progress", "index": i, "message": f"正在调用 Gemini API 生成图片{reference_info}..."},
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+
+                # 配置图片生成参数
+                image_config = types.ImageConfig(
+                    aspectRatio="16:9",  # 幻灯片使用 16:9 比例
+                )
+
+                # 重试机制：最多重试3次，指数退避
+                import time
+                max_retries = 3
+                retry_delay = 1  # 初始延迟1秒
+                response = None
+                last_error = None
+                
+                for attempt in range(max_retries):
+                    try:
+                        # 第一张幻灯片特殊处理：确保 contents 格式正确
+                        if i == 0:
+                            # 第一张幻灯片：contents 应该只包含 prompt 文本（字符串）
+                            if len(contents) != 1 or not isinstance(contents[0], str):
+                                raise Exception(f"第一张幻灯片 contents 格式错误: 期望长度为1的字符串列表，实际: {len(contents)} 个元素")
+                            logger.info(f"第一张幻灯片 contents: 仅包含文本 prompt，长度: {len(contents[0])}")
+                        else:
+                            # 后续幻灯片：contents 应该包含参考图片（Part对象）+ prompt（字符串）
+                            if len(contents) < 1:
+                                raise Exception(f"后续幻灯片 contents 为空")
+                            # 最后一个应该是 prompt（字符串），前面的应该是图片（Part对象）
+                            if not isinstance(contents[-1], str):
+                                raise Exception(f"后续幻灯片 contents 最后一个元素应该是字符串（prompt），实际类型: {type(contents[-1])}")
+                            logger.info(f"幻灯片 {i + 1} contents: {len(contents) - 1} 张参考图片 + 1 个文本 prompt")
+                        
+                        # 调用 Gemini API 生成图片
+                        response = client.models.generate_content(
+                            model=model_name,
+                            contents=contents,  # 第一张：仅文本；后续：图片+文本
+                            config=types.GenerateContentConfig(
+                                response_modalities=["IMAGE"],
+                                image_config=image_config,
+                            ),
+                        )
+                        
+                        # 检查响应是否有效
+                        if response is None:
+                            raise Exception("API返回空响应")
+                        
+                        # 检查 response.parts 是否存在且可迭代
+                        if not hasattr(response, 'parts') or response.parts is None:
+                            raise Exception("响应中缺少parts属性或parts为None")
+                        
+                        # 成功获取响应，跳出重试循环
+                        break
+                        
+                    except Exception as api_error:
+                        last_error = api_error
+                        error_str = str(api_error).lower()
+                        
+                        # 判断是否可重试的错误
+                        is_retryable = (
+                            "network" in error_str or
+                            "timeout" in error_str or
+                            "connection" in error_str or
+                            "service unavailable" in error_str or
+                            "rate limit" in error_str or
+                            "429" in error_str or
+                            "500" in error_str or
+                            "502" in error_str or
+                            "503" in error_str or
+                            "504" in error_str or
+                            "none" in error_str or
+                            "null" in error_str
+                        )
+                        
+                        if not is_retryable or attempt == max_retries - 1:
+                            # 不可重试或已达到最大重试次数，抛出异常
+                            raise api_error
+                        
+                        # 可重试，等待后重试
+                        logger.warning(f"生成幻灯片 {i + 1} 第 {attempt + 1} 次尝试失败: {api_error}，{retry_delay}秒后重试...")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # 指数退避：1s, 2s, 4s
+                
+                # 最终检查响应有效性
+                if response is None:
+                    raise Exception(f"API调用失败，已重试{max_retries}次: {last_error}")
+                
+                if not hasattr(response, 'parts') or response.parts is None:
+                    raise Exception("响应中缺少parts属性或parts为None，无法提取图片")
+
+                # 发送进度消息
+                yield (
+                    json.dumps(
+                        {"type": "slide_progress", "index": i, "message": "正在保存图片..."},
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+
+                # 从响应中提取图片并保存
+                image_saved = False
+                saved_file_path = None
+                
+                # 安全地迭代 response.parts
+                parts_to_iterate = []
+                try:
+                    if response.parts is not None:
+                        # 尝试转换为列表以确保可迭代
+                        if isinstance(response.parts, (list, tuple)):
+                            parts_to_iterate = list(response.parts)
+                        else:
+                            # 尝试迭代
+                            parts_to_iterate = list(response.parts)
+                except (TypeError, AttributeError) as e:
+                    logger.error(f"无法迭代响应parts: {e}, response.parts类型: {type(response.parts)}")
+                    raise Exception(f"响应parts格式错误，无法迭代: {e}")
+                
+                for part in parts_to_iterate:
+                    if part is None:
+                        continue
+                    if hasattr(part, 'inline_data') and part.inline_data is not None:
+                        try:
+                            # 使用 part.as_image() 方法获取图片对象
+                            image = part.as_image()
+                            
+                            # 生成文件名
+                            safe_title = _sanitize_filename(chapter_title)
+                            filename = f"slide_{i + 1:02d}_{safe_title}.png"
+                            file_path = slides_dir / filename
+
+                            # 使用图片对象的 save() 方法保存
+                            image.save(str(file_path))
+                            image_saved = True
+                            saved_file_path = file_path
+
+                            # 构建访问URL
+                            image_url = f"/api/workspace/slides/{project_id}/{filename}"
+
+                            # 发送幻灯片完成消息
+                            yield (
+                                json.dumps(
+                                    {
+                                        "type": "slide_done",
+                                        "index": i,
+                                        "title": chapter_title,
+                                        "filename": filename,
+                                        "url": image_url,
+                                    },
+                                    ensure_ascii=False,
+                                )
+                                + "\n"
+                            )
+                            break
+                        except Exception as e:
+                            logger.error(f"保存幻灯片图片失败: {e}")
+                            continue
+
+                if not image_saved:
+                    # 如果没有找到图片数据，尝试检查文本响应
+                    error_msg = "未能从响应中提取图片数据"
+                    try:
+                        if response and hasattr(response, 'parts') and response.parts is not None:
+                            # 安全地迭代 response.parts
+                            parts_list = []
+                            try:
+                                if isinstance(response.parts, (list, tuple)):
+                                    parts_list = list(response.parts)
+                                else:
+                                    parts_list = list(response.parts)
+                            except (TypeError, AttributeError):
+                                parts_list = []
+                            
+                            text_parts = [part.text for part in parts_list if hasattr(part, 'text') and part.text is not None]
+                            if text_parts:
+                                error_msg += f"。响应文本: {''.join(text_parts)}"
+                    except Exception as e:
+                        logger.warning(f"提取响应文本失败: {e}")
+                    # 抛出异常，由外层异常处理器统一处理 generated_slide_paths
+                    raise Exception(error_msg)
+                else:
+                    # 成功生成，记录文件路径供后续幻灯片参考
+                    generated_slide_paths.append(saved_file_path)
+                    logger.info(f"幻灯片 {i + 1} 已保存: {saved_file_path.name}")
+
+            except Exception as e:
+                logger.error(f"生成幻灯片 {chapter_title} 失败: {e}")
+                # 记录失败，但不中断后续幻灯片的生成
+                # 如果 generated_slide_paths 长度不够，补充 None
+                while len(generated_slide_paths) <= i:
+                    generated_slide_paths.append(None)
+                generated_slide_paths[i] = None
+                
+                yield (
+                    json.dumps(
+                        {
+                            "type": "slide_error",
+                            "index": i,
+                            "title": chapter_title,
+                            "error": str(e),
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+
+        # 发送全部完成消息
+        yield json.dumps({"type": "done"}, ensure_ascii=False) + "\n"
+
+    return generator
+
+
+@router.get("/projects/{project_id}/slides/preview", response_model=PreviewSlidesPromptsResponse)
+async def preview_slides_prompts(
+    project_id: str,
+    custom_requirements: str = Query("", description="用户自定义要求（如颜色、风格等），用于预览"),
+):
+    """预览幻灯片生成所需的 prompts 列表
+
+    Args:
+        project_id: 项目 ID
+        custom_requirements: 用户自定义要求（如颜色、风格等），用于预览
+
+    Returns:
+        包含 prompts 列表的响应
+    """
+    try:
+        workspace_dir = deps.config.workspace_dir
+        project_path = Path(workspace_dir) / project_id
+        outline_path = project_path / "outline.md"
+
+        # 检查项目是否存在
+        if not project_path.exists():
+            return PreviewSlidesPromptsResponse(
+                success=False,
+                prompts=[],
+                total=0,
+                error=f"项目不存在: {project_id}",
+            )
+
+        # 检查大纲文件是否存在
+        if not outline_path.exists():
+            return PreviewSlidesPromptsResponse(
+                success=False,
+                prompts=[],
+                total=0,
+                error="大纲文件 outline.md 不存在",
+            )
+
+        # 读取大纲内容
+        outline_content = outline_path.read_text(encoding="utf-8")
+
+        # 解析大纲获取章节
+        chapters = _parse_outline_chapters(outline_content)
+
+        if not chapters:
+            return PreviewSlidesPromptsResponse(
+                success=False,
+                prompts=[],
+                total=0,
+                error="无法从大纲中解析出章节",
+            )
+
+        # 检查是否已生成章节文件
+        chapter_files_exist = False
+        for i, chapter in enumerate(chapters):
+            safe_title = _sanitize_filename(chapter["title"])
+            chapter_filename = f"{i + 1:02d}_{safe_title}.md"
+            chapter_file_path = project_path / chapter_filename
+            if chapter_file_path.exists():
+                chapter_files_exist = True
+                break
+
+        if not chapter_files_exist:
+            return PreviewSlidesPromptsResponse(
+                success=False,
+                prompts=[],
+                total=0,
+                error="请先生成章节文件，然后再生成幻灯片。章节文件格式：01_章节名.md",
+            )
+
+        # 为每个章节生成 prompt（章节标题 + 内容）
+        from lifetrace.schemas.workspace import SlidePromptPreview
+
+        prompts = []
+        for i, chapter in enumerate(chapters):
+            chapter_title = chapter["title"]
+            chapter_content = chapter.get("content", "").strip()
+            chapter_points = chapter.get("points", [])
+            
+            # 构建基础 prompt：章节标题
+            base_prompt = f"生成一个专业的学术演示文稿幻灯片，主题为：{chapter_title}"
+            
+            # 尝试读取对应的章节.md文件
+            safe_title = _sanitize_filename(chapter_title)
+            chapter_filename = f"{i + 1:02d}_{safe_title}.md"
+            chapter_file_path = project_path / chapter_filename
+            
+            chapter_doc_content = None
+            if chapter_file_path.exists():
+                try:
+                    chapter_doc_content = chapter_file_path.read_text(encoding="utf-8").strip()
+                except Exception as e:
+                    logger.warning(f"读取章节文档 {chapter_filename} 失败: {e}")
+            
+            # 构建完整 prompt
+            # 结构：主题 -> 所有要求（集中在前） -> 章节内容
+            prompt_parts = [base_prompt]
+            
+            # 收集所有要求，集中放在前面
+            requirements_parts = []
+            
+            # 1. 默认要求
+            requirements_parts.append("要求：简洁、专业、美观，适合学术演示。")
+            
+            # 2. 自定义要求（如果有，预览接口也支持）
+            if custom_requirements and custom_requirements.strip():
+                requirements_parts.append(f"自定义要求：{custom_requirements.strip()}")
+            
+            # 将所有要求添加到 prompt（在内容之前）
+            if requirements_parts:
+                prompt_parts.append("\n\n" + "\n\n".join(requirements_parts))
+            
+            # 章节内容（放在要求之后）
+            if chapter_doc_content:
+                prompt_parts.append(f"\n\n章节详细内容：\n{chapter_doc_content}")
+            # 如果没有章节文档，使用大纲中的内容
+            elif chapter_content:
+                prompt_parts.append(f"\n\n章节内容：\n{chapter_content}")
+            # 如果都没有，使用要点
+            elif chapter_points:
+                chapter_points_text = "\n".join(f"- {p}" for p in chapter_points)
+                prompt_parts.append(f"\n\n要点：\n{chapter_points_text}")
+            
+            prompt = "".join(prompt_parts)
+            
+            prompts.append(
+                SlidePromptPreview(
+                    title=chapter_title,
+                    index=i,
+                    prompt=prompt,
+                )
+            )
+
+        return PreviewSlidesPromptsResponse(
+            success=True,
+            prompts=prompts,
+            total=len(prompts),
+        )
+
+    except Exception as e:
+        logger.error(f"预览幻灯片 prompts 失败: {e}")
+        return PreviewSlidesPromptsResponse(
+            success=False,
+            prompts=[],
+            total=0,
+            error=str(e),
+        )
+
+
+@router.post("/projects/{project_id}/slides/generate")
+async def generate_project_slides_stream(
+    project_id: str,
+    custom_requirements: str = Query("", description="用户自定义要求（如颜色、风格等）"),
+):
+    """根据大纲流式生成幻灯片图片
+
+    Args:
+        project_id: 项目 ID
+        custom_requirements: 用户自定义要求（如颜色、风格等）
+    """
+    try:
+        workspace_dir = deps.config.workspace_dir
+        project_path = Path(workspace_dir) / project_id
+        outline_path = project_path / "outline.md"
+
+        # 检查项目是否存在
+        if not project_path.exists():
+            async def error_gen():
+                import json
+
+                yield (
+                    json.dumps(
+                        {"type": "error", "message": f"项目不存在: {project_id}"},
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+
+            return StreamingResponse(error_gen(), media_type="application/x-ndjson; charset=utf-8")
+
+        # 检查大纲文件是否存在
+        if not outline_path.exists():
+            async def error_gen():
+                import json
+
+                yield (
+                    json.dumps(
+                        {"type": "error", "message": "大纲文件 outline.md 不存在"},
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+
+            return StreamingResponse(error_gen(), media_type="application/x-ndjson; charset=utf-8")
+
+        # 读取大纲内容
+        outline_content = outline_path.read_text(encoding="utf-8")
+        
+        # 解析大纲获取章节列表
+        chapters = _parse_outline_chapters(outline_content)
+        
+        # 检查是否已生成章节文件（前置要求）
+        chapter_files_exist = False
+        for i, chapter in enumerate(chapters):
+            safe_title = _sanitize_filename(chapter["title"])
+            chapter_filename = f"{i + 1:02d}_{safe_title}.md"
+            chapter_file_path = project_path / chapter_filename
+            if chapter_file_path.exists():
+                chapter_files_exist = True
+                break
+        
+        if not chapter_files_exist:
+            async def error_gen():
+                import json
+
+                yield (
+                    json.dumps(
+                        {"type": "error", "message": "请先生成章节文件，然后再生成幻灯片。章节文件格式：01_章节名.md"},
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+
+            return StreamingResponse(error_gen(), media_type="application/x-ndjson; charset=utf-8")
+
+        # 创建流式生成器，传递自定义要求
+        generator = _create_slides_stream_generator(
+            project_id, outline_content, project_path, custom_requirements
+        )
+        headers = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+
+        return StreamingResponse(
+            generator(), media_type="application/x-ndjson; charset=utf-8", headers=headers
+        )
+
+    except Exception as e:
+        logger.error(f"流式生成幻灯片失败: {e}")
+        async def error_gen():
+            import json
+
+            yield (
+                json.dumps(
+                    {"type": "error", "message": f"生成幻灯片失败: {str(e)}"},
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+
+        return StreamingResponse(error_gen(), media_type="application/x-ndjson; charset=utf-8")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

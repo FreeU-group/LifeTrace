@@ -630,6 +630,33 @@ export const en: Translation = {
       errorStatus: 'Failed',
       progress: '{completed}/{total}',
     },
+    // Slides generation
+    generateSlides: 'Generate Slides',
+    generatingSlides: 'Generating slides...',
+    generateSlidesDesc: 'Auto-generate slide images based on outline',
+    slidesGenerated: 'Slides generated',
+    slideGenerating: 'Generating: {title}',
+    slideDone: 'Generated: {title}',
+    slideError: 'Failed: {title}',
+    totalSlides: '{count} slides total',
+    // Slides generation confirmation dialog
+    slidesConfirmTitle: 'Confirm Generate Slides',
+    slidesConfirmMessage: 'Will generate {count} slides based on outline. Please confirm the following prompts:',
+    slidesConfirmConfirm: 'Confirm',
+    slidesConfirmCancel: 'Cancel',
+    // Slides generation modal
+    slidesModal: {
+      title: 'Generate Slides',
+      generating: 'Generating slides based on outline...',
+      complete: 'All slides have been generated',
+      failed: 'Some slides failed to generate',
+      close: 'Close',
+      pending: 'Pending',
+      generatingStatus: 'Generating',
+      doneStatus: 'Done',
+      errorStatus: 'Failed',
+      progress: '{completed}/{total}',
+    },
     // Regenerate confirmation
     regenerateConfirmTitle: 'Regenerate Chapters',
     regenerateConfirmMessage: 'Existing chapter files detected. Regenerating will overwrite the current content. Do you want to continue?',

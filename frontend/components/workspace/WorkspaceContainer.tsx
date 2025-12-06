@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { GripVertical, Upload, Plus, Folder, ArrowLeft, Sparkles } from 'lucide-react';
+import { GripVertical, Upload, Plus, Folder, ArrowLeft, Sparkles, Image as ImageIcon } from 'lucide-react';
 import FileTree, { FileNode } from './FileTree';
 // import RichTextEditor from './RichTextEditor';
 import RichTextEditorTiptap from './RichTextEditorTiptap';
@@ -10,6 +10,7 @@ import MultiImageViewer from './MultiImageViewer';
 import WorkspaceChat from './WorkspaceChat';
 import WorkspaceProjectList from './WorkspaceProjectList';
 import ChapterGenerationModal from './ChapterGenerationModal';
+import SlidesGenerationModal from './SlidesGenerationModal';
 import Button from '@/components/common/Button';
 import { api } from '@/lib/api';
 import { toast } from '@/lib/toast';
@@ -21,6 +22,18 @@ interface ChapterState {
   content: string;
   status: 'pending' | 'generating' | 'done' | 'error';
   error?: string;
+  isExpanded: boolean;
+}
+
+// 幻灯片类型定义
+interface SlideState {
+  title: string;
+  index: number;
+  prompt: string;
+  status: 'pending' | 'generating' | 'done' | 'error';
+  error?: string;
+  filename?: string;
+  url?: string;
   isExpanded: boolean;
 }
 
@@ -140,6 +153,33 @@ interface WorkspaceContainerProps {
       errorStatus: string;
       progress: string;
     };
+    // 幻灯片生成
+    generateSlidesLabel?: string;
+    generatingSlidesLabel?: string;
+    generateSlidesDescLabel?: string;
+    slidesGeneratedLabel?: string;
+    slideGeneratingLabel?: string;
+    slideDoneLabel?: string;
+    slideErrorLabel?: string;
+    totalSlidesLabel?: string;
+    // 幻灯片生成确认对话框
+    slidesConfirmTitle?: string;
+    slidesConfirmMessage?: string;
+    slidesConfirmConfirm?: string;
+    slidesConfirmCancel?: string;
+    // 幻灯片生成模态框
+    slidesModalLabels?: {
+      title: string;
+      generating: string;
+      complete: string;
+      failed: string;
+      close: string;
+      pending: string;
+      generatingStatus: string;
+      doneStatus: string;
+      errorStatus: string;
+      progress: string;
+    };
     // 重新生成确认
     regenerateConfirmTitle?: string;
     regenerateConfirmMessage?: string;
@@ -188,6 +228,18 @@ export default function WorkspaceContainer({
   const [currentChapterIndex, setCurrentChapterIndex] = useState<number | null>(null);
   const [isChapterGenerationComplete, setIsChapterGenerationComplete] = useState(false);
   const [hasChapterError, setHasChapterError] = useState(false);
+
+  // 幻灯片生成状态
+  const [isGeneratingSlides, setIsGeneratingSlides] = useState(false);
+  const [showSlidesModal, setShowSlidesModal] = useState(false);
+  const [showSlidesConfirmModal, setShowSlidesConfirmModal] = useState(false);
+  const [slidesPreviewPrompts, setSlidesPreviewPrompts] = useState<Array<{ title: string; index: number; prompt: string }>>([]);
+  const [slidesCustomRequirements, setSlidesCustomRequirements] = useState<string>('');
+  const [isUpdatingPreview, setIsUpdatingPreview] = useState<boolean>(false);
+  const [slidesState, setSlidesState] = useState<SlideState[]>([]);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState<number | null>(null);
+  const [isSlidesGenerationComplete, setIsSlidesGenerationComplete] = useState(false);
+  const [hasSlidesError, setHasSlidesError] = useState(false);
 
   // 幻灯片查看器状态
   const [slidesImages, setSlidesImages] = useState<Array<{ url: string; name: string }>>([]);
@@ -410,6 +462,185 @@ export default function WorkspaceContainer({
       setCurrentChapterIndex(null);
       setIsChapterGenerationComplete(false);
       setHasChapterError(false);
+    }
+  };
+
+  // 预览幻灯片 prompts（支持自定义要求）
+  const previewSlidesPrompts = async (customReqs?: string, showModal: boolean = true) => {
+    if (!currentProject) return;
+
+    setIsUpdatingPreview(true);
+    try {
+      const response = await api.previewSlidesPrompts(
+        currentProject,
+        customReqs !== undefined ? customReqs : slidesCustomRequirements
+      );
+      if (response?.success && response?.prompts) {
+        setSlidesPreviewPrompts(response.prompts);
+        if (showModal && !showSlidesConfirmModal) {
+          setShowSlidesConfirmModal(true);
+        }
+      } else {
+        toast.error(response?.error || '预览 prompts 失败');
+      }
+    } catch (error) {
+      console.error('预览幻灯片 prompts 失败:', error);
+      toast.error('预览 prompts 失败，请重试');
+    } finally {
+      setIsUpdatingPreview(false);
+    }
+  };
+
+  // 实时预览：当自定义要求改变时，更新prompt预览（仅在确认对话框打开时）
+  useEffect(() => {
+    // 如果确认对话框已打开，实时更新预览
+    if (showSlidesConfirmModal) {
+      // 防抖：延迟500ms后更新，避免频繁请求
+      const timer = setTimeout(() => {
+        previewSlidesPrompts(slidesCustomRequirements, false); // false表示不重复打开对话框
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slidesCustomRequirements, showSlidesConfirmModal]);
+
+  // 确认生成幻灯片
+  const handleConfirmSlidesGeneration = () => {
+    setShowSlidesConfirmModal(false);
+    startSlidesGeneration();
+  };
+
+  // 取消生成幻灯片
+  const handleCancelSlidesGeneration = () => {
+    setShowSlidesConfirmModal(false);
+    setSlidesPreviewPrompts([]);
+    setSlidesCustomRequirements('');
+  };
+
+  // 流式生成幻灯片
+  const startSlidesGeneration = async () => {
+    if (!currentProject || isGeneratingSlides) return;
+
+    // 初始化状态并打开模态框
+    setIsGeneratingSlides(true);
+    setShowSlidesModal(true);
+    setSlidesState([]);
+    setCurrentSlideIndex(null);
+    setIsSlidesGenerationComplete(false);
+    setHasSlidesError(false);
+
+    try {
+      await api.generateSlidesStream(
+        currentProject,
+        (message) => {
+          switch (message.type) {
+            case 'slides':
+            // 收到幻灯片列表，初始化幻灯片状态
+            if (message.data) {
+              const initialSlides: SlideState[] = message.data.map((s) => ({
+                title: s.title,
+                index: s.index,
+                prompt: s.prompt,
+                status: 'pending' as const,
+                isExpanded: false,
+              }));
+              setSlidesState(initialSlides);
+            }
+            break;
+          case 'slide_start':
+            // 开始生成某幻灯片
+            if (message.index !== undefined) {
+              setCurrentSlideIndex(message.index);
+              setSlidesState((prev) =>
+                prev.map((s, i) =>
+                  i === message.index
+                    ? { ...s, status: 'generating' as const, isExpanded: true }
+                    : s
+                )
+              );
+            }
+            break;
+          case 'slide_progress':
+            // 收到进度消息（可选，用于显示详细进度）
+            break;
+          case 'slide_done':
+            // 幻灯片生成完成
+            if (message.index !== undefined) {
+              setSlidesState((prev) =>
+                prev.map((s, i) =>
+                  i === message.index
+                    ? {
+                        ...s,
+                        status: 'done' as const,
+                        filename: message.filename,
+                        url: message.url,
+                        isExpanded: false,
+                      }
+                    : s
+                )
+              );
+            }
+            break;
+          case 'slide_error':
+            // 幻灯片生成失败
+            if (message.index !== undefined) {
+              setHasSlidesError(true);
+              setSlidesState((prev) =>
+                prev.map((s, i) =>
+                  i === message.index
+                    ? { ...s, status: 'error' as const, error: message.error, isExpanded: true }
+                    : s
+                )
+              );
+            }
+            break;
+          case 'done':
+            // 全部完成
+            setIsSlidesGenerationComplete(true);
+            setCurrentSlideIndex(null);
+            toast.success(editorLabels.slidesGeneratedLabel || '幻灯片生成完成');
+            // 刷新文件列表
+            refreshProjectFiles();
+            break;
+          case 'error':
+            // 出错
+            setHasSlidesError(true);
+            setIsSlidesGenerationComplete(true);
+            toast.error(message.message || '生成幻灯片失败');
+            break;
+          }
+        },
+        slidesCustomRequirements
+      );
+    } catch (error) {
+      console.error('流式生成幻灯片失败:', error);
+      setHasSlidesError(true);
+      setIsSlidesGenerationComplete(true);
+      toast.error('生成幻灯片失败，请重试');
+    } finally {
+      setIsGeneratingSlides(false);
+      setCurrentSlideIndex(null);
+    }
+  };
+
+  // 切换幻灯片展开状态
+  const handleToggleSlide = (index: number) => {
+    setSlidesState((prev) =>
+      prev.map((s, i) =>
+        i === index ? { ...s, isExpanded: !s.isExpanded } : s
+      )
+    );
+  };
+
+  // 关闭幻灯片生成模态框
+  const handleCloseSlidesModal = () => {
+    if (!isGeneratingSlides) {
+      setShowSlidesModal(false);
+      setSlidesState([]);
+      setCurrentSlideIndex(null);
+      setIsSlidesGenerationComplete(false);
+      setHasSlidesError(false);
     }
   };
 
@@ -1327,16 +1558,24 @@ export default function WorkspaceContainer({
           />
         )}
 
-        {/* 生成章节按钮 - 仅在 outline.md 文件时显示 */}
+        {/* 生成章节和幻灯片按钮 - 仅在 outline.md 文件时显示 */}
         {selectedFile?.name?.toLowerCase() === 'outline.md' && !isGeneratingOutline && (
-          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10">
+          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10 flex gap-3">
             <Button
               onClick={handleGenerateChaptersClick}
-              disabled={isGeneratingChapters}
+              disabled={isGeneratingChapters || isGeneratingSlides}
               className="shadow-lg gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white border-0"
             >
               <Sparkles className="h-4 w-4" />
               <span>{editorLabels.generateChaptersLabel || '生成章节'}</span>
+            </Button>
+            <Button
+              onClick={previewSlidesPrompts}
+              disabled={isGeneratingChapters || isGeneratingSlides}
+              className="shadow-lg gap-2 px-6 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-0"
+            >
+              <ImageIcon className="h-4 w-4" />
+              <span>{editorLabels.generateSlidesLabel || '生成幻灯片'}</span>
             </Button>
           </div>
         )}
@@ -1372,6 +1611,90 @@ export default function WorkspaceContainer({
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 幻灯片生成确认对话框 */}
+        {showSlidesConfirmModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleCancelSlidesGeneration} />
+            <div className="relative bg-background rounded-xl shadow-2xl border border-border p-6 max-w-2xl mx-4 max-h-[85vh] flex flex-col">
+              <div className="flex items-start gap-4 mb-4">
+                <div className="p-3 rounded-full bg-purple-500/10">
+                  <ImageIcon className="h-6 w-6 text-purple-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    {editorLabels.slidesConfirmTitle || '确认生成幻灯片'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {(editorLabels.slidesConfirmMessage || '将根据大纲生成 {count} 张幻灯片，请确认以下 prompts：').replace('{count}', String(slidesPreviewPrompts.length))}
+                  </p>
+                  
+                  {/* 自定义要求输入框 */}
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      {editorLabels.slidesCustomRequirementsLabel || '自定义要求（可选）'}
+                    </label>
+                    <textarea
+                      value={slidesCustomRequirements}
+                      onChange={(e) => setSlidesCustomRequirements(e.target.value)}
+                      placeholder={editorLabels.slidesCustomRequirementsPlaceholder || '例如：使用蓝色作为主色调，采用简约风格，字体使用微软雅黑...'}
+                      className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                      rows={3}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {editorLabels.slidesCustomRequirementsHint || '可以指定颜色、风格、字体等视觉要求，这些要求将应用到所有幻灯片'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Prompts 列表 */}
+              <div className="flex-1 overflow-y-auto mb-4 space-y-3 pr-2">
+                {isUpdatingPreview && (
+                  <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                    <span>正在更新预览...</span>
+                  </div>
+                )}
+                {slidesPreviewPrompts.map((item, index) => (
+                  <div
+                    key={index}
+                    className="rounded-lg border border-border bg-card p-4"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center text-sm font-medium text-purple-600 dark:text-purple-400">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-semibold text-foreground mb-2">
+                          {item.title}
+                        </h4>
+                        <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-3 max-h-32 overflow-y-auto">
+                          <pre className="whitespace-pre-wrap font-sans">{item.prompt}</pre>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 操作按钮 */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                <button
+                  onClick={handleCancelSlidesGeneration}
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                >
+                  {editorLabels.slidesConfirmCancel || '取消'}
+                </button>
+                <button
+                  onClick={handleConfirmSlidesGeneration}
+                  className="px-4 py-2 text-sm font-medium text-white bg-purple-500 hover:bg-purple-600 rounded-lg transition-colors"
+                >
+                  {editorLabels.slidesConfirmConfirm || '确认生成'}
+                </button>
               </div>
             </div>
           </div>
@@ -1426,6 +1749,30 @@ export default function WorkspaceContainer({
           generating: '正在根据大纲生成章节内容...',
           complete: '所有章节已生成完成',
           failed: '部分章节生成失败',
+          close: '关闭',
+          pending: '等待中',
+          generatingStatus: '生成中',
+          doneStatus: '已完成',
+          errorStatus: '失败',
+          progress: '{completed}/{total}',
+        }}
+      />
+
+      {/* 幻灯片生成模态框 */}
+      <SlidesGenerationModal
+        isOpen={showSlidesModal}
+        slides={slidesState}
+        currentSlideIndex={currentSlideIndex}
+        isGenerating={isGeneratingSlides}
+        isComplete={isSlidesGenerationComplete}
+        hasError={hasSlidesError}
+        onClose={handleCloseSlidesModal}
+        onToggleSlide={handleToggleSlide}
+        labels={editorLabels.slidesModalLabels || {
+          title: '生成幻灯片',
+          generating: '正在根据大纲生成幻灯片...',
+          complete: '所有幻灯片已生成完成',
+          failed: '部分幻灯片生成失败',
           close: '关闭',
           pending: '等待中',
           generatingStatus: '生成中',

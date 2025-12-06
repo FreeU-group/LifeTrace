@@ -101,3 +101,7 @@ llm:
     qwen-turbo:
       input_price: 0.0003
       output_price: 0.0006
+
+# Gemini API配置（用于生成幻灯片等功能）
+gemini:
+  api_key: YOUR_GEMINI_API_KEY_HERE  # Gemini API 密钥，需要用户配置

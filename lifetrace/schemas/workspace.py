@@ -291,3 +291,20 @@ class GenerateSlidesResponse(BaseModel):
     total_slides: int
     generated_slides: list[GeneratedSlideInfo] = []
     error: str | None = None
+
+
+class SlidePromptPreview(BaseModel):
+    """幻灯片 Prompt 预览信息"""
+
+    title: str  # 章节标题
+    index: int  # 索引
+    prompt: str  # Prompt 内容
+
+
+class PreviewSlidesPromptsResponse(BaseModel):
+    """预览幻灯片 Prompts 响应"""
+
+    success: bool
+    prompts: list[SlidePromptPreview] = []
+    total: int = 0
+    error: str | None = None
